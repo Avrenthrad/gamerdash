@@ -1,10 +1,10 @@
-// Vercel serverless function — merges four separate pricing-related
-// proxies (xbxprices.js, platprices.js, cheapshark.js, currency.js)
-// into one file, purely to stay under Vercel's Hobby plan's
-// 12-serverless-function limit. No behavior changed for any of the
-// four — each keeps its own exact logic, just dispatched by
-// ?service= instead of being four separate files. Same consolidation
-// reasoning as the bungie.js merge.
+// Vercel serverless function — merges several pricing-related proxies
+// (xbxprices.js, platprices.js, cheapshark.js, currency.js, plus MTG
+// pricing: cardkingdom, tcgaggregator) into one file, purely to stay
+// under Vercel's Hobby plan's 12-serverless-function limit. No
+// behavior changed for the original four — each keeps its own exact
+// logic, just dispatched by ?service= instead of being separate
+// files. Same consolidation reasoning as the bungie.js merge.
 //
 // Usage from the frontend:
 //   fetch("/api/pricing?service=xbxprices&endpoint=search&q=...&region=au")
@@ -12,6 +12,8 @@
 //   fetch("/api/pricing?service=platprices&name=...")
 //   fetch("/api/pricing?service=cheapshark&endpoint=games&title=...")
 //   fetch("/api/pricing?service=currency")
+//   fetch("/api/pricing?service=cardkingdom&scryfallIds=id1,id2,...")
+//   fetch("/api/pricing?service=tcgaggregator&...")
 
 const XBXPRICES_BASE = "https://xbxprices.com/api/v2";
 const CHEAPSHARK_ALLOWED_ENDPOINTS = ["games", "deals", "stores"];
@@ -100,6 +102,90 @@ async function handleCheapshark(searchParams, res) {
   }
 }
 
+// ---------- Card Kingdom (real public MTG singles pricelist, no key needed) ----------
+// Verified live: https://api.cardkingdom.com/api/pricelist returns a
+// real, public, ~45MB JSON pricelist covering Card Kingdom's actual
+// MTG singles inventory, each entry carrying a real scryfall_id — no
+// fuzzy name matching needed. Confirmed real field names by fetching
+// it directly, not guessed. This does NOT include sealed product —
+// checked the data for booster/box entries and found none; sealed
+// pricing isn't available through this feed, so this project doesn't
+// claim it.
+//
+// The file is too large to fetch+parse on every single card lookup,
+// so it's cached in this function's own memory (persists across warm
+// invocations on Vercel, not across cold starts) for 12h — retail
+// prices don't move meaningfully faster than that, and this is a
+// shared cache serving every user's lookups, not per-user.
+const CARD_KINGDOM_URL = "https://api.cardkingdom.com/api/pricelist";
+const CARD_KINGDOM_TTL_MS = 12 * 60 * 60 * 1000;
+let ckCache = null; // { byScryfallId: Map<string, Array<entry>>, fetchedAt: number, asOf: string }
+
+async function loadCardKingdomIndex() {
+  if (ckCache && Date.now() - ckCache.fetchedAt < CARD_KINGDOM_TTL_MS) return ckCache;
+
+  const ckRes = await fetch(CARD_KINGDOM_URL, { headers: { "User-Agent": "Lykodex/1.0 (+https://gamerdash.vercel.app)" } });
+  if (!ckRes.ok) throw new Error(`Card Kingdom pricelist request failed (${ckRes.status})`);
+  const json = await ckRes.json();
+
+  const byScryfallId = new Map();
+  for (const entry of json.data || []) {
+    if (!entry.scryfall_id) continue;
+    const trimmed = {
+      name: entry.name,
+      variation: entry.variation,
+      edition: entry.edition,
+      isFoil: entry.is_foil === "true",
+      priceRetail: entry.price_retail !== null && entry.price_retail !== "" ? Number(entry.price_retail) : null,
+      qtyRetail: entry.qty_retail,
+      url: entry.url ? `https://www.cardkingdom.com/${entry.url}` : null,
+    };
+    const list = byScryfallId.get(entry.scryfall_id) || [];
+    list.push(trimmed);
+    byScryfallId.set(entry.scryfall_id, list);
+  }
+
+  ckCache = { byScryfallId, fetchedAt: Date.now(), asOf: json.meta?.created_at || null };
+  return ckCache;
+}
+
+async function handleCardKingdom(searchParams, res) {
+  const idsParam = searchParams.get("scryfallIds");
+  if (!idsParam) return res.status(400).json({ error: "Missing scryfallIds query parameter" });
+  const ids = idsParam.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 75);
+
+  try {
+    const index = await loadCardKingdomIndex();
+    const results = {};
+    for (const id of ids) {
+      const entries = index.byScryfallId.get(id);
+      if (entries) results[id] = entries;
+    }
+    return res.status(200).json({ asOf: index.asOf, results });
+  } catch (err) {
+    console.error("pricing (cardkingdom): fetch threw", err);
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+// ---------- Multi-game TCG aggregator (Pokemon/Yu-Gi-Oh/One Piece/Riftbound) ----------
+// No specific real provider has been named or verified for this yet.
+// This project's own hard rule is to never guess an API's real
+// endpoint/field names (learned from a real Fortnite pricing bug
+// earlier in this project) — so rather than wire a fabricated
+// integration against a made-up shape, this stays an honest
+// "not configured" response even once TCGAPI_KEY is set, until a real
+// provider is named and its docs are actually verified against a live
+// response the way cardkingdom above was.
+async function handleTcgAggregator(res) {
+  const apiKey = process.env.TCGAPI_KEY;
+  if (!apiKey) return res.status(200).json({ error: "no_key" });
+  return res.status(200).json({
+    error: "not_configured",
+    message: "TCGAPI_KEY is set, but no real multi-game pricing provider is wired yet — see handleTcgAggregator in api/pricing.js.",
+  });
+}
+
 async function handleCurrency(res) {
   try {
     const url = "https://api.frankfurter.app/latest?from=USD&to=AUD,CAD,NZD,GBP,EUR";
@@ -125,6 +211,8 @@ export default async function handler(req, res) {
   if (service === "platprices") return handlePlatprices(searchParams, res);
   if (service === "cheapshark") return handleCheapshark(searchParams, res);
   if (service === "currency") return handleCurrency(res);
+  if (service === "cardkingdom") return handleCardKingdom(searchParams, res);
+  if (service === "tcgaggregator") return handleTcgAggregator(res);
 
   return res.status(400).json({ error: "Missing or invalid service parameter" });
 }

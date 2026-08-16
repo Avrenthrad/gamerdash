@@ -17,7 +17,7 @@ export async function fetchCollection(userId) {
   return data || [];
 }
 
-export async function addToCollection(userId, card, { quantity = 1, foil = false, condition = "Near Mint" } = {}) {
+export async function addToCollection(userId, card, { quantity = 1, foil = false, condition = "Near Mint", source = "manual" } = {}) {
   const { error } = await supabase.from("mtg_collection").insert({
     user_id: userId,
     scryfall_id: card.id,
@@ -26,9 +26,30 @@ export async function addToCollection(userId, card, { quantity = 1, foil = false
     quantity,
     foil,
     condition,
+    source,
   });
   if (error) throw error;
   logActivityForUser(userId, "mtg_card_added", { title: card.name });
+}
+
+// Bulk version for CSV import — one real insert per confirmed row
+// rather than a synthetic batch call, so a partial failure doesn't
+// silently drop good rows (each is caught/reported independently by
+// the caller — see CsvImportPage).
+export async function addManyToCollection(userId, rows) {
+  const { error } = await supabase.from("mtg_collection").insert(
+    rows.map((r) => ({
+      user_id: userId,
+      scryfall_id: r.card.id,
+      card_name: r.card.name,
+      set_code: r.card.setCode,
+      quantity: r.quantity,
+      foil: r.foil,
+      condition: r.condition || "Near Mint",
+      source: r.source || "csv",
+    }))
+  );
+  if (error) throw error;
 }
 
 export async function updateCollectionEntry(entryId, patch) {
@@ -202,7 +223,7 @@ export async function fetchBinderCards(binderId) {
 // One row per card per binder — re-adding the same card updates its
 // quantity instead of stacking a duplicate row (see the unique
 // (binder_id, scryfall_id) constraint in schema.sql).
-export async function setBinderCardQuantity(binderId, card, quantity, { foil = false, condition = "Near Mint" } = {}) {
+export async function setBinderCardQuantity(binderId, card, quantity, { foil = false, condition = "Near Mint", source } = {}) {
   if (quantity <= 0) {
     const { error } = await supabase
       .from("mtg_binder_cards")
@@ -224,6 +245,7 @@ export async function setBinderCardQuantity(binderId, card, quantity, { foil = f
         quantity,
         condition,
         foil,
+        ...(source ? { source } : {}),
       },
       { onConflict: "binder_id,scryfall_id" }
     )

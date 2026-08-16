@@ -12,6 +12,7 @@ import { fetchCollection } from "../lib/mtg";
 import { fetchEntertainmentEntries } from "../lib/entertainment";
 import { fetchCollectibles } from "../lib/collectibles";
 import { fetchCampaigns, fetchArmies } from "../lib/tabletop";
+import SteamPresenceCard from "./SteamPresenceCard";
 
 const NOT_BUILT_COLLEGES = [];
 
@@ -63,6 +64,8 @@ export default function OverviewPage({
         <h1 className="price-page__title">Overview</h1>
         <p className="price-page__subtitle">What's actually going on across your Colleges.</p>
       </div>
+
+      {showGaming && isLoggedIn && <SteamPresenceCard linkedSteamId={linkedSteamId} />}
 
       <div className="overview-grid">
         {showGaming && (

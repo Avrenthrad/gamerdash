@@ -79,12 +79,13 @@ export async function getCardAutocomplete(query) {
 // this matches the same caching discipline used for every other
 // pricing source in this project (Xbox, PlayStation) to protect
 // against hammering a free API unnecessarily.
-export async function getCardByName(exactName) {
-  const cacheKey = `gd-mtg-card:${exactName.toLowerCase()}`;
+export async function getCardByName(exactName, setCode) {
+  const cacheKey = `gd-mtg-card:${exactName.toLowerCase()}${setCode ? `:${setCode.toLowerCase()}` : ""}`;
   const cached = getCached(cacheKey, CACHE_TTL.ONE_DAY);
   if (cached !== undefined) return cached;
 
-  const res = await fetch(`${API_BASE}/api/scryfall?mode=named&exact=${encodeURIComponent(exactName)}`);
+  const url = `${API_BASE}/api/scryfall?mode=named&exact=${encodeURIComponent(exactName)}${setCode ? `&set=${encodeURIComponent(setCode)}` : ""}`;
+  const res = await fetch(url);
   if (!res.ok) return null;
   const data = await res.json();
   const card = normalizeCard(data);

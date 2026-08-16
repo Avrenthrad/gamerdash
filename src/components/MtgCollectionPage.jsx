@@ -10,6 +10,7 @@
 import { useEffect, useState } from "react";
 import { fetchCollection, enrichCollectionEntry, updateCollectionEntry, removeFromCollection, fetchDecks } from "../lib/mtg";
 import MtgBindersPage from "./MtgBindersPage";
+import MtgPriceHistoryModal from "./MtgPriceHistoryModal";
 
 const TABS = [
   { id: "cards", label: "Cards" },
@@ -18,7 +19,7 @@ const TABS = [
   { id: "set-lists", label: "Set lists" },
 ];
 
-export default function MtgCollectionPage({ onBack, userId, onGoToSearch, onGoToScan, onGoToDecks }) {
+export default function MtgCollectionPage({ onBack, userId, onGoToSearch, onGoToScan, onGoToDecks, onGoToImport }) {
   const [tab, setTab] = useState("cards");
 
   return (
@@ -43,7 +44,7 @@ export default function MtgCollectionPage({ onBack, userId, onGoToSearch, onGoTo
       </div>
 
       {tab === "cards" && (
-        <CardsTab userId={userId} onGoToSearch={onGoToSearch} onGoToScan={onGoToScan} />
+        <CardsTab userId={userId} onGoToSearch={onGoToSearch} onGoToScan={onGoToScan} onGoToImport={onGoToImport} />
       )}
       {tab === "decks" && <DecksTab userId={userId} onGoToDecks={onGoToDecks} />}
       {tab === "binders" && <MtgBindersPage userId={userId} kind="binder" />}
@@ -52,9 +53,10 @@ export default function MtgCollectionPage({ onBack, userId, onGoToSearch, onGoTo
   );
 }
 
-function CardsTab({ userId, onGoToSearch, onGoToScan }) {
+function CardsTab({ userId, onGoToSearch, onGoToScan, onGoToImport }) {
   const [entries, setEntries] = useState([]);
   const [status, setStatus] = useState("loading");
+  const [priceHistoryCard, setPriceHistoryCard] = useState(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -140,6 +142,9 @@ function CardsTab({ userId, onGoToSearch, onGoToScan }) {
         <button type="button" className="quickdash-reset-btn" onClick={onGoToSearch}>
           + Search &amp; add
         </button>
+        <button type="button" className="quickdash-reset-btn" onClick={onGoToImport}>
+          ⬆️ Import CSV
+        </button>
       </div>
 
       {status === "loading" && <p className="panel__status">Loading your collection…</p>}
@@ -161,8 +166,20 @@ function CardsTab({ userId, onGoToSearch, onGoToScan }) {
                 <span className="backlog-card__title">{entry.card_name}</span>
                 <div className="backlog-card__meta">
                   <span>{entry.set_code?.toUpperCase()}</span>
-                  {entry.card?.prices?.usd && !entry.foil && <span className="score-badge">${entry.card.prices.usd} each</span>}
-                  {entry.card?.prices?.usd_foil && entry.foil && <span className="score-badge score-badge--preorder">${entry.card.prices.usd_foil} each (foil)</span>}
+                  {entry.card && (entry.card.prices?.usd || entry.card.prices?.usd_foil) && (
+                    <button
+                      type="button"
+                      className="score-badge score-badge--link"
+                      onClick={() => setPriceHistoryCard(entry.card)}
+                      title="View real price + history"
+                    >
+                      {entry.foil && entry.card.prices?.usd_foil
+                        ? `$${entry.card.prices.usd_foil} (foil)`
+                        : entry.card.prices?.usd
+                        ? `$${entry.card.prices.usd}`
+                        : "View price"}
+                    </button>
+                  )}
                 </div>
                 <div className="backlog-card__actions">
                   <label className="backlog-card__hours">
@@ -190,6 +207,10 @@ function CardsTab({ userId, onGoToSearch, onGoToScan }) {
       <a href="https://scryfall.com" target="_blank" rel="noopener noreferrer" className="ps-trophy-attribution">
         Card data and pricing powered by Scryfall
       </a>
+
+      {priceHistoryCard && (
+        <MtgPriceHistoryModal card={priceHistoryCard} onClose={() => setPriceHistoryCard(null)} />
+      )}
     </>
   );
 }

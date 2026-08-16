@@ -82,6 +82,7 @@ const KNOWN_VIEWS = [
   "mtg-collection",
   "mtg-decks",
   "mtg-scan",
+  "mtg-import",
   "guilds",
   "friends",
   "overview",

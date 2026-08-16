@@ -244,6 +244,10 @@ create table public.mtg_collection (
   quantity integer default 1,
   foil boolean default false,
   condition text default 'Near Mint',
+  -- Real provenance, not decorative: 'manual' (added by hand/search/
+  -- scan) vs the real CSV source it came from ('manabox', 'collectr',
+  -- 'csv') — see lib/csvImport.js.
+  source text default 'manual',
   added_at timestamptz default now()
 );
 
@@ -733,6 +737,7 @@ create table public.mtg_binder_cards (
   -- Standard 5-point TCG grading scale (same one TCGplayer/Card
   -- Kingdom use) — matches mtg_collection.condition below.
   condition text default 'Near Mint',
+  source text default 'manual',
   added_at timestamptz default now(),
   unique (binder_id, scryfall_id)
 );
@@ -1293,3 +1298,33 @@ create policy "View rosters of public guilds, or private ones you're in"
     not public.guild_is_private(guild_id)
     or public.is_guild_member(guild_id, auth.uid())
   );
+
+-- ---------- TCG price history ----------
+-- Shared MTG price history — not personal data (it's a market price
+-- for a card, same for everyone), so this is a shared table rather
+-- than per-user: any signed-in user can read all history, and
+-- inserting a snapshot just means "record the price I observed just
+-- now" (fired when a user actually views a card's real price — see
+-- lib/tcgPricing.js), not a privileged write.
+create table public.tcg_price_snapshots (
+  id uuid default gen_random_uuid() primary key,
+  scryfall_id text not null,
+  source text not null check (source in ('scryfall', 'cardkingdom')),
+  market text,
+  price numeric not null,
+  foil boolean default false,
+  currency text default 'USD',
+  captured_at timestamptz default now()
+);
+
+alter table public.tcg_price_snapshots enable row level security;
+
+create policy "Any signed-in user can view price history"
+  on public.tcg_price_snapshots for select
+  using (auth.role() = 'authenticated');
+
+create policy "Any signed-in user can record a price observation"
+  on public.tcg_price_snapshots for insert
+  with check (auth.role() = 'authenticated');
+
+create index tcg_price_snapshots_scryfall_id_idx on public.tcg_price_snapshots (scryfall_id, captured_at desc);

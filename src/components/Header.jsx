@@ -52,7 +52,7 @@ export const GAMING_VIEWS = [
   "backlog", "upcoming-releases", "linking", "settings", "dashfeed",
 ];
 
-export const TCG_VIEWS = ["tcg-home", "mtg-search", "mtg-collection", "mtg-decks", "mtg-scan"];
+export const TCG_VIEWS = ["tcg-home", "mtg-search", "mtg-collection", "mtg-decks", "mtg-scan", "mtg-import"];
 
 function DefaultAvatarIcon() {
   return (

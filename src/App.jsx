@@ -26,6 +26,7 @@ import { AccountGatePage } from "./components/AccountGate";
 import LoadingSplash from "./components/LoadingSplash";
 import PageLoadingFallback from "./components/PageLoadingFallback";
 import CurrentRotation from "./components/CurrentRotation";
+import SteamPresenceCard from "./components/SteamPresenceCard";
 
 import { useApp } from "./hooks/useApp";
 
@@ -43,6 +44,7 @@ const MtgSearchPage = lazy(() => import("./components/MtgSearchPage"));
 const MtgCollectionPage = lazy(() => import("./components/MtgCollectionPage"));
 const MtgDeckBuilderPage = lazy(() => import("./components/MtgDeckBuilderPage"));
 const MtgScanPage = lazy(() => import("./components/MtgScanPage"));
+const CsvImportPage = lazy(() => import("./components/CsvImportPage"));
 const GuildsPage = lazy(() => import("./components/GuildsPage"));
 const FriendsPage = lazy(() => import("./components/FriendsPage"));
 const OverviewPage = lazy(() => import("./components/OverviewPage"));
@@ -424,6 +426,18 @@ export default function App() {
             />
           )}
 
+          {view === "mtg-import" && (
+            isLoggedIn ? (
+              <CsvImportPage onBack={() => goTo("mtg-collection")} userId={userId} />
+            ) : (
+              <AccountGatePage
+                title="Import Collection"
+                onSignIn={() => goTo("login", "login")}
+                onCreateAccount={() => goTo("login", "signup")}
+              />
+            )
+          )}
+
           {view === "guilds" && (
             <GuildsPage
               onBack={() => goTo("overview")}
@@ -514,6 +528,7 @@ export default function App() {
                 onGoToSearch={() => goTo("mtg-search")}
                 onGoToScan={() => goTo("mtg-scan")}
                 onGoToDecks={() => goTo("mtg-decks")}
+                onGoToImport={() => goTo("mtg-import")}
               />
             ) : (
               <AccountGatePage
@@ -555,6 +570,8 @@ export default function App() {
                 onToggleCustomize={() => setCustomizingLayout((v) => !v)}
                 onResetLayout={resetLayout}
               />
+
+              {isLoggedIn && <SteamPresenceCard linkedSteamId={linkedSteamId} />}
 
               <CurrentRotation
                 wishlist={wishlist}

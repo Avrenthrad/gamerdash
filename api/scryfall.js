@@ -58,7 +58,14 @@ export default async function handler(req, res) {
     if (mode === "named") {
       const exact = searchParams.get("exact");
       if (!exact) return res.status(400).json({ error: "Missing exact query parameter" });
-      const scryRes = await fetch(`${BASE_URL}/cards/named?exact=${encodeURIComponent(exact)}`, { headers: SCRYFALL_HEADERS });
+      // Optional `set` narrows to that specific printing — real,
+      // documented Scryfall param, verified live against
+      // api.scryfall.com/cards/named?exact=...&set=... — used by CSV
+      // import to match the exact edition a row specifies rather than
+      // just whatever printing Scryfall considers "default".
+      const set = searchParams.get("set");
+      const url = `${BASE_URL}/cards/named?exact=${encodeURIComponent(exact)}${set ? `&set=${encodeURIComponent(set)}` : ""}`;
+      const scryRes = await fetch(url, { headers: SCRYFALL_HEADERS });
       const data = await scryRes.json();
       if (!scryRes.ok) return res.status(scryRes.status).json({ error: data.details || "Card not found" });
       return res.status(200).json(data);

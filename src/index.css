@@ -2599,6 +2599,18 @@ button { font-family: inherit; }
   white-space: nowrap;
 }
 
+.score-badge--link {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.score-badge--link:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
 .score-badge--metacritic.score-badge--good {
   background: rgba(143, 195, 61, 0.15);
   color: var(--lime);
@@ -5342,4 +5354,207 @@ html[data-mode="light"] .current-rotation {
   .cmdk {
     animation: none;
   }
+}
+
+/* ---------- Steam presence card (real Now Playing / last online) ---------- */
+
+.presence-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.presence-card--playing {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 6%, transparent), transparent 70%), var(--surface);
+}
+
+.presence-card--empty {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.presence-card--empty p {
+  margin: 0;
+}
+
+.presence-card__icon {
+  font-size: 18px;
+}
+
+.presence-card__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.presence-card__dot--playing {
+  background: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent);
+  animation: presencePulse 2s ease-in-out infinite;
+}
+
+.presence-card__dot--online {
+  background: var(--lime);
+}
+
+.presence-card__dot--offline {
+  background: var(--text-tertiary);
+}
+
+.presence-card__body {
+  display: flex;
+  flex-direction: column;
+}
+
+.presence-card__title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.presence-card__meta {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+@keyframes presencePulse {
+  0%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent); }
+  50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 10%, transparent); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .presence-card__dot--playing {
+    animation: none;
+  }
+}
+
+/* ---------- TCG CSV import ---------- */
+
+.import-source-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.import-source-card {
+  position: relative;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 14px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.import-source-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+.import-source-card--selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-raised));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.import-source-card__label {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.import-source-card__note {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* ---------- MTG price history modal ---------- */
+
+.price-history-modal {
+  width: 100%;
+  max-width: 520px;
+  max-height: 80vh;
+  overflow-y: auto;
+  margin: 0 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  animation: popoverIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.price-history-modal__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.price-history-modal__thumb {
+  width: 48px;
+  height: 67px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.price-history-modal__title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.price-history-modal__meta {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin: 2px 0 0;
+}
+
+.price-history-modal__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.price-history-modal__range {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.price-badge {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.price-badge__value {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.price-badge__meta {
+  font-size: 10.5px;
+  color: var(--text-tertiary);
 }
