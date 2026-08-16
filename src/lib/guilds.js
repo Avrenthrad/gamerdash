@@ -8,6 +8,23 @@
 
 import { supabase } from "./supabaseClient";
 
+const EVENT_LABELS = {
+  achievement_unlocked: "unlocked an achievement in",
+  gd_score_milestone: "hit a new GD Score high",
+  backlog_status_change: "updated their backlog:",
+  wishlist_added: "added to their wishlist:",
+  mtg_card_added: "added a card to their MTG collection:",
+  joined_guild: "joined the guild",
+};
+
+// Shared with the header notification bell so both surfaces describe
+// the same real activity rows identically.
+export function describeActivity(entry) {
+  const label = EVENT_LABELS[entry.event_type] || entry.event_type;
+  const detail = entry.event_data?.title || entry.event_data?.name || "";
+  return `${label}${detail ? ` ${detail}` : ""}`;
+}
+
 export async function fetchGuilds() {
   const { data, error } = await supabase
     .from("guilds")
@@ -70,6 +87,31 @@ export async function fetchGuildActivity(guildId, limit = 30) {
     .from("guild_activity")
     .select("*")
     .eq("guild_id", guildId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data || [];
+}
+
+// Powers the header notification bell — real activity across every
+// Guild the user is actually a member of (their own actions plus
+// their guildmates'), never invented counts or placeholder rows.
+// Returns [] for someone in no guilds, which the bell renders as a
+// genuine empty state rather than hiding itself.
+export async function fetchRecentActivityForUser(userId, limit = 10) {
+  const { data: memberships, error: memberError } = await supabase
+    .from("guild_members")
+    .select("guild_id")
+    .eq("user_id", userId);
+  if (memberError) throw memberError;
+
+  const guildIds = (memberships || []).map((m) => m.guild_id);
+  if (guildIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("guild_activity")
+    .select("*, guilds(name)")
+    .in("guild_id", guildIds)
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;

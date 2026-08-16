@@ -4,9 +4,9 @@
 import { useEffect, useState } from "react";
 import { searchCards } from "../lib/scryfall";
 import {
-  fetchDecks, createDeck, deleteDeck,
+  fetchDecks, createDeck, deleteDeck, updateDeck,
   fetchDeckCards, addCardToDeck, updateDeckCardQuantity, removeCardFromDeck,
-  checkDeckLegality,
+  checkDeckLegality, uploadCoverImage,
 } from "../lib/mtg";
 
 const FORMATS = ["standard", "pioneer", "modern", "legacy", "vintage", "pauper", "commander", "brawl", "alchemy"];
@@ -25,6 +25,9 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
 
   const [addQuery, setAddQuery] = useState("");
   const [addResults, setAddResults] = useState([]);
+
+  const [labelsInput, setLabelsInput] = useState("");
+  const [coverStatus, setCoverStatus] = useState("idle");
 
   useEffect(() => {
     if (!userId) return;
@@ -70,16 +73,40 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
   async function openDeck(deckId) {
     setActiveDeckId(deckId);
     setDeckCardsStatus("loading");
+    const deck = decks.find((d) => d.id === deckId);
+    setLabelsInput((deck?.labels || []).join(", "));
     try {
       const cards = await fetchDeckCards(deckId);
       setDeckCards(cards);
-      const deck = decks.find((d) => d.id === deckId);
       const { illegal } = await checkDeckLegality(cards, deck?.format || "commander");
       setIllegalCards(illegal.map((i) => i.card_name));
       setDeckCardsStatus("ready");
     } catch (err) {
       console.error("Failed to load deck cards:", err);
       setDeckCardsStatus("error");
+    }
+  }
+
+  function handleLabelsBlur() {
+    if (!activeDeckId) return;
+    const labels = labelsInput.split(",").map((s) => s.trim()).filter(Boolean);
+    updateDeck(activeDeckId, { labels })
+      .then(() => setDecks((prev) => prev.map((d) => (d.id === activeDeckId ? { ...d, labels } : d))))
+      .catch((err) => console.error("Failed to save deck labels:", err));
+  }
+
+  async function handleCoverUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file || !userId || !activeDeckId) return;
+    setCoverStatus("uploading");
+    try {
+      const url = await uploadCoverImage(userId, file);
+      await updateDeck(activeDeckId, { cover_image_url: url });
+      setDecks((prev) => prev.map((d) => (d.id === activeDeckId ? { ...d, cover_image_url: url } : d)));
+      setCoverStatus("idle");
+    } catch (err) {
+      console.error("Failed to upload deck cover photo:", err);
+      setCoverStatus("error");
     }
   }
 
@@ -132,8 +159,32 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
       <div className="price-page">
         <div className="price-page__head">
           <button type="button" className="back-link" onClick={() => setActiveDeckId(null)}>← Back to Decks</button>
-          <h1 className="price-page__title">{activeDeck.name}</h1>
-          <p className="price-page__subtitle" style={{ textTransform: "capitalize" }}>{activeDeck.format} — {totalCards} cards</p>
+          <div className="binder-detail__head">
+            <div className="binder-detail__cover">
+              {activeDeck.cover_image_url ? (
+                <img src={activeDeck.cover_image_url} alt="" />
+              ) : (
+                <span className="binder-card__cover-fallback" aria-hidden="true">🛠️</span>
+              )}
+            </div>
+            <div className="binder-detail__info">
+              <h1 className="price-page__title">{activeDeck.name}</h1>
+              <p className="price-page__subtitle" style={{ textTransform: "capitalize" }}>{activeDeck.format} — {totalCards} cards</p>
+              <label className="settings-avatar__upload">
+                {coverStatus === "uploading" ? "Uploading…" : "Change cover photo"}
+                <input type="file" accept="image/*" onChange={handleCoverUpload} hidden />
+              </label>
+            </div>
+          </div>
+          <label className="auth-form__field" style={{ marginTop: "12px" }}>
+            <span>Labels</span>
+            <input
+              value={labelsInput}
+              onChange={(e) => setLabelsInput(e.target.value)}
+              onBlur={handleLabelsBlur}
+              placeholder="Comma separated…"
+            />
+          </label>
         </div>
 
         {illegalCards.length > 0 && (
@@ -233,6 +284,13 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
               <div className="backlog-card__info">
                 <span className="backlog-card__title">{deck.name}</span>
                 <span className="backlog-card__meta" style={{ textTransform: "capitalize" }}>{deck.format}</span>
+                {deck.labels?.length > 0 && (
+                  <div className="label-chip-row">
+                    {deck.labels.map((l) => (
+                      <span key={l} className="label-chip">{l}</span>
+                    ))}
+                  </div>
+                )}
               </div>
               <button type="button" className="linking-row__connect" onClick={() => openDeck(deck.id)}>Open</button>
               <button type="button" className="game-popup__close" onClick={() => handleDeleteDeck(deck.id)} aria-label="Delete deck">✕</button>

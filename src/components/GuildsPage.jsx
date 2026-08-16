@@ -7,22 +7,8 @@ import { useEffect, useState } from "react";
 import {
   fetchGuilds, createGuild, joinGuild, leaveGuild,
   fetchMyGuilds, fetchGuildMembers, fetchGuildActivity,
+  describeActivity,
 } from "../lib/guilds";
-
-const EVENT_LABELS = {
-  achievement_unlocked: "unlocked an achievement in",
-  gd_score_milestone: "hit a new GD Score high",
-  backlog_status_change: "updated their backlog:",
-  wishlist_added: "added to their wishlist:",
-  mtg_card_added: "added a card to their MTG collection:",
-  joined_guild: "joined the guild",
-};
-
-function describeActivity(entry) {
-  const label = EVENT_LABELS[entry.event_type] || entry.event_type;
-  const detail = entry.event_data?.title || entry.event_data?.name || "";
-  return `${label}${detail ? ` ${detail}` : ""}`;
-}
 
 export default function GuildsPage({ onBack, userId, isLoggedIn, onSignIn, onCreateAccount }) {
   const [allGuilds, setAllGuilds] = useState([]);

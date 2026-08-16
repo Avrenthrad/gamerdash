@@ -20,7 +20,7 @@
 // same as the rest of the app), so a dead button implying otherwise
 // was actively misleading, not just unfinished.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ReorderableList from "./ReorderableList";
 import { faviconFor, shortStoreName } from "./price/priceUtils";
 import { COLLEGES as ALL_COLLEGES } from "../data/colleges";
@@ -103,6 +103,10 @@ export default function AccountSettingsPage({
 
   const timezones = useMemo(getTimezoneList, []);
   const [avatarStatus, setAvatarStatus] = useState("idle"); // idle | uploading | error
+  const [avatarBroken, setAvatarBroken] = useState(false);
+  useEffect(() => {
+    setAvatarBroken(false);
+  }, [avatarUrl]);
 
   // Real upload to Supabase Storage — this used to just create a
   // browser-local blob: URL, which looked like it worked but was
@@ -116,8 +120,13 @@ export default function AccountSettingsPage({
 
     setAvatarStatus("uploading");
     try {
-      const ext = file.name.split(".").pop();
-      const path = `${userId}/avatar.${ext}`;
+      // file.name doesn't always have a usable extension (camera
+      // captures, pasted images) — fall back to deriving one from the
+      // MIME type rather than uploading to a garbage path.
+      const nameExt = file.name.includes(".") ? file.name.split(".").pop() : "";
+      const mimeExt = file.type?.split("/")?.[1];
+      const ext = (nameExt || mimeExt || "png").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const path = `${userId}/avatar.${ext || "png"}`;
 
       const { error: uploadError } = await supabase.storage
         .from("avatars")
@@ -146,8 +155,12 @@ export default function AccountSettingsPage({
       <section className="settings-card">
         <div className="settings-avatar-row">
           <div className="settings-avatar">
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="Profile avatar preview" />
+            {avatarUrl && !avatarBroken ? (
+              <img
+                src={avatarUrl}
+                alt="Profile avatar preview"
+                onError={() => setAvatarBroken(true)}
+              />
             ) : (
               <span className="settings-avatar__placeholder">
                 {(firstName[0] || "") + (lastName[0] || "") || "?"}
@@ -402,6 +415,13 @@ export default function AccountSettingsPage({
               <span className="college-picker-card__label">{college.label}</span>
               <span className="college-picker-card__tagline">{college.tagline}</span>
               {!college.built && <span className="college-picker-card__badge">Coming soon</span>}
+              {selectedColleges?.includes(college.id) && (
+                <span className="college-picker-card__check" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 13l4 4L19 7" />
+                  </svg>
+                </span>
+              )}
             </button>
           ))}
         </div>

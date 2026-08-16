@@ -2,7 +2,7 @@
 // Real card data throughout via Scryfall (see lib/scryfall.js).
 
 import { supabase } from "./supabaseClient";
-import { getCardById } from "./scryfall";
+import { getCardById, getSet, getSetCoverArt } from "./scryfall";
 import { logActivityForUser } from "./guilds";
 
 // ---------- Collection ----------
@@ -124,4 +124,135 @@ export async function checkDeckLegality(deckCards, format) {
   );
   const illegal = enriched.filter((dc) => dc.card && dc.card.legalities[format] !== "legal");
   return { illegal, enriched };
+}
+
+// ---------- Binders & Set Lists ----------
+// Same table (mtg_binders), split by kind: a plain "binder" is just a
+// user-named group of cards; a "set_list" is additionally pinned to
+// one real Scryfall set and doubles as that set's owned-quantity
+// checklist. See supabase/schema.sql for the RLS/ownership pattern.
+
+export async function fetchBinders(userId, kind) {
+  let query = supabase.from("mtg_binders").select("*").eq("user_id", userId);
+  if (kind) query = query.eq("kind", kind);
+  const { data, error } = await query.order("updated_at", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createBinder(userId, { name, labels = [], coverImageUrl = null, notes = null }) {
+  const { data, error } = await supabase
+    .from("mtg_binders")
+    .insert({ user_id: userId, name, labels, cover_image_url: coverImageUrl, notes, kind: "binder" })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+// Looks up the real set on Scryfall, then creates a binder pinned to
+// it with a genuine default cover (a real card's art from that set)
+// and the set's own icon — never invented metadata.
+export async function createSetList(userId, setCode) {
+  const set = await getSet(setCode);
+  if (!set) throw new Error(`Unknown Scryfall set code: ${setCode}`);
+
+  const coverArt = await getSetCoverArt(setCode).catch(() => null);
+
+  const { data, error } = await supabase
+    .from("mtg_binders")
+    .insert({
+      user_id: userId,
+      name: set.name,
+      kind: "set_list",
+      set_code: set.code,
+      set_name: set.name,
+      scryfall_set_icon_url: set.iconSvgUri,
+      cover_image_url: coverArt,
+      labels: [],
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateBinder(binderId, patch) {
+  const { error } = await supabase
+    .from("mtg_binders")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", binderId);
+  if (error) throw error;
+}
+
+export async function deleteBinder(binderId) {
+  const { error } = await supabase.from("mtg_binders").delete().eq("id", binderId);
+  if (error) throw error;
+}
+
+export async function fetchBinderCards(binderId) {
+  const { data, error } = await supabase
+    .from("mtg_binder_cards")
+    .select("*")
+    .eq("binder_id", binderId);
+  if (error) throw error;
+  return data || [];
+}
+
+// One row per card per binder — re-adding the same card updates its
+// quantity instead of stacking a duplicate row (see the unique
+// (binder_id, scryfall_id) constraint in schema.sql).
+export async function setBinderCardQuantity(binderId, card, quantity, { foil = false } = {}) {
+  if (quantity <= 0) {
+    const { error } = await supabase
+      .from("mtg_binder_cards")
+      .delete()
+      .eq("binder_id", binderId)
+      .eq("scryfall_id", card.id);
+    if (error) throw error;
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("mtg_binder_cards")
+    .upsert(
+      {
+        binder_id: binderId,
+        scryfall_id: card.id,
+        card_name: card.name,
+        set_code: card.setCode,
+        quantity,
+        foil,
+      },
+      { onConflict: "binder_id,scryfall_id" }
+    )
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function removeBinderCard(binderCardId) {
+  const { error } = await supabase.from("mtg_binder_cards").delete().eq("id", binderCardId);
+  if (error) throw error;
+}
+
+// Shared cover-photo upload for binders, set lists, and decks — same
+// real Supabase Storage pattern as avatar upload (see
+// AccountSettingsPage), just against the "mtg-covers" bucket instead.
+// Unlike the avatar (one fixed filename per user), each cover needs
+// its own permanent path since one person can have many binders/decks.
+export async function uploadCoverImage(userId, file) {
+  const nameExt = file.name.includes(".") ? file.name.split(".").pop() : "";
+  const mimeExt = file.type?.split("/")?.[1];
+  const ext = (nameExt || mimeExt || "png").toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
+  const path = `${userId}/${Date.now()}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("mtg-covers")
+    .upload(path, file, { contentType: file.type });
+  if (uploadError) throw uploadError;
+
+  const { data } = supabase.storage.from("mtg-covers").getPublicUrl(path);
+  return `${data.publicUrl}?t=${Date.now()}`;
 }

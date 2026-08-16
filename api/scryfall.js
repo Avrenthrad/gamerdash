@@ -18,6 +18,7 @@
 //   fetch("/api/scryfall?mode=named&exact=...")
 //   fetch("/api/scryfall?mode=autocomplete&q=...")
 //   fetch("/api/scryfall?mode=card&id=...")
+//   fetch("/api/scryfall?mode=set&code=...")
 
 const BASE_URL = "https://api.scryfall.com";
 
@@ -30,7 +31,13 @@ export default async function handler(req, res) {
       const q = searchParams.get("q");
       if (!q) return res.status(400).json({ error: "Missing q query parameter" });
       const page = searchParams.get("page") || "1";
-      const scryRes = await fetch(`${BASE_URL}/cards/search?q=${encodeURIComponent(q)}&page=${page}`);
+      // "cards" (default) collapses functionally-identical reprints;
+      // "prints" returns every real printing — needed for a set's
+      // full checklist (alternate arts/borderless are distinct cards
+      // even within one set). Both are genuine Scryfall `unique`
+      // values, not invented.
+      const unique = searchParams.get("unique") === "prints" ? "prints" : "cards";
+      const scryRes = await fetch(`${BASE_URL}/cards/search?q=${encodeURIComponent(q)}&page=${page}&unique=${unique}`);
       const data = await scryRes.json();
       // Scryfall returns a real 404 with a JSON error body when a
       // search has zero matches — not a failure on our end, just an
@@ -63,6 +70,28 @@ export default async function handler(req, res) {
       const scryRes = await fetch(`${BASE_URL}/cards/${id}`);
       const data = await scryRes.json();
       if (!scryRes.ok) return res.status(scryRes.status).json({ error: data.details || "Card not found" });
+      return res.status(200).json(data);
+    }
+
+    // Every real Scryfall set (paper + digital-only) — powers the "pick
+    // a set" search when starting a new set list. One request, cached
+    // client-side, rather than hammering a per-keystroke search.
+    if (mode === "sets") {
+      const scryRes = await fetch(`${BASE_URL}/sets`);
+      const data = await scryRes.json();
+      if (!scryRes.ok) return res.status(scryRes.status).json({ error: data.details || "Failed to list sets" });
+      return res.status(200).json(data);
+    }
+
+    // Set metadata for TCG binders' "set list" kind — real Set object
+    // (name, card_count, released_at, icon_svg_uri, etc.), field names
+    // verified live against https://api.scryfall.com/sets/<code>.
+    if (mode === "set") {
+      const code = searchParams.get("code");
+      if (!code) return res.status(400).json({ error: "Missing code query parameter" });
+      const scryRes = await fetch(`${BASE_URL}/sets/${encodeURIComponent(code)}`);
+      const data = await scryRes.json();
+      if (!scryRes.ok) return res.status(scryRes.status).json({ error: data.details || "Set not found" });
       return res.status(200).json(data);
     }
 

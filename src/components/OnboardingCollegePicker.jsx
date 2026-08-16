@@ -35,6 +35,13 @@ export default function OnboardingCollegePicker({ selected, onChange, onContinue
             <span className="college-picker-card__label">{college.label}</span>
             <span className="college-picker-card__tagline">{college.tagline}</span>
             {!college.built && <span className="college-picker-card__badge">Coming soon</span>}
+            {selected.includes(college.id) && (
+              <span className="college-picker-card__check" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 13l4 4L19 7" />
+                </svg>
+              </span>
+            )}
           </button>
         ))}
       </div>

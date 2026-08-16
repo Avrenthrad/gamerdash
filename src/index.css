@@ -34,6 +34,19 @@
   --font-display: 'Space Grotesk', sans-serif;
   --font-body: 'Inter', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+
+  /* ---------- Semantic design tokens ----------
+     Aliases over the tokens above so the rest of the stylesheet (and
+     any new component CSS) can reason in "bg-base / surface / text
+     hierarchy / accent" terms without a risky mass rename of ~4,600
+     lines of existing, working CSS. accent is red-for-interactive-only
+     — never used for description/body copy. */
+  --bg-base: var(--bg);
+  --text-primary: var(--text);
+  --text-secondary: var(--text-muted);
+  --text-tertiary: color-mix(in srgb, var(--text-muted) 65%, transparent);
+  --accent: var(--red);
+  --accent-deep: var(--red-deep);
 }
 
 /* ---------- Theme engine ----------
@@ -1453,6 +1466,141 @@ button { font-family: inherit; }
 .dash-header__gear:hover {
   color: var(--text);
   border-color: var(--red);
+}
+
+/* Search + notifications icon buttons — same 36px footprint/shape as
+   the gear so the right-side icon row reads as one consistent group. */
+.dash-header__icon-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.dash-header__icon-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.dash-header__icon-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+}
+
+.dash-header__search-popover {
+  min-width: 280px;
+  padding: 10px;
+}
+
+.dash-header__search-input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.dash-header__search-input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.dash-header__search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.dash-header__search-empty {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  padding: 10px 4px 2px;
+  margin: 0;
+}
+
+.dash-header__notifications-popover {
+  min-width: 300px;
+  padding: 10px;
+}
+
+.dash-header__notifications-title {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  padding: 2px 6px 8px;
+}
+
+.dash-header__notification-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 6px;
+  border-radius: 8px;
+}
+
+.dash-header__notification-row:hover {
+  background: var(--surface);
+}
+
+.dash-header__notification-text {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.dash-header__notification-meta {
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+}
+
+.dash-header__empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 18px 10px 10px;
+}
+
+.dash-header__empty-state-icon {
+  color: var(--text-tertiary);
+  opacity: 0.7;
+}
+
+.dash-header__empty-state p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.dash-header__empty-state-cta {
+  width: auto;
+  align-self: center;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  margin-top: 2px;
 }
 
 /* Small popover — used for the Login button's Sign in / New account choice */
@@ -4270,6 +4418,13 @@ button { font-family: inherit; }
   text-align: left;
 }
 
+.empty-state__icon {
+  display: block;
+  font-size: 28px;
+  margin-bottom: 10px;
+  opacity: 0.85;
+}
+
 .empty-state__title {
   margin: 0 0 8px;
   font-family: var(--font-display);
@@ -4415,18 +4570,34 @@ html[data-mode="light"] .current-rotation {
 }
 
 .college-picker-card--selected {
-  border-color: var(--red);
-  background: color-mix(in srgb, var(--red) 8%, var(--surface-raised));
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-raised));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.college-picker-card__check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  animation: popoverIn 0.18s ease-out;
 }
 
 .college-picker-card__label {
   font-weight: 600;
   font-size: 14px;
+  color: var(--text-primary);
 }
 
 .college-picker-card__tagline {
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   line-height: 1.4;
 }
 
@@ -4622,5 +4793,259 @@ html[data-mode="light"] .current-rotation {
   }
   .gaming-sidebar__label {
     display: none;
+  }
+}
+
+/* ---------- TCG: Binders / Set Lists / label chips ---------- */
+
+.label-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.label-chip {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.binder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.binder-card {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+
+.binder-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+.binder-card__open,
+.binder-card.binder-card--plain {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font-family: inherit;
+}
+
+.binder-card--plain {
+  padding-bottom: 12px;
+}
+
+.binder-card__cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 5 / 4;
+  background: var(--surface-raised);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.binder-card__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.binder-card__cover-fallback {
+  font-size: 30px;
+  opacity: 0.6;
+}
+
+.binder-card__set-icon {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+
+.binder-card__name {
+  display: block;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--text-primary);
+  padding: 10px 12px 2px;
+}
+
+.binder-card__meta {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  padding: 0 12px;
+  text-transform: capitalize;
+}
+
+.binder-card .label-chip-row {
+  padding: 6px 12px 12px;
+}
+
+.binder-card__delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: color-mix(in srgb, var(--bg-base) 70%, transparent);
+  border-radius: 50%;
+}
+
+.binder-detail__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.binder-detail__cover {
+  width: 96px;
+  height: 96px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  display: grid;
+  place-items: center;
+}
+
+.binder-detail__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.binder-detail__info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.binder-detail__set-icon {
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.backlog-card--owned {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+}
+
+/* ---------- Game Mastery Score ---------- */
+
+.mastery-xp-bar {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.mastery-xp-bar__fill {
+  height: 100%;
+  background: var(--grad-red);
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+
+.mastery-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.mastery-breakdown__row {
+  display: grid;
+  grid-template-columns: 110px 90px 1fr;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.mastery-breakdown__platform {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.mastery-breakdown__score {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.mastery-breakdown__meta {
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+}
+
+.mastery-ps-grid {
+  display: grid;
+  grid-template-columns: 150px repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 10px;
+  align-items: center;
+}
+
+.mastery-ps-grid__row {
+  display: contents;
+}
+
+.mastery-ps-grid__row > span {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.mastery-ps-grid__row--head > span {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+  font-weight: 600;
+}
+
+.mastery-ps-grid__row input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 6px;
+  color: var(--text-primary);
+  font-size: 12.5px;
+}
+
+@media (max-width: 640px) {
+  .mastery-ps-grid {
+    grid-template-columns: 90px repeat(4, 1fr);
   }
 }

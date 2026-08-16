@@ -42,6 +42,7 @@ import { setPersonalXbxPricesKey } from "../lib/xbxprices";
 import { setPersonalPlatPricesKey } from "../lib/platprices";
 import { computeGdScore } from "../lib/gdScore";
 import { logActivityForUser } from "../lib/guilds";
+import { recomputeMastery as recomputeMasteryData } from "../lib/gameMasteryData";
 
 // ---------- constants (same as before) ----------
 
@@ -161,6 +162,18 @@ export function AppProvider({ children }) {
   const [username, setUsername] = useState("");
   const [gdScore, setGdScore] = useState(0);
   const [linkedSteamId, setLinkedSteamId] = useState(null);
+
+  // ----- Game Mastery Score (real Steam + self-reported Xbox/PS) -----
+  // Cached on the profile, same pattern as gd_score — recomputed via
+  // recomputeMastery() below right after a "new snapshot" event (Steam
+  // link/unlink, or saving Xbox/PS self-reported numbers), not on
+  // every render. See lib/gameMasteryData.js.
+  const [masteryScore, setMasteryScore] = useState(0);
+  const [masteryXp, setMasteryXp] = useState(0);
+  const [masteryLevel, setMasteryLevel] = useState(0);
+  const [masteryBreakdown, setMasteryBreakdown] = useState([]);
+  const [masteryComputedAt, setMasteryComputedAt] = useState(null);
+
   const [themeMode, setThemeMode] = useState("dark");
   const [accentColor, setAccentColor] = useState("red");
   const [currency, setCurrency] = useState("AUD");
@@ -354,6 +367,11 @@ export function AppProvider({ children }) {
       setGdScore(0);
       setWishlist([]);
       setLinkedSteamId(null);
+      setMasteryScore(0);
+      setMasteryXp(0);
+      setMasteryLevel(0);
+      setMasteryBreakdown([]);
+      setMasteryComputedAt(null);
       setThemeMode("dark");
       setAccentColor("red");
       setCurrency("AUD");
@@ -369,12 +387,24 @@ export function AppProvider({ children }) {
     Promise.all([fetchProfile(userId), fetchWishlist(userId)])
       .then(([profile, wishlistRows]) => {
         if (cancelled) return;
-        setAvatarUrl(profile.avatar_url);
+        // Fall back to the OAuth provider's own avatar (Google/Discord
+        // expose this in user_metadata) when nothing has been uploaded
+        // to our own storage yet — better than showing the default
+        // icon for someone who signed in with a provider that already
+        // has a photo.
+        setAvatarUrl(
+          profile.avatar_url || session?.user?.user_metadata?.avatar_url || null
+        );
         setFirstName(profile.first_name || "");
         setLastName(profile.last_name || "");
         setUsername(profile.username || "");
         setGdScore(profile.gd_score || 0);
         setLinkedSteamId(profile.linked_steam_id || null);
+        setMasteryScore(profile.mastery_score || 0);
+        setMasteryXp(profile.mastery_xp || 0);
+        setMasteryLevel(profile.mastery_level || 0);
+        setMasteryBreakdown(profile.mastery_breakdown || []);
+        setMasteryComputedAt(profile.mastery_computed_at || null);
         setThemeMode(profile.theme_mode || "dark");
         setAccentColor(profile.accent_color || "red");
         setCurrency(profile.currency || "AUD");
@@ -406,6 +436,10 @@ export function AppProvider({ children }) {
     return () => {
       cancelled = true;
     };
+    // session is intentionally read but not a dep: it changes in the
+    // same render as userId (userId is derived from it), so this only
+    // needs to re-run on userId transitions, not every session update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
   // ---------- effects: debounced profile write-back ----------
@@ -578,6 +612,31 @@ export function AppProvider({ children }) {
     setDashboardLayout(DEFAULT_DASHBOARD_LAYOUT);
   }, []);
 
+  // Recomputes the Mastery Score from whatever real data is actually
+  // available right now (self-reported Xbox/PS inputs + live Steam
+  // data if linked) and persists it. Called explicitly after a "new
+  // snapshot" event — Steam link/unlink, saving Xbox Gamerscore, or
+  // saving PS trophy counts — not on every render.
+  //
+  // Accepts an optional steamId override: right after linking/
+  // unlinking Steam, the caller passes the new value directly rather
+  // than relying on the linkedSteamId this closure captured, since
+  // setLinkedSteamId's update isn't visible here yet in the same tick.
+  const recomputeMastery = useCallback(async (steamIdOverride) => {
+    if (!supabaseConfigured || !userId) return;
+    try {
+      const steamId = steamIdOverride !== undefined ? steamIdOverride : linkedSteamId;
+      const result = await recomputeMasteryData(userId, steamId);
+      setMasteryScore(result.masteryScore);
+      setMasteryXp(result.accountXp);
+      setMasteryLevel(result.accountLevel);
+      setMasteryBreakdown(result.breakdown);
+      setMasteryComputedAt(result.computedAt);
+    } catch (err) {
+      console.error("Failed to recompute Game Mastery:", err);
+    }
+  }, [userId, linkedSteamId]);
+
   // ---------- value (memoized so consumers don't re-render for nothing) ----------
   const value = useMemo(
     () => ({
@@ -608,6 +667,12 @@ export function AppProvider({ children }) {
       gdScore,
       linkedSteamId,
       setLinkedSteamId,
+      masteryScore,
+      masteryXp,
+      masteryLevel,
+      masteryBreakdown,
+      masteryComputedAt,
+      recomputeMastery,
       themeMode,
       setThemeMode,
       accentColor,
@@ -672,6 +737,12 @@ export function AppProvider({ children }) {
       username,
       gdScore,
       linkedSteamId,
+      masteryScore,
+      masteryXp,
+      masteryLevel,
+      masteryBreakdown,
+      masteryComputedAt,
+      recomputeMastery,
       themeMode,
       accentColor,
       currency,

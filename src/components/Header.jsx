@@ -11,18 +11,48 @@
 // The GD Score is a placeholder for Stage 1 — it gets calculated for
 // real in Stage 9 (the achievement scoring algorithm).
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import LykodexLogo from "./LykodexLogo";
+import { fetchRecentActivityForUser, describeActivity } from "../lib/guilds";
+import { relativeTime } from "./price/priceUtils";
 
 // Top-level College tabs. Order matters — this is the fixed display
 // order regardless of which ones a person actually selected during
 // onboarding (filtering happens where this is rendered, not here).
+// Overview always leads — it's not a College, but it's the one place
+// that summarizes across all of them, so it belongs in the same row.
 const COLLEGES = [
+  { id: "overview", label: "Overview", view: "overview", alwaysShown: true },
   { id: "gaming", label: "Gaming", view: "dashboard" },
   { id: "tcg", label: "TCG", view: "tcg-home" },
   { id: "entertainment", label: "Entertainment", view: "college-entertainment" },
   { id: "collectibles", label: "Collectibles", view: "college-collectibles" },
   { id: "tabletop", label: "Tabletop", view: "college-tabletop" },
+];
+
+// Quick-jump search index — every real, already-built destination in
+// the app. This is genuine navigation, not a stubbed-out search box:
+// typing filters this list and Enter/click jumps straight there. No
+// invented "results" — just the app's own real pages.
+const NAV_INDEX = [
+  { label: "Overview", view: "overview", keywords: "home summary" },
+  { label: "Gaming Dashboard", view: "dashboard", keywords: "gaming home" },
+  { label: "Library", view: "library", keywords: "gaming games owned" },
+  { label: "Prices & Wishlist", view: "prices", keywords: "gaming deals" },
+  { label: "Backlog", view: "backlog", keywords: "gaming games" },
+  { label: "Upcoming Releases", view: "upcoming-releases", keywords: "gaming calendar" },
+  { label: "TCG Home", view: "tcg-home", keywords: "mtg magic cards" },
+  { label: "MTG Search", view: "mtg-search", keywords: "tcg magic cards scryfall" },
+  { label: "MTG Collection", view: "mtg-collection", keywords: "tcg magic cards" },
+  { label: "MTG Deck Builder", view: "mtg-decks", keywords: "tcg magic decks" },
+  { label: "MTG Card Scanner", view: "mtg-scan", keywords: "tcg magic ocr" },
+  { label: "Entertainment", view: "college-entertainment", keywords: "movies tv anime books" },
+  { label: "Collectibles", view: "college-collectibles", keywords: "shelf funko lego statues" },
+  { label: "Tabletop", view: "college-tabletop", keywords: "rpg dnd wargames dice" },
+  { label: "Guilds", view: "guilds", keywords: "social friends activity" },
+  { label: "Account Settings", view: "settings", keywords: "profile avatar theme" },
+  { label: "Account Linking", view: "linking", keywords: "steam link connect" },
+  { label: "Dashfeed Settings", view: "dashfeed", keywords: "toggles layout" },
 ];
 
 // Gaming's own sub-pages — shown as a left sidebar only while inside
@@ -64,6 +94,24 @@ function CloseIcon() {
   );
 }
 
+function SearchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4.3-4.3" />
+    </svg>
+  );
+}
+
+function BellIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  );
+}
+
 export default function Header({
   onNavigateView,
   onNavigateHome,
@@ -75,19 +123,84 @@ export default function Header({
   onToggleMode,
   currentView,
   selectedColleges = ["gaming"],
+  userId,
 }) {
   // "settings" | "login" | "avatar" | null — only one open at a time.
   // "logo" (the old Dashboards drawer trigger) is gone — the logo now
   // just navigates straight to Overview, and the College tabs replace
   // what that drawer used to list.
   const [openMenu, setOpenMenu] = useState(null);
+  // Tracks a broken/failed avatar image load so we fall back to the
+  // default icon instead of showing a broken-image glyph. Reset
+  // whenever the URL itself changes (new upload, re-hydrate) so a
+  // fresh URL always gets a real chance to load.
+  const [avatarBroken, setAvatarBroken] = useState(false);
+  useEffect(() => {
+    setAvatarBroken(false);
+  }, [avatarUrl]);
+
+  // ----- quick-jump search -----
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return NAV_INDEX.filter(
+      (item) => item.label.toLowerCase().includes(q) || item.keywords.includes(q)
+    ).slice(0, 8);
+  }, [searchQuery]);
+
+  // ----- notifications bell (real Guild activity, never fabricated) -----
+  const [activity, setActivity] = useState([]);
+  const [activityStatus, setActivityStatus] = useState("idle"); // idle | loading | ready | error
+  const lastSeenRef = useRef(
+    typeof window !== "undefined" ? localStorage.getItem("gd-activity-last-seen") : null
+  );
+
+  const notificationsOpen = openMenu === "notifications";
+  useEffect(() => {
+    if (!isLoggedIn || !userId) {
+      setActivity([]);
+      setActivityStatus("idle");
+      return;
+    }
+    let cancelled = false;
+    setActivityStatus("loading");
+    fetchRecentActivityForUser(userId, 8)
+      .then((rows) => {
+        if (cancelled) return;
+        setActivity(rows);
+        setActivityStatus("ready");
+      })
+      .catch((err) => {
+        console.error("Failed to load activity for notifications bell:", err);
+        if (!cancelled) setActivityStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, userId, notificationsOpen]);
+
+  const hasUnseenActivity =
+    activity.length > 0 &&
+    (!lastSeenRef.current || new Date(activity[0].created_at) > new Date(lastSeenRef.current));
 
   function toggleMenu(name) {
-    setOpenMenu(openMenu === name ? null : name);
+    const next = openMenu === name ? null : name;
+    setOpenMenu(next);
+    if (name === "notifications" && next === "notifications" && activity[0]) {
+      lastSeenRef.current = activity[0].created_at;
+      try {
+        localStorage.setItem("gd-activity-last-seen", activity[0].created_at);
+      } catch {
+        /* ignore */
+      }
+    }
+    if (name === "search" && next !== "search") setSearchQuery("");
   }
 
   function closeMenu() {
     setOpenMenu(null);
+    setSearchQuery("");
   }
 
   function handleAccountClick(viewId, mode) {
@@ -95,19 +208,27 @@ export default function Header({
     onNavigateView(viewId, mode);
   }
 
+  function handleSearchSelect(view) {
+    closeMenu();
+    onNavigateView(view);
+  }
+
   const showBackdrop = openMenu === "settings";
 
-  const activeCollegeId = GAMING_VIEWS.includes(currentView)
-    ? "gaming"
-    : TCG_VIEWS.includes(currentView)
-    ? "tcg"
-    : currentView === "college-entertainment"
-    ? "entertainment"
-    : currentView === "college-collectibles"
-    ? "collectibles"
-    : currentView === "college-tabletop"
-    ? "tabletop"
-    : null;
+  const activeCollegeId =
+    currentView === "overview"
+      ? "overview"
+      : GAMING_VIEWS.includes(currentView)
+      ? "gaming"
+      : TCG_VIEWS.includes(currentView)
+      ? "tcg"
+      : currentView === "college-entertainment"
+      ? "entertainment"
+      : currentView === "college-collectibles"
+      ? "collectibles"
+      : currentView === "college-tabletop"
+      ? "tabletop"
+      : null;
 
   return (
     <>
@@ -153,6 +274,103 @@ export default function Header({
         </div>
 
         <div className="dash-header__right">
+          <div className="dash-header__menu-wrap">
+            <button
+              type="button"
+              className="dash-header__icon-btn"
+              onClick={() => toggleMenu("search")}
+              aria-expanded={openMenu === "search"}
+              aria-label="Search Lykodex"
+            >
+              <SearchIcon />
+            </button>
+
+            {openMenu === "search" && (
+              <div className="dash-header__popover dash-header__popover--right dash-header__search-popover">
+                <input
+                  type="text"
+                  autoFocus
+                  className="dash-header__search-input"
+                  placeholder="Jump to a page…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && searchResults[0]) handleSearchSelect(searchResults[0].view);
+                    if (e.key === "Escape") closeMenu();
+                  }}
+                />
+                {searchQuery.trim() && (
+                  <div className="dash-header__search-results">
+                    {searchResults.length > 0 ? (
+                      searchResults.map((item) => (
+                        <button
+                          key={item.view}
+                          type="button"
+                          className="dash-header__popover-item"
+                          onClick={() => handleSearchSelect(item.view)}
+                        >
+                          {item.label}
+                        </button>
+                      ))
+                    ) : (
+                      <p className="dash-header__search-empty">No pages match "{searchQuery}".</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {isLoggedIn && (
+            <div className="dash-header__menu-wrap">
+              <button
+                type="button"
+                className="dash-header__icon-btn"
+                onClick={() => toggleMenu("notifications")}
+                aria-expanded={openMenu === "notifications"}
+                aria-label="Notifications"
+              >
+                <BellIcon />
+                {hasUnseenActivity && <span className="dash-header__icon-dot" aria-hidden="true" />}
+              </button>
+
+              {openMenu === "notifications" && (
+                <div className="dash-header__popover dash-header__popover--right dash-header__notifications-popover">
+                  <span className="dash-header__notifications-title">Guild activity</span>
+                  {activityStatus === "loading" ? (
+                    <p className="dash-header__search-empty">Loading…</p>
+                  ) : activity.length > 0 ? (
+                    activity.map((entry) => (
+                      <div key={entry.id} className="dash-header__notification-row">
+                        <span className="dash-header__notification-text">
+                          {describeActivity(entry)}
+                        </span>
+                        <span className="dash-header__notification-meta">
+                          {entry.guilds?.name ? `${entry.guilds.name} · ` : ""}
+                          {relativeTime(entry.created_at)}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="dash-header__empty-state">
+                      <span className="dash-header__empty-state-icon" aria-hidden="true">
+                        <BellIcon />
+                      </span>
+                      <p>No activity yet — join or create a Guild to see real updates from your crew here.</p>
+                      <button
+                        type="button"
+                        className="dash-header__popover-item dash-header__empty-state-cta"
+                        onClick={() => handleAccountClick("guilds")}
+                      >
+                        Explore Guilds
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="dash-header__score" title="Unified Lykodex score">
             <span className="dash-header__score-label">GD Score</span>
             <span className="dash-header__score-value">
@@ -169,8 +387,13 @@ export default function Header({
                 aria-expanded={openMenu === "avatar"}
                 aria-label="Your account"
               >
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt="" className="dash-header__avatar-img" />
+                {avatarUrl && !avatarBroken ? (
+                  <img
+                    src={avatarUrl}
+                    alt=""
+                    className="dash-header__avatar-img"
+                    onError={() => setAvatarBroken(true)}
+                  />
                 ) : (
                   <span className="dash-header__avatar-default">
                     <DefaultAvatarIcon />
@@ -269,7 +492,10 @@ export default function Header({
             them on Gaming with no way out. Everyone gets all 5 tabs to
             browse until they're actually logged in and have a real
             preference to respect. */}
-        {(isLoggedIn ? COLLEGES.filter((c) => selectedColleges.includes(c.id)) : COLLEGES).map((c) => (
+        {(isLoggedIn
+          ? COLLEGES.filter((c) => c.alwaysShown || selectedColleges.includes(c.id))
+          : COLLEGES
+        ).map((c) => (
           <button
             key={c.id}
             type="button"

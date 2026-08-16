@@ -20,6 +20,7 @@ import { importSteamWishlist } from "../lib/wishlistImport";
 import { checkBungieStatus, connectBungie, disconnectBungie } from "../lib/bungie";
 import { linkIdentity, unlinkProviderIdentity, getLinkedProviders, syncDiscordLink, removeDiscordLink } from "../lib/auth";
 import { supabase } from "../lib/supabaseClient";
+import GameMasterySection from "./GameMasterySection";
 
 const platforms = [
   { name: "Xbox", support: "No self-service API", note: "The real Xbox Live API is gated behind Microsoft's ID@Xbox / Creators Program — for approved game developers, not companion apps like this one." },
@@ -98,7 +99,19 @@ function OAuthProviderCard({ label, provider, note, linkedProviders, onChanged }
   );
 }
 
-export default function AccountLinkingPage({ linkedSteamId, onLinkSteam, onUnlinkSteam, onAddToWishlist }) {
+export default function AccountLinkingPage({
+  userId,
+  linkedSteamId,
+  onLinkSteam,
+  onUnlinkSteam,
+  onAddToWishlist,
+  masteryScore,
+  masteryXp,
+  masteryLevel,
+  masteryBreakdown,
+  masteryComputedAt,
+  onRecomputeMastery,
+}) {
   const [input, setInput] = useState("");
   const [status, setStatus] = useState("idle"); // idle | loading | done | error
   const [message, setMessage] = useState("");
@@ -209,6 +222,19 @@ export default function AccountLinkingPage({ linkedSteamId, onLinkSteam, onUnlin
           <p className={`panel__status ${status === "error" ? "panel__status--error" : ""}`}>{message}</p>
         )}
       </div>
+
+      {onRecomputeMastery && (
+        <GameMasterySection
+          userId={userId}
+          linkedSteamId={linkedSteamId}
+          masteryScore={masteryScore}
+          masteryXp={masteryXp}
+          masteryLevel={masteryLevel}
+          masteryBreakdown={masteryBreakdown}
+          masteryComputedAt={masteryComputedAt}
+          onRecomputeMastery={onRecomputeMastery}
+        />
+      )}
 
       <div className="steam-link-card">
         <h2 className="settings-card__title">Destiny 2 (Eververse store)</h2>

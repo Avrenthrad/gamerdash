@@ -79,6 +79,12 @@ export default function App() {
     gdScore,
     linkedSteamId,
     setLinkedSteamId,
+    masteryScore,
+    masteryXp,
+    masteryLevel,
+    masteryBreakdown,
+    masteryComputedAt,
+    recomputeMastery,
     themeMode,
     accentColor,
     setAccentColor,
@@ -230,6 +236,7 @@ export default function App() {
           onToggleMode={toggleThemeMode}
           currentView={view}
           selectedColleges={selectedColleges}
+          userId={userId}
         />
 
         <div className="dash-layout">
@@ -240,10 +247,23 @@ export default function App() {
           {view === "linking" &&
             (isLoggedIn ? (
               <AccountLinkingPage
+                userId={userId}
                 linkedSteamId={linkedSteamId}
-                onLinkSteam={setLinkedSteamId}
-                onUnlinkSteam={() => setLinkedSteamId(null)}
+                onLinkSteam={(steamId) => {
+                  setLinkedSteamId(steamId);
+                  recomputeMastery(steamId);
+                }}
+                onUnlinkSteam={() => {
+                  setLinkedSteamId(null);
+                  recomputeMastery(null);
+                }}
                 onAddToWishlist={addToWishlist}
+                masteryScore={masteryScore}
+                masteryXp={masteryXp}
+                masteryLevel={masteryLevel}
+                masteryBreakdown={masteryBreakdown}
+                masteryComputedAt={masteryComputedAt}
+                onRecomputeMastery={recomputeMastery}
               />
             ) : (
               <AccountGatePage
@@ -367,7 +387,7 @@ export default function App() {
 
           {view === "mtg-search" && (
             <MtgSearchPage
-              onBack={() => goTo("dashboard")}
+              onBack={() => goTo("tcg-home")}
               userId={userId}
               isLoggedIn={isLoggedIn}
               onSignIn={() => goTo("login", "login")}
@@ -377,7 +397,7 @@ export default function App() {
 
           {view === "mtg-scan" && (
             <MtgScanPage
-              onBack={() => goTo("dashboard")}
+              onBack={() => goTo("tcg-home")}
               userId={userId}
               isLoggedIn={isLoggedIn}
               onSignIn={() => goTo("login", "login")}
@@ -460,10 +480,11 @@ export default function App() {
           {view === "mtg-collection" && (
             isLoggedIn ? (
               <MtgCollectionPage
-                onBack={() => goTo("dashboard")}
+                onBack={() => goTo("tcg-home")}
                 userId={userId}
                 onGoToSearch={() => goTo("mtg-search")}
                 onGoToScan={() => goTo("mtg-scan")}
+                onGoToDecks={() => goTo("mtg-decks")}
               />
             ) : (
               <AccountGatePage
@@ -476,7 +497,7 @@ export default function App() {
 
           {view === "mtg-decks" && (
             isLoggedIn ? (
-              <MtgDeckBuilderPage onBack={() => goTo("dashboard")} userId={userId} />
+              <MtgDeckBuilderPage onBack={() => goTo("tcg-home")} userId={userId} />
             ) : (
               <AccountGatePage
                 title="Deck Builder"
@@ -496,6 +517,8 @@ export default function App() {
                 lastName={lastName}
                 username={username}
                 gdScore={gdScore}
+                masteryScore={masteryScore}
+                masteryLevel={masteryLevel}
                 wishlistCount={wishlist.length}
                 onGoToSettings={() => goTo("settings")}
                 onGoToLinking={() => goTo("linking")}

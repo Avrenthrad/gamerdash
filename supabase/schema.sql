@@ -686,3 +686,132 @@ create policy "Users can delete their own avatar"
 --
 -- If you already ran collectible_entries before is_wishlist existed:
 --   alter table public.collectible_entries add column if not exists is_wishlist boolean not null default false;
+
+-- ---------- TCG: Binders & Set Lists (additive) ----------
+-- A "binder" is a user-named group of cards (with labels + an optional
+-- cover photo) separate from the flat mtg_collection list — e.g. "EDH
+-- staples" or "Trade box". A "set list" is the same table with kind =
+-- 'set_list': it's pinned to one real Scryfall set (set_code/set_name/
+-- scryfall_set_icon_url all come straight from Scryfall's own Set API,
+-- never invented) and mtg_binder_cards under it doubles as that set's
+-- owned-quantity checklist.
+create table public.mtg_binders (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  name text not null,
+  labels jsonb default '[]'::jsonb,
+  cover_image_url text,
+  kind text not null default 'binder' check (kind in ('binder', 'set_list')),
+  set_code text,
+  set_name text,
+  scryfall_set_icon_url text,
+  notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table public.mtg_binders enable row level security;
+
+create policy "Users can manage their own binders"
+  on public.mtg_binders for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create index mtg_binders_user_id_idx on public.mtg_binders (user_id);
+
+-- One row per distinct card per binder (quantity holds the count),
+-- same "stable id at add time, live data resolved later" pattern as
+-- mtg_collection — never a stored price/text snapshot that goes stale.
+create table public.mtg_binder_cards (
+  id uuid default gen_random_uuid() primary key,
+  binder_id uuid references public.mtg_binders on delete cascade not null,
+  scryfall_id text not null,
+  card_name text not null,
+  set_code text,
+  quantity integer not null default 1,
+  foil boolean default false,
+  added_at timestamptz default now(),
+  unique (binder_id, scryfall_id)
+);
+
+alter table public.mtg_binder_cards enable row level security;
+
+-- Owned indirectly through the parent binder, same pattern as
+-- mtg_deck_cards -> mtg_decks.
+create policy "Users can manage cards in their own binders"
+  on public.mtg_binder_cards for all
+  using (exists (select 1 from public.mtg_binders where mtg_binders.id = mtg_binder_cards.binder_id and mtg_binders.user_id = auth.uid()))
+  with check (exists (select 1 from public.mtg_binders where mtg_binders.id = mtg_binder_cards.binder_id and mtg_binders.user_id = auth.uid()));
+
+create index mtg_binder_cards_binder_id_idx on public.mtg_binder_cards (binder_id);
+
+-- Decks get the same labels + cover treatment as binders, for visual
+-- consistency across the TCG My Collection hub tabs.
+alter table public.mtg_decks add column if not exists labels jsonb default '[]'::jsonb;
+alter table public.mtg_decks add column if not exists cover_image_url text;
+
+-- Cover photo storage for binders/set lists/decks — identical pattern
+-- to the avatars bucket above (public read, write scoped to the
+-- uploader's own user-id folder).
+insert into storage.buckets (id, name, public)
+values ('mtg-covers', 'mtg-covers', true)
+on conflict (id) do nothing;
+
+create policy "MTG cover images are publicly viewable"
+  on storage.objects for select
+  using (bucket_id = 'mtg-covers');
+
+create policy "Users can upload their own MTG cover images"
+  on storage.objects for insert
+  with check (bucket_id = 'mtg-covers' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Users can update their own MTG cover images"
+  on storage.objects for update
+  using (bucket_id = 'mtg-covers' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Users can delete their own MTG cover images"
+  on storage.objects for delete
+  using (bucket_id = 'mtg-covers' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ---------- Game Mastery Score ----------
+-- Cross-platform "Gamerscore equivalent". Steam's half is fully real
+-- and live-computed (unlocked achievements + Steam's own global
+-- unlock-percent rarity, via the existing ISteamUserStats endpoints —
+-- see lib/steam.js). Xbox and PlayStation have no public API for a
+-- person's own earned achievements/trophies at all (see
+-- AccountLinkingPage.jsx's honest "not available" listing for both),
+-- so their inputs are real numbers the person types in themselves —
+-- self-reported, not scraped, and labeled as such in the UI. See
+-- lib/gameMastery.js for the pure scoring math and
+-- lib/gameMasteryData.js for how these inputs get combined.
+create table public.mastery_inputs (
+  user_id uuid references auth.users on delete cascade primary key,
+  xbox_gamerscore integer,
+  xbox_updated_at timestamptz,
+  -- { bronze: {common,rare,very_rare,ultra_rare}, silver: {...}, gold: {...}, platinum: {...} },
+  -- each a real trophy count the person read off their own PSN trophy
+  -- case (Sony's own trophy UI already breaks trophies down exactly
+  -- this way by tier x rarity).
+  ps_trophy_counts jsonb,
+  ps_updated_at timestamptz,
+  updated_at timestamptz default now()
+);
+
+alter table public.mastery_inputs enable row level security;
+
+create policy "Users can manage their own mastery inputs"
+  on public.mastery_inputs for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- Cached result on the profile, same pattern as gd_score — recomputed
+-- (see lib/gameMasteryData.js's recomputeMastery) whenever a linked
+-- platform's data changes, not on every page load.
+alter table public.profiles add column if not exists mastery_score numeric default 0;
+alter table public.profiles add column if not exists mastery_xp integer default 0;
+alter table public.profiles add column if not exists mastery_level integer default 0;
+-- Per-platform breakdown for the UI: raw score, normalized score,
+-- data source, and "as of" time per linked platform — never just the
+-- final number with no way to see where it came from.
+alter table public.profiles add column if not exists mastery_breakdown jsonb;
+alter table public.profiles add column if not exists mastery_computed_at timestamptz;
