@@ -220,6 +220,7 @@ function BinderDetail({ binder, userId, onBack, onUpdated }) {
   const [setCardsStatus, setSetCardsStatus] = useState(isSetList ? "loading" : "idle");
   const [labelsInput, setLabelsInput] = useState((binder.labels || []).join(", "));
   const [coverStatus, setCoverStatus] = useState("idle");
+  const [checklistQuery, setChecklistQuery] = useState("");
 
   useEffect(() => {
     loadBinderCards();
@@ -297,6 +298,20 @@ function BinderDetail({ binder, userId, onBack, onUpdated }) {
   const totalQty = binderCards.reduce((sum, bc) => sum + bc.quantity, 0);
   const ownedCount = binderCards.filter((bc) => bc.quantity > 0).length;
 
+  // Client-side filter over the already-loaded set checklist — no
+  // extra Scryfall calls, just narrowing what's already on screen.
+  // Matches by name or collector number ("#1", "1") so either works.
+  const visibleSetCards = useMemo(() => {
+    const q = checklistQuery.trim().toLowerCase();
+    if (!q) return setCards;
+    const qNumber = q.replace(/^#/, "");
+    return setCards.filter(
+      (card) =>
+        card.name.toLowerCase().includes(q) ||
+        (card.collectorNumber && card.collectorNumber.toLowerCase() === qNumber)
+    );
+  }, [setCards, checklistQuery]);
+
   return (
     <div className="price-page">
       <div className="price-page__head">
@@ -346,9 +361,34 @@ function BinderDetail({ binder, userId, onBack, onUpdated }) {
           {setCardsStatus === "ready" && setCards.length === 0 && (
             <p className="panel__status">Scryfall didn't return any cards for this set.</p>
           )}
+
           {setCardsStatus === "ready" && setCards.length > 0 && (
+            <>
+              <div className="checklist-search">
+                <input
+                  className="price-search__input"
+                  type="text"
+                  placeholder={`Search ${setCards.length} cards by name or #number…`}
+                  value={checklistQuery}
+                  onChange={(e) => setChecklistQuery(e.target.value)}
+                />
+                {checklistQuery.trim() && (
+                  <button type="button" className="checklist-search__clear" onClick={() => setChecklistQuery("")} aria-label="Clear search">
+                    ✕
+                  </button>
+                )}
+              </div>
+              {checklistQuery.trim() && (
+                <p className="panel__status">
+                  {visibleSetCards.length} match{visibleSetCards.length === 1 ? "" : "es"} for "{checklistQuery}"
+                </p>
+              )}
+            </>
+          )}
+
+          {setCardsStatus === "ready" && visibleSetCards.length > 0 && (
             <ul className="backlog-list">
-              {setCards.map((card) => {
+              {visibleSetCards.map((card) => {
                 const owned = ownedMap[card.id];
                 const qty = owned?.quantity || 0;
                 return (

@@ -5049,3 +5049,28 @@ html[data-mode="light"] .current-rotation {
     grid-template-columns: 90px repeat(4, 1fr);
   }
 }
+
+/* ---------- Set-list checklist search ---------- */
+
+.checklist-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 4px;
+}
+
+.checklist-search__clear {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.checklist-search__clear:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
