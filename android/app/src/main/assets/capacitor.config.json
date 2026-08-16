@@ -1,0 +1,8 @@
+{
+	"appId": "com.lykodex.app",
+	"appName": "Lykodex",
+	"webDir": "dist",
+	"server": {
+		"androidScheme": "https"
+	}
+}

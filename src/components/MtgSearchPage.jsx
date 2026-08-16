@@ -1,0 +1,135 @@
+// Magic: The Gathering — card search/catalog. Real data throughout
+// via Scryfall's genuine free public API.
+
+import { useEffect, useState } from "react";
+import { searchCards, getCardAutocomplete } from "../lib/scryfall";
+import { addToCollection } from "../lib/mtg";
+
+export default function MtgSearchPage({ onBack, userId, isLoggedIn, onSignIn, onCreateAccount }) {
+  const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [results, setResults] = useState([]);
+  const [status, setStatus] = useState("idle"); // idle | loading | ready | error
+  const [addedIds, setAddedIds] = useState(new Set());
+
+  useEffect(() => {
+    if (query.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      getCardAutocomplete(query).then(setSuggestions);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  async function handleSearch(e) {
+    e?.preventDefault();
+    if (!query.trim()) return;
+    setSuggestions([]);
+    setStatus("loading");
+    try {
+      const { cards } = await searchCards(query.trim());
+      setResults(cards);
+      setStatus("ready");
+    } catch (err) {
+      console.error("MTG search failed:", err);
+      setStatus("error");
+    }
+  }
+
+  async function handleAdd(card) {
+    try {
+      await addToCollection(userId, card);
+      setAddedIds((prev) => new Set(prev).add(card.id));
+    } catch (err) {
+      console.error("Failed to add card to collection:", err);
+    }
+  }
+
+  return (
+    <div className="price-page">
+      <div className="price-page__head">
+        <button type="button" className="back-link" onClick={onBack}>← Back</button>
+        <h1 className="price-page__title">Magic: The Gathering — Card Search</h1>
+        <p className="price-page__subtitle">
+          Real card data and pricing via Scryfall, including every printing back to Alpha.
+        </p>
+      </div>
+
+      <form className="price-search" onSubmit={handleSearch} style={{ position: "relative" }}>
+        <input
+          className="price-search__input"
+          type="text"
+          placeholder='Search by name, or try Scryfall syntax like "c:red type:creature"'
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <button type="submit" className="price-search__button">Search</button>
+
+        {suggestions.length > 0 && (
+          <ul className="backlog-search-results" style={{ position: "absolute", top: "48px", zIndex: 10, background: "var(--surface)", width: "100%", maxWidth: "480px" }}>
+            {suggestions.map((name) => (
+              <li key={name} className="backlog-search-results__row">
+                <button
+                  type="button"
+                  className="linking-row__connect"
+                  onClick={() => { setQuery(name); setSuggestions([]); handleSearch(); }}
+                  style={{ width: "100%", textAlign: "left" }}
+                >
+                  {name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </form>
+
+      {status === "loading" && <p className="panel__status">Searching…</p>}
+      {status === "error" && <p className="panel__status panel__status--error">Couldn't search right now.</p>}
+      {status === "ready" && results.length === 0 && <p className="panel__status">No cards found for that search.</p>}
+
+      {status === "ready" && results.length > 0 && (
+        <ul className="backlog-list">
+          {results.slice(0, 30).map((card) => (
+            <li key={card.id} className="backlog-card">
+              {card.imageSmall ? (
+                <img src={card.imageSmall} alt="" className="backlog-card__thumb" style={{ width: "56px", height: "78px" }} />
+              ) : (
+                <div className="backlog-card__thumb backlog-card__thumb--placeholder" style={{ width: "56px", height: "78px" }} />
+              )}
+              <div className="backlog-card__info">
+                <span className="backlog-card__title">{card.name}</span>
+                <div className="backlog-card__meta">
+                  <span>{card.setName}</span>
+                  {card.rarity && <span style={{ textTransform: "capitalize" }}>{card.rarity}</span>}
+                  {card.prices.usd && <span className="score-badge">${card.prices.usd}</span>}
+                  {card.prices.usd_foil && <span className="score-badge score-badge--preorder">Foil ${card.prices.usd_foil}</span>}
+                </div>
+              </div>
+              {isLoggedIn ? (
+                <button
+                  type="button"
+                  className="linking-row__connect"
+                  onClick={() => handleAdd(card)}
+                  disabled={addedIds.has(card.id)}
+                >
+                  {addedIds.has(card.id) ? "Added" : "Add to Collection"}
+                </button>
+              ) : (
+                <div className="backlog-card__actions">
+                  <button type="button" className="linking-row__connect" onClick={onSignIn}>Sign in to add</button>
+                  <button type="button" className="linking-row__connect" onClick={onCreateAccount}>Create account</button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <a href="https://scryfall.com" target="_blank" rel="noopener noreferrer" className="ps-trophy-attribution">
+        Card data and images powered by Scryfall
+      </a>
+    </div>
+  );
+}

@@ -1,0 +1,12 @@
+# Scopes linting to the actual web app source. Without this, oxlint's
+# default recursive scan also sweeps up android/ and ios/ (real native
+# Capacitor projects — Java/Kotlin/Swift/Gradle, not JS) and
+# discord-bot/ (a genuinely separate Node project with its own
+# package.json, meant to be linted independently if at all) — none of
+# which are meant to be linted as part of the main app.
+dist
+android
+ios
+src-tauri
+discord-bot
+node_modules
