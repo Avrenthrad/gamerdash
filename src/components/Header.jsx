@@ -183,7 +183,7 @@ export default function Header({
       ? "gaming"
       : TCG_VIEWS.includes(currentView)
       ? "tcg"
-      : currentView === "college-entertainment"
+      : currentView === "college-entertainment" || currentView === "books" || currentView === "comics"
       ? "entertainment"
       : currentView === "college-collectibles"
       ? "collectibles"

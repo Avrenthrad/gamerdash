@@ -34,6 +34,26 @@ export default async function handler(req, res) {
       return res.status(200).json({ results: data.docs || [] });
     }
 
+    // Real, documented ISBN lookup — verified live against
+    // openlibrary.org/api/books?bibkeys=ISBN:...&jscmd=data, used for
+    // barcode-scan -> book lookup. Field names (title, authors[].name,
+    // publishers[].name, publish_date, identifiers) confirmed from a
+    // real response, not guessed.
+    if (mode === "isbn") {
+      const isbn = searchParams.get("isbn");
+      if (!isbn) return res.status(400).json({ error: "Missing isbn query parameter" });
+
+      const bibkey = `ISBN:${isbn}`;
+      const olRes = await fetch(
+        `${BASE_URL}/api/books?bibkeys=${encodeURIComponent(bibkey)}&format=json&jscmd=data`,
+        { headers: { "User-Agent": USER_AGENT } }
+      );
+      const data = await olRes.json();
+      const book = data[bibkey];
+      if (!book) return res.status(200).json({ book: null });
+      return res.status(200).json({ book });
+    }
+
     return res.status(400).json({ error: "Missing or invalid mode parameter" });
   } catch (err) {
     console.error("openlibrary proxy error:", err);

@@ -27,3 +27,29 @@ export async function searchBooks(query) {
   const data = await res.json();
   return (data.results || []).map(normalizeResult);
 }
+
+// Real cover-by-ISBN URL — Open Library's own documented image
+// service, verified live (302-redirects to a real cover), same
+// pattern as the cover_i-based URLs above.
+export function coverUrlForIsbn(isbn) {
+  return `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`;
+}
+
+// Barcode-scan -> book lookup. Returns null (not an error) for a real
+// ISBN Open Library just doesn't have data for — a genuinely honest
+// "not found", not a failure.
+export async function lookupBookByIsbn(isbn) {
+  const res = await fetch(`${API_BASE}/api/openlibrary?mode=isbn&isbn=${encodeURIComponent(isbn)}`);
+  if (!res.ok) return null;
+  const data = await res.json();
+  const book = data.book;
+  if (!book) return null;
+  return {
+    isbn,
+    title: book.title || "",
+    author: book.authors?.[0]?.name || null,
+    coverUrl: coverUrlForIsbn(isbn),
+    publisher: book.publishers?.[0]?.name || null,
+    publishDate: book.publish_date || null,
+  };
+}

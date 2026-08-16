@@ -1328,3 +1328,118 @@ create policy "Any signed-in user can record a price observation"
   with check (auth.role() = 'authenticated');
 
 create index tcg_price_snapshots_scryfall_id_idx on public.tcg_price_snapshots (scryfall_id, captured_at desc);
+
+-- ---------- Books: TBR / lists / owned library ----------
+-- Distinct from entertainment_entries (which already tracks a simple
+-- want/watching/completed status for movies/TV/anime/books) — this is
+-- specifically the barcode-scan -> TBR/owned/list flow, which needs
+-- real multi-list membership entertainment_entries doesn't model.
+create table public.user_books (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  isbn text,
+  title text not null,
+  author text,
+  cover_url text,
+  status text not null default 'tbr' check (status in ('tbr', 'reading', 'finished', 'owned')),
+  source text default 'manual', -- 'manual' | 'barcode' | 'search'
+  added_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table public.user_books enable row level security;
+
+create policy "Users can manage their own books"
+  on public.user_books for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create index user_books_user_id_idx on public.user_books (user_id);
+
+create table public.book_lists (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  name text not null,
+  created_at timestamptz default now()
+);
+
+alter table public.book_lists enable row level security;
+
+create policy "Users can manage their own book lists"
+  on public.book_lists for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create table public.book_list_items (
+  id uuid default gen_random_uuid() primary key,
+  list_id uuid references public.book_lists on delete cascade not null,
+  book_id uuid references public.user_books on delete cascade not null,
+  added_at timestamptz default now(),
+  unique (list_id, book_id)
+);
+
+alter table public.book_list_items enable row level security;
+
+-- Owned indirectly through the parent list, same pattern as
+-- mtg_deck_cards -> mtg_decks.
+create policy "Users can manage items in their own book lists"
+  on public.book_list_items for all
+  using (exists (select 1 from public.book_lists where book_lists.id = book_list_items.list_id and book_lists.user_id = auth.uid()))
+  with check (exists (select 1 from public.book_lists where book_lists.id = book_list_items.list_id and book_lists.user_id = auth.uid()));
+
+create index book_list_items_list_id_idx on public.book_list_items (list_id);
+
+-- ---------- Comics: real user-owned issue library ----------
+-- No external comics catalogue API is wired yet (Comic Vine's real
+-- response shape couldn't be verified live from this environment —
+-- its docs page is a JS app, not static docs, and no API key was
+-- available to test a real call against — so rather than guess field
+-- names the way this project got burned doing once before with
+-- Fortnite pricing, this stays honestly manual-entry-only for now;
+-- Comic Vine enrichment is a real, named next step once a key exists
+-- to verify against, same as Rebrickable/Discogs/IGDB are documented
+-- as real next phases for collectible_entries).
+create table public.comic_issues (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  title text not null,
+  issue_number text,
+  publisher text,
+  cover_url text,
+  condition text default 'Near Mint',
+  status text not null default 'owned' check (status in ('owned', 'pull_list', 'wishlist')),
+  notes text,
+  added_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table public.comic_issues enable row level security;
+
+create policy "Users can manage their own comic issues"
+  on public.comic_issues for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create index comic_issues_user_id_idx on public.comic_issues (user_id);
+
+-- Cover photo storage for books/comics — identical pattern to the
+-- avatars/mtg-covers buckets above.
+insert into storage.buckets (id, name, public)
+values ('entertainment-covers', 'entertainment-covers', true)
+on conflict (id) do nothing;
+
+create policy "Entertainment cover images are publicly viewable"
+  on storage.objects for select
+  using (bucket_id = 'entertainment-covers');
+
+create policy "Users can upload their own entertainment cover images"
+  on storage.objects for insert
+  with check (bucket_id = 'entertainment-covers' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Users can update their own entertainment cover images"
+  on storage.objects for update
+  using (bucket_id = 'entertainment-covers' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Users can delete their own entertainment cover images"
+  on storage.objects for delete
+  using (bucket_id = 'entertainment-covers' and (storage.foldername(name))[1] = auth.uid()::text);

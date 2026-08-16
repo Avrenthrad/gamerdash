@@ -18,6 +18,8 @@ export const NAV_INDEX = [
   { label: "MTG Card Scanner", view: "mtg-scan", keywords: "tcg magic ocr" },
   { label: "Import Collection", view: "mtg-import", keywords: "tcg magic csv manabox collectr import" },
   { label: "Entertainment", view: "college-entertainment", keywords: "movies tv anime books" },
+  { label: "Books", view: "books", keywords: "entertainment tbr barcode isbn reading lists" },
+  { label: "Comics", view: "comics", keywords: "entertainment issues pull list" },
   { label: "Collectibles", view: "college-collectibles", keywords: "shelf funko lego statues" },
   { label: "Tabletop", view: "college-tabletop", keywords: "rpg dnd wargames dice" },
   { label: "Guilds", view: "guilds", keywords: "social friends activity crew" },

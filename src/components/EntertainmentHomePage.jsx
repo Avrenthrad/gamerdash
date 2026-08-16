@@ -1,7 +1,8 @@
-// Entertainment College — real movie/TV search and tracking via TMDB.
-// First real slice of this College (anime/books are researched,
-// real APIs identified — AniList, Open Library — but not yet built;
-// this page is honest about that rather than pretending they exist).
+// Entertainment College — real movie/TV/anime/book search and
+// tracking via TMDB, AniList, and Open Library. Comics and the real
+// barcode-scan TBR book flow live on their own dedicated pages (see
+// ComicsPage.jsx / BooksPage.jsx) since they need real multi-list/
+// status models this simple search-and-track flow doesn't.
 //
 // NOTE: TMDB's terms require their logo specifically be displayed for
 // attribution, not just a text link — the credit line at the bottom
@@ -25,7 +26,7 @@ const STATUS_LABELS = {
   dropped: "Dropped",
 };
 
-export default function EntertainmentHomePage({ onBack, isLoggedIn, userId, onSignIn, onCreateAccount }) {
+export default function EntertainmentHomePage({ onBack, isLoggedIn, userId, onSignIn, onCreateAccount, onGoToBooks, onGoToComics }) {
   const [searchType, setSearchType] = useState("movie");
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
@@ -115,6 +116,17 @@ export default function EntertainmentHomePage({ onBack, isLoggedIn, userId, onSi
           Real movies, TV, anime, and books — via TMDB, AniList, and Open Library.
         </p>
       </div>
+
+      {isLoggedIn && (
+        <div className="backlog-add">
+          <button type="button" className="quickdash-reset-btn" onClick={onGoToBooks}>
+            📷 Scan a book barcode / My TBR
+          </button>
+          <button type="button" className="quickdash-reset-btn" onClick={onGoToComics}>
+            📖 My Comics
+          </button>
+        </div>
+      )}
 
       {isLoggedIn && entries.length > 0 && (
         <div className="backlog-summary">

@@ -51,6 +51,8 @@ const OverviewPage = lazy(() => import("./components/OverviewPage"));
 const TcgHomePage = lazy(() => import("./components/TcgHomePage"));
 const LibraryPage = lazy(() => import("./components/LibraryPage"));
 const EntertainmentHomePage = lazy(() => import("./components/EntertainmentHomePage"));
+const BooksPage = lazy(() => import("./components/BooksPage"));
+const ComicsPage = lazy(() => import("./components/ComicsPage"));
 const CollectiblesHomePage = lazy(() => import("./components/CollectiblesHomePage"));
 const TabletopHomePage = lazy(() => import("./components/TabletopHomePage"));
 const CurrentSalesPage = lazy(() => import("./components/CurrentSalesPage"));
@@ -495,6 +497,28 @@ export default function App() {
               onBack={() => goTo("overview")}
               isLoggedIn={isLoggedIn}
               userId={userId}
+              onSignIn={() => goTo("login", "login")}
+              onCreateAccount={() => goTo("login", "signup")}
+              onGoToBooks={() => goTo("books")}
+              onGoToComics={() => goTo("comics")}
+            />
+          )}
+
+          {view === "books" && (
+            <BooksPage
+              onBack={() => goTo("college-entertainment")}
+              userId={userId}
+              isLoggedIn={isLoggedIn}
+              onSignIn={() => goTo("login", "login")}
+              onCreateAccount={() => goTo("login", "signup")}
+            />
+          )}
+
+          {view === "comics" && (
+            <ComicsPage
+              onBack={() => goTo("college-entertainment")}
+              userId={userId}
+              isLoggedIn={isLoggedIn}
               onSignIn={() => goTo("login", "login")}
               onCreateAccount={() => goTo("login", "signup")}
             />

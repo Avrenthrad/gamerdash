@@ -89,6 +89,8 @@ const KNOWN_VIEWS = [
   "library",
   "tcg-home",
   "college-entertainment",
+  "books",
+  "comics",
   "college-collectibles",
   "college-tabletop",
 ];
