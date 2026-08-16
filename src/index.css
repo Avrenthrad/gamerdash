@@ -1040,7 +1040,16 @@ button { font-family: inherit; }
 }
 
 .auth-oauth-btn:hover {
-  border-color: var(--red);
+  border-color: var(--accent);
+}
+
+.auth-oauth-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.auth-oauth-btn:disabled:hover {
+  border-color: var(--border);
 }
 
 .auth-oauth-btn__mark {
@@ -1462,36 +1471,6 @@ button { font-family: inherit; }
   border-radius: 50%;
   background: var(--accent);
   border: 2px solid var(--surface);
-}
-
-.dash-header__search-popover {
-  min-width: 280px;
-  padding: 10px;
-}
-
-.dash-header__search-input {
-  width: 100%;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 9px 12px;
-  color: var(--text-primary);
-  font-size: 14px;
-  font-family: inherit;
-}
-
-.dash-header__search-input:focus-visible {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.dash-header__search-results {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-top: 8px;
-  max-height: 280px;
-  overflow-y: auto;
 }
 
 .dash-header__search-empty {
@@ -5198,4 +5177,169 @@ html[data-mode="light"] .current-rotation {
   padding: 5px 8px;
   color: var(--text-primary);
   font-size: 11.5px;
+}
+
+/* ---------- Universal command palette (Ctrl/Cmd+K) ---------- */
+
+.cmdk-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 90;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  animation: fadeIn 0.18s ease-out;
+}
+
+.cmdk {
+  width: 100%;
+  max-width: 560px;
+  max-height: 70vh;
+  margin: 0 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: popoverIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cmdk__input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.cmdk__input-icon {
+  color: var(--text-tertiary);
+  display: flex;
+}
+
+.cmdk__input {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 16px;
+  font-family: inherit;
+}
+
+.cmdk__input:focus {
+  outline: none;
+}
+
+.cmdk__esc {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+}
+
+.cmdk__hint {
+  padding: 14px 18px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.cmdk__section {
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.cmdk__section-label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  padding: 6px 10px;
+}
+
+.cmdk__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cmdk__item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 10px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.cmdk__item--active {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.cmdk__item-icon {
+  font-size: 17px;
+  flex-shrink: 0;
+  width: 24px;
+  text-align: center;
+}
+
+.cmdk__item-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cmdk__item-label {
+  font-size: 14px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cmdk__item-sublabel {
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  text-transform: capitalize;
+}
+
+.cmdk__empty {
+  padding: 28px 18px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.cmdk__empty-icon {
+  display: block;
+  font-size: 26px;
+  margin-bottom: 8px;
+  opacity: 0.8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cmdk-backdrop,
+  .cmdk {
+    animation: none;
+  }
 }

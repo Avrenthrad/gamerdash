@@ -52,6 +52,7 @@ const EntertainmentHomePage = lazy(() => import("./components/EntertainmentHomeP
 const CollectiblesHomePage = lazy(() => import("./components/CollectiblesHomePage"));
 const TabletopHomePage = lazy(() => import("./components/TabletopHomePage"));
 const CurrentSalesPage = lazy(() => import("./components/CurrentSalesPage"));
+const CommandPalette = lazy(() => import("./components/CommandPalette"));
 
 export default function App() {
   const {
@@ -134,6 +135,21 @@ export default function App() {
   // it is pure presentation and does not belong in the shared context).
   const gridContainerRef = useRef(null);
   const [gridWidth, setGridWidth] = useState(0);
+
+  // Universal command palette — Ctrl/Cmd+K from anywhere, or the
+  // header search icon (see CommandPalette.jsx). Lives at this level
+  // (not per-page) since it's a global overlay, not a route.
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  useEffect(() => {
+    function handleGlobalKeydown(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((open) => !open);
+      }
+    }
+    window.addEventListener("keydown", handleGlobalKeydown);
+    return () => window.removeEventListener("keydown", handleGlobalKeydown);
+  }, []);
 
   useEffect(() => {
     if (!customizingLayout || !gridContainerRef.current) return;
@@ -238,6 +254,7 @@ export default function App() {
           currentView={view}
           selectedColleges={selectedColleges}
           userId={userId}
+          onOpenPalette={() => setPaletteOpen(true)}
         />
 
         <div className="dash-layout">
@@ -650,6 +667,18 @@ export default function App() {
     <>
       {splashVisible && <LoadingSplash fadingOut={splashFading} />}
       <Suspense fallback={<PageLoadingFallback />}>{content}</Suspense>
+      {paletteOpen && (
+        <Suspense fallback={null}>
+          <CommandPalette
+            isOpen={paletteOpen}
+            onClose={() => setPaletteOpen(false)}
+            onNavigateView={navigateToView}
+            isLoggedIn={isLoggedIn}
+            userId={userId}
+            linkedSteamId={linkedSteamId}
+          />
+        </Suspense>
+      )}
     </>
   );
 }

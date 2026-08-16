@@ -20,6 +20,26 @@ export async function signIn(email, password) {
   return data;
 }
 
+// Real OAuth sign-in (not linking — see linkIdentity below for that).
+// Supabase's signInWithOAuth() redirects the browser to the provider
+// itself by default, so this "returns" only if kicking off the
+// redirect fails (provider not enabled in Supabase, etc.) — a
+// successful call never resolves here, the page navigates away.
+//
+// Setup needed per provider (Supabase dashboard, not code):
+//   Authentication > Providers > enable it, paste the Client ID/Secret
+//   from that provider's own developer console, and add this app's
+//   real deployed URL (now that one exists) as an authorized redirect
+//   there. Apple additionally requires a Services ID + a private key
+//   generated in Apple's developer portal, not just a client secret.
+export async function signInWithOAuth(provider) {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider,
+    options: { redirectTo: `${window.location.origin}${window.location.pathname}#/dashboard` },
+  });
+  if (error) throw error;
+}
+
 export async function signOut() {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;

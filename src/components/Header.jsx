@@ -1,16 +1,19 @@
 // Top navigation bar.
 // - Left: light/dark theme toggle.
 // - Center: the "Lykodex" banner/logo — clicking it goes to Overview.
-// - Right: quick-jump search, the notifications bell (real Guild
-//   activity), the unified GD Score, and — once signed in — the
-//   avatar, which opens ONE consolidated account drawer (Social,
-//   Account Settings, Account Linking, Dashfeed Settings, Log out).
-//   There used to be a second, separate gear-icon menu here with an
-//   overlapping subset of the same destinations — merged into the one
-//   avatar drawer below so there's a single place to look, not two.
+// - Right: search icon (opens the universal command palette — see
+//   CommandPalette.jsx and App.jsx's Ctrl/Cmd+K handler; this icon and
+//   that shortcut open the exact same overlay, not two competing
+//   search UIs), the notifications bell (real Guild activity), the
+//   unified GD Score, and — once signed in — the avatar, which opens
+//   ONE consolidated account drawer (Social, Account Settings, Account
+//   Linking, Dashfeed Settings, Log out). There used to be a second,
+//   separate gear-icon menu here with an overlapping subset of the
+//   same destinations — merged into the one avatar drawer below so
+//   there's a single place to look, not two.
 // - Below the header: the College tabs row (Overview + the 5 Colleges).
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import LykodexLogo from "./LykodexLogo";
 import { fetchRecentActivityForUser, describeActivity } from "../lib/guilds";
 import { relativeTime } from "./price/priceUtils";
@@ -27,32 +30,6 @@ const COLLEGES = [
   { id: "entertainment", label: "Entertainment", view: "college-entertainment" },
   { id: "collectibles", label: "Collectibles", view: "college-collectibles" },
   { id: "tabletop", label: "Tabletop", view: "college-tabletop" },
-];
-
-// Quick-jump search index — every real, already-built destination in
-// the app. This is genuine navigation, not a stubbed-out search box:
-// typing filters this list and Enter/click jumps straight there. No
-// invented "results" — just the app's own real pages.
-const NAV_INDEX = [
-  { label: "Overview", view: "overview", keywords: "home summary" },
-  { label: "Gaming Dashboard", view: "dashboard", keywords: "gaming home" },
-  { label: "Library", view: "library", keywords: "gaming games owned" },
-  { label: "Prices & Wishlist", view: "prices", keywords: "gaming deals" },
-  { label: "Backlog", view: "backlog", keywords: "gaming games" },
-  { label: "Upcoming Releases", view: "upcoming-releases", keywords: "gaming calendar" },
-  { label: "TCG Home", view: "tcg-home", keywords: "mtg magic cards" },
-  { label: "MTG Search", view: "mtg-search", keywords: "tcg magic cards scryfall" },
-  { label: "MTG Collection", view: "mtg-collection", keywords: "tcg magic cards" },
-  { label: "MTG Deck Builder", view: "mtg-decks", keywords: "tcg magic decks" },
-  { label: "MTG Card Scanner", view: "mtg-scan", keywords: "tcg magic ocr" },
-  { label: "Entertainment", view: "college-entertainment", keywords: "movies tv anime books" },
-  { label: "Collectibles", view: "college-collectibles", keywords: "shelf funko lego statues" },
-  { label: "Tabletop", view: "college-tabletop", keywords: "rpg dnd wargames dice" },
-  { label: "Guilds", view: "guilds", keywords: "social friends activity crew" },
-  { label: "Friends", view: "friends", keywords: "social guilds add friend code" },
-  { label: "Account Settings", view: "settings", keywords: "profile avatar theme" },
-  { label: "Account Linking", view: "linking", keywords: "steam link connect" },
-  { label: "Dashfeed Settings", view: "dashfeed", keywords: "toggles layout" },
 ];
 
 // Gaming's own sub-pages — shown as a left sidebar only while inside
@@ -124,6 +101,7 @@ export default function Header({
   currentView,
   selectedColleges = ["gaming"],
   userId,
+  onOpenPalette,
 }) {
   // "settings" | "login" | "avatar" | null — only one open at a time.
   // "logo" (the old Dashboards drawer trigger) is gone — the logo now
@@ -138,16 +116,6 @@ export default function Header({
   useEffect(() => {
     setAvatarBroken(false);
   }, [avatarUrl]);
-
-  // ----- quick-jump search -----
-  const [searchQuery, setSearchQuery] = useState("");
-  const searchResults = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return [];
-    return NAV_INDEX.filter(
-      (item) => item.label.toLowerCase().includes(q) || item.keywords.includes(q)
-    ).slice(0, 8);
-  }, [searchQuery]);
 
   // ----- notifications bell (real Guild activity, never fabricated) -----
   const [activity, setActivity] = useState([]);
@@ -195,22 +163,15 @@ export default function Header({
         /* ignore */
       }
     }
-    if (name === "search" && next !== "search") setSearchQuery("");
   }
 
   function closeMenu() {
     setOpenMenu(null);
-    setSearchQuery("");
   }
 
   function handleAccountClick(viewId, mode) {
     closeMenu();
     onNavigateView(viewId, mode);
-  }
-
-  function handleSearchSelect(view) {
-    closeMenu();
-    onNavigateView(view);
   }
 
   const showBackdrop = openMenu === "settings";
@@ -274,52 +235,15 @@ export default function Header({
         </div>
 
         <div className="dash-header__right">
-          <div className="dash-header__menu-wrap">
-            <button
-              type="button"
-              className="dash-header__icon-btn"
-              onClick={() => toggleMenu("search")}
-              aria-expanded={openMenu === "search"}
-              aria-label="Search Lykodex"
-            >
-              <SearchIcon />
-            </button>
-
-            {openMenu === "search" && (
-              <div className="dash-header__popover dash-header__popover--right dash-header__search-popover">
-                <input
-                  type="text"
-                  autoFocus
-                  className="dash-header__search-input"
-                  placeholder="Jump to a page…"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && searchResults[0]) handleSearchSelect(searchResults[0].view);
-                    if (e.key === "Escape") closeMenu();
-                  }}
-                />
-                {searchQuery.trim() && (
-                  <div className="dash-header__search-results">
-                    {searchResults.length > 0 ? (
-                      searchResults.map((item) => (
-                        <button
-                          key={item.view}
-                          type="button"
-                          className="dash-header__popover-item"
-                          onClick={() => handleSearchSelect(item.view)}
-                        >
-                          {item.label}
-                        </button>
-                      ))
-                    ) : (
-                      <p className="dash-header__search-empty">No pages match "{searchQuery}".</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <button
+            type="button"
+            className="dash-header__icon-btn"
+            onClick={onOpenPalette}
+            aria-label="Search Lykodex (Ctrl/Cmd+K)"
+            title="Search (Ctrl/Cmd+K)"
+          >
+            <SearchIcon />
+          </button>
 
           {isLoggedIn && (
             <div className="dash-header__menu-wrap">

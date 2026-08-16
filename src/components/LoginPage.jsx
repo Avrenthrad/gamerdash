@@ -1,19 +1,23 @@
-// Auth screen — real email/password via Supabase.
-// OAuth (Google/Apple/Discord) needs real redirect URLs to register
-// with each provider, which only exist once this is actually deployed —
-// so those stay visually present but disabled for now, rather than
-// silently pretending to work. See lib/auth.js for why email
-// confirmation is also skipped for this first testing pass.
+// Auth screen — real email/password via Supabase, plus real OAuth
+// sign-in (Google/Apple/Microsoft/Discord) via Supabase's own
+// signInWithOAuth. This app now has a real deployed URL, so OAuth is
+// no longer blocked the way it was pre-deployment — but each provider
+// still needs to be enabled in Supabase's dashboard with real
+// credentials from that provider's own developer console before a
+// click here does anything but error. See lib/auth.js for the exact
+// setup steps per provider. Email confirmation is still deliberately
+// off for this early testing pass (see lib/auth.js history).
 
 import { useState } from "react";
 import LykodexLogo from "./LykodexLogo";
-import { signUp, signIn } from "../lib/auth";
+import { signUp, signIn, signInWithOAuth } from "../lib/auth";
 import { supabaseConfigured } from "../lib/supabaseClient";
 
 const oauthProviders = [
-  { name: "Google", initial: "G" },
-  { name: "Apple", initial: "A" },
-  { name: "Discord", initial: "D" },
+  { name: "Google", provider: "google", initial: "G" },
+  { name: "Apple", provider: "apple", initial: "A" },
+  { name: "Microsoft", provider: "azure", initial: "M" },
+  { name: "Discord", provider: "discord", initial: "D" },
 ];
 
 export default function LoginPage({ onLoginSuccess, initialMode }) {
@@ -23,6 +27,30 @@ export default function LoginPage({ onLoginSuccess, initialMode }) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [status, setStatus] = useState("idle"); // idle | loading | error
   const [error, setError] = useState("");
+
+  // Which OAuth button (if any) is mid-redirect, and any error from
+  // kicking that off — keyed so one provider erroring doesn't disable
+  // the others.
+  const [oauthLoading, setOauthLoading] = useState(null);
+  const [oauthError, setOauthError] = useState("");
+
+  async function handleOAuth(provider, label) {
+    setOauthError("");
+    setOauthLoading(provider);
+    try {
+      await signInWithOAuth(provider);
+      // On success the browser navigates away to the provider — this
+      // line only runs if that redirect itself failed to kick off.
+    } catch (err) {
+      console.error(`${label} sign-in failed:`, err);
+      setOauthError(
+        err.message?.toLowerCase().includes("provider is not enabled")
+          ? `${label} sign-in isn't turned on yet in Supabase — enable it under Authentication > Providers.`
+          : err.message || `Couldn't start ${label} sign-in.`
+      );
+      setOauthLoading(null);
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -149,14 +177,15 @@ export default function LoginPage({ onLoginSuccess, initialMode }) {
               key={p.name}
               type="button"
               className="auth-oauth-btn"
-              title={`${p.name} sign-in isn't set up yet — needs a deployed URL first`}
-              disabled
+              onClick={() => handleOAuth(p.provider, p.name)}
+              disabled={oauthLoading !== null}
             >
               <span className="auth-oauth-btn__mark">{p.initial}</span>
-              {p.name}
+              {oauthLoading === p.provider ? "Redirecting…" : p.name}
             </button>
           ))}
         </div>
+        {oauthError && <p className="panel__status panel__status--error">{oauthError}</p>}
 
         <p className="auth-card__mfa-note">
           Two-factor authentication (Google Authenticator) can be enabled after sign-in.
