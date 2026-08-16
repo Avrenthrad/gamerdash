@@ -22,6 +22,14 @@
 
 const BASE_URL = "https://api.scryfall.com";
 
+// Scryfall rejects requests with no User-Agent (or a bare default one
+// from the HTTP client) with a 400 — confirmed live, not documented
+// anywhere obvious. Every request needs both of these headers.
+const SCRYFALL_HEADERS = {
+  "User-Agent": "Lykodex/1.0 (+https://gamerdash.vercel.app)",
+  Accept: "application/json",
+};
+
 export default async function handler(req, res) {
   const { searchParams } = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const mode = searchParams.get("mode");
@@ -37,7 +45,7 @@ export default async function handler(req, res) {
       // even within one set). Both are genuine Scryfall `unique`
       // values, not invented.
       const unique = searchParams.get("unique") === "prints" ? "prints" : "cards";
-      const scryRes = await fetch(`${BASE_URL}/cards/search?q=${encodeURIComponent(q)}&page=${page}&unique=${unique}`);
+      const scryRes = await fetch(`${BASE_URL}/cards/search?q=${encodeURIComponent(q)}&page=${page}&unique=${unique}`, { headers: SCRYFALL_HEADERS });
       const data = await scryRes.json();
       // Scryfall returns a real 404 with a JSON error body when a
       // search has zero matches — not a failure on our end, just an
@@ -50,7 +58,7 @@ export default async function handler(req, res) {
     if (mode === "named") {
       const exact = searchParams.get("exact");
       if (!exact) return res.status(400).json({ error: "Missing exact query parameter" });
-      const scryRes = await fetch(`${BASE_URL}/cards/named?exact=${encodeURIComponent(exact)}`);
+      const scryRes = await fetch(`${BASE_URL}/cards/named?exact=${encodeURIComponent(exact)}`, { headers: SCRYFALL_HEADERS });
       const data = await scryRes.json();
       if (!scryRes.ok) return res.status(scryRes.status).json({ error: data.details || "Card not found" });
       return res.status(200).json(data);
@@ -59,7 +67,7 @@ export default async function handler(req, res) {
     if (mode === "autocomplete") {
       const q = searchParams.get("q");
       if (!q) return res.status(400).json({ error: "Missing q query parameter" });
-      const scryRes = await fetch(`${BASE_URL}/cards/autocomplete?q=${encodeURIComponent(q)}`);
+      const scryRes = await fetch(`${BASE_URL}/cards/autocomplete?q=${encodeURIComponent(q)}`, { headers: SCRYFALL_HEADERS });
       const data = await scryRes.json();
       return res.status(200).json(data);
     }
@@ -67,7 +75,7 @@ export default async function handler(req, res) {
     if (mode === "card") {
       const id = searchParams.get("id");
       if (!id) return res.status(400).json({ error: "Missing id query parameter" });
-      const scryRes = await fetch(`${BASE_URL}/cards/${id}`);
+      const scryRes = await fetch(`${BASE_URL}/cards/${id}`, { headers: SCRYFALL_HEADERS });
       const data = await scryRes.json();
       if (!scryRes.ok) return res.status(scryRes.status).json({ error: data.details || "Card not found" });
       return res.status(200).json(data);
@@ -77,7 +85,7 @@ export default async function handler(req, res) {
     // a set" search when starting a new set list. One request, cached
     // client-side, rather than hammering a per-keystroke search.
     if (mode === "sets") {
-      const scryRes = await fetch(`${BASE_URL}/sets`);
+      const scryRes = await fetch(`${BASE_URL}/sets`, { headers: SCRYFALL_HEADERS });
       const data = await scryRes.json();
       if (!scryRes.ok) return res.status(scryRes.status).json({ error: data.details || "Failed to list sets" });
       return res.status(200).json(data);
@@ -89,7 +97,7 @@ export default async function handler(req, res) {
     if (mode === "set") {
       const code = searchParams.get("code");
       if (!code) return res.status(400).json({ error: "Missing code query parameter" });
-      const scryRes = await fetch(`${BASE_URL}/sets/${encodeURIComponent(code)}`);
+      const scryRes = await fetch(`${BASE_URL}/sets/${encodeURIComponent(code)}`, { headers: SCRYFALL_HEADERS });
       const data = await scryRes.json();
       if (!scryRes.ok) return res.status(scryRes.status).json({ error: data.details || "Set not found" });
       return res.status(200).json(data);
