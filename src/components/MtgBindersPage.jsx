@@ -13,6 +13,10 @@ import {
 } from "../lib/mtg";
 import { searchCards, getAllSets, getSetCards } from "../lib/scryfall";
 
+// Standard 5-point TCG grading scale — same one TCGplayer/Card Kingdom
+// use, matches mtg_binder_cards.condition / mtg_collection.condition.
+const CARD_CONDITIONS = ["Near Mint", "Lightly Played", "Moderately Played", "Heavily Played", "Damaged"];
+
 function LabelChips({ labels }) {
   if (!labels || labels.length === 0) return null;
   return (
@@ -261,9 +265,9 @@ function BinderDetail({ binder, userId, onBack, onUpdated }) {
     return map;
   }, [binderCards]);
 
-  async function handleChecklistQuantity(card, quantity, foil) {
+  async function handleChecklistQuantity(card, quantity, foil, condition) {
     try {
-      const row = await setBinderCardQuantity(binder.id, card, quantity, { foil });
+      const row = await setBinderCardQuantity(binder.id, card, quantity, { foil, condition });
       setBinderCards((prev) => {
         const others = prev.filter((bc) => bc.scryfall_id !== card.id);
         return row ? [...others, row] : others;
@@ -405,24 +409,56 @@ function BinderDetail({ binder, userId, onBack, onUpdated }) {
                       <span className="backlog-card__meta">{card.rarity}</span>
                     </div>
                     <div className="backlog-card__actions">
-                      <label className="backlog-card__hours">
-                        Qty:
-                        <input
-                          type="number"
-                          min="0"
-                          value={qty}
-                          onChange={(e) => handleChecklistQuantity(card, Math.max(0, Number(e.target.value) || 0), owned?.foil || false)}
-                          style={{ width: "48px" }}
-                        />
-                      </label>
-                      <label className="backlog-card__hours">
-                        <input
-                          type="checkbox"
-                          checked={!!owned?.foil}
-                          onChange={() => handleChecklistQuantity(card, qty || 1, !owned?.foil)}
-                        />
-                        Foil
-                      </label>
+                      <div className="qty-stepper">
+                        {qty > 0 && (
+                          <button
+                            type="button"
+                            className="qty-stepper__btn"
+                            aria-label={`Remove one ${card.name}`}
+                            onClick={() => handleChecklistQuantity(card, qty - 1, owned?.foil || false, owned?.condition)}
+                          >
+                            −
+                          </button>
+                        )}
+                        {qty > 0 && <span className="qty-stepper__count">{qty}</span>}
+                        <button
+                          type="button"
+                          className="qty-stepper__btn qty-stepper__btn--add"
+                          aria-label={`Add one ${card.name}`}
+                          onClick={() =>
+                            handleChecklistQuantity(card, qty + 1, owned?.foil || false, owned?.condition || "Near Mint")
+                          }
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="foil-toggle"
+                        role="switch"
+                        aria-checked={!!owned?.foil}
+                        aria-label={`${card.name} is foil`}
+                        onClick={() => handleChecklistQuantity(card, qty || 1, !owned?.foil, owned?.condition || "Near Mint")}
+                      >
+                        <span className="foil-toggle__track">
+                          <span className="foil-toggle__thumb" />
+                        </span>
+                        <span className="foil-toggle__label">Foil</span>
+                      </button>
+
+                      {qty > 0 && (
+                        <select
+                          className="condition-select"
+                          value={owned?.condition || "Near Mint"}
+                          onChange={(e) => handleChecklistQuantity(card, qty, owned?.foil || false, e.target.value)}
+                          aria-label={`Condition for ${card.name}`}
+                        >
+                          {CARD_CONDITIONS.map((c) => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                   </li>
                 );

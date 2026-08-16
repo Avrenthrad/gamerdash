@@ -730,6 +730,9 @@ create table public.mtg_binder_cards (
   set_code text,
   quantity integer not null default 1,
   foil boolean default false,
+  -- Standard 5-point TCG grading scale (same one TCGplayer/Card
+  -- Kingdom use) — matches mtg_collection.condition below.
+  condition text default 'Near Mint',
   added_at timestamptz default now(),
   unique (binder_id, scryfall_id)
 );

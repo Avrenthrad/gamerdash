@@ -202,7 +202,7 @@ export async function fetchBinderCards(binderId) {
 // One row per card per binder — re-adding the same card updates its
 // quantity instead of stacking a duplicate row (see the unique
 // (binder_id, scryfall_id) constraint in schema.sql).
-export async function setBinderCardQuantity(binderId, card, quantity, { foil = false } = {}) {
+export async function setBinderCardQuantity(binderId, card, quantity, { foil = false, condition = "Near Mint" } = {}) {
   if (quantity <= 0) {
     const { error } = await supabase
       .from("mtg_binder_cards")
@@ -222,6 +222,7 @@ export async function setBinderCardQuantity(binderId, card, quantity, { foil = f
         card_name: card.name,
         set_code: card.setCode,
         quantity,
+        condition,
         foil,
       },
       { onConflict: "binder_id,scryfall_id" }
