@@ -25,6 +25,7 @@ import ReorderableList from "./ReorderableList";
 import { faviconFor, shortStoreName } from "./price/priceUtils";
 import { COLLEGES as ALL_COLLEGES } from "../data/colleges";
 import { supabase } from "../lib/supabaseClient";
+import { fetchMyFriendCode } from "../lib/friends";
 
 const platforms = [
   { id: "steam", label: "Steam", placeholder: "e.g. mysteamname" },
@@ -85,10 +86,15 @@ export default function AccountSettingsPage({
   selectedColleges,
   onSelectedCollegesChange,
   userId,
+  onGoToFriends,
 }) {
-  // Genuinely fine to stay local — this is just "is the QR popup
-  // currently open," not data worth persisting across sessions.
-  const [showQr, setShowQr] = useState(false);
+  const [friendCode, setFriendCode] = useState("");
+  useEffect(() => {
+    if (!userId) return;
+    fetchMyFriendCode(userId)
+      .then(setFriendCode)
+      .catch((err) => console.error("Failed to load friend code:", err));
+  }, [userId]);
 
   const details = profileDetails || {};
   const phoneNumber = details.phoneNumber || "";
@@ -488,31 +494,24 @@ export default function AccountSettingsPage({
         </label>
       </section>
 
-      {/* Add friends */}
+      {/* Add friends — a real per-account code (profiles.friend_code),
+          not the hardcoded placeholder this used to show. Managing
+          requests/removing friends lives on the real Friends page;
+          this is just the "here's your code" quick-reference. */}
       <section className="settings-card">
         <h2 className="settings-card__title">Add friends</h2>
         <p className="settings-card__note">
-          Friends can add you by phone number, your Lykodex friend code, or by scanning your QR code.
-          Your username can be changed any time — your friend code below never changes, so
-          friends who've added you stay connected even if you rename yourself.
+          Your friend code never changes, even if you rename your username later.
         </p>
 
         <div className="friend-code-row">
-          <span className="friend-code-row__code">GD-4F9K-772X</span>
-          <button type="button" className="linking-row__connect" onClick={() => setShowQr(!showQr)}>
-            {showQr ? "Hide QR code" : "Show QR code"}
-          </button>
+          <span className="friend-code-row__code">{friendCode || "…"}</span>
+          {onGoToFriends && (
+            <button type="button" className="linking-row__connect" onClick={onGoToFriends}>
+              Manage friends
+            </button>
+          )}
         </div>
-
-        {showQr && (
-          <div className="qr-placeholder" role="img" aria-label="QR code for adding this Lykodex friend code">
-            <div className="qr-placeholder__grid">
-              {Array.from({ length: 49 }).map((_, i) => (
-                <span key={i} className={i % 3 === 0 || i % 7 === 0 ? "is-dark" : ""} />
-              ))}
-            </div>
-          </div>
-        )}
       </section>
 
       <p className="panel__status">Changes save automatically as you type.</p>

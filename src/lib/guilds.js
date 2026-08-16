@@ -7,6 +7,7 @@
 // See schema.sql for the full reasoning.
 
 import { supabase } from "./supabaseClient";
+import { getPublicProfiles } from "./publicProfiles";
 
 const EVENT_LABELS = {
   achievement_unlocked: "unlocked an achievement in",
@@ -34,10 +35,12 @@ export async function fetchGuilds() {
   return data || [];
 }
 
-export async function createGuild(userId, name) {
+export async function createGuild(userId, name, isPrivate = false) {
   const { data, error } = await supabase
     .from("guilds")
-    .insert({ name, created_by: userId })
+    // code is generated server-side by the on_guild_created trigger —
+    // never set client-side.
+    .insert({ name, created_by: userId, is_private: isPrivate })
     .select()
     .single();
   if (error) throw error;
@@ -52,6 +55,17 @@ export async function joinGuild(guildId, userId) {
   const { error } = await supabase.from("guild_members").insert({ guild_id: guildId, user_id: userId });
   if (error) throw error;
   await logGuildActivity(guildId, userId, "joined_guild", {});
+}
+
+// Real, immediate join via a guild's own unique code — same trust
+// model as a Discord invite link. Goes through a SECURITY DEFINER
+// function since it has to work for private guilds too (which a
+// plain client-side insert into guild_members can't reach — see
+// schema.sql for why the membership INSERT policy was tightened).
+export async function joinGuildByCode(code) {
+  const { data, error } = await supabase.rpc("join_guild_by_code", { p_code: code });
+  if (error) throw error;
+  return data;
 }
 
 export async function leaveGuild(guildId, userId) {
@@ -71,6 +85,117 @@ export async function fetchGuildMembers(guildId) {
     .order("joined_at", { ascending: true });
   if (error) throw error;
   return data || [];
+}
+
+// Same as fetchGuildMembers but enriched with real names/avatars for
+// display — used by the Guild Settings roster.
+export async function fetchGuildMembersWithProfiles(guildId) {
+  const members = await fetchGuildMembers(guildId);
+  const profiles = await getPublicProfiles(members.map((m) => m.user_id));
+  const profileById = Object.fromEntries(profiles.map((p) => [p.id, p]));
+  return members.map((m) => ({ ...m, profile: profileById[m.user_id] || null }));
+}
+
+// ---------- Privacy: browsable/request-to-join ----------
+
+export async function updateGuildPrivacy(guildId, isPrivate) {
+  const { error } = await supabase.from("guilds").update({ is_private: isPrivate }).eq("id", guildId);
+  if (error) throw error;
+}
+
+export async function requestToJoinGuild(guildId, userId) {
+  const { error } = await supabase.from("guild_join_requests").insert({ guild_id: guildId, user_id: userId });
+  if (error) throw error;
+}
+
+export async function withdrawJoinRequest(requestId) {
+  const { error } = await supabase.from("guild_join_requests").delete().eq("id", requestId);
+  if (error) throw error;
+}
+
+export async function fetchMyJoinRequest(guildId, userId) {
+  const { data, error } = await supabase
+    .from("guild_join_requests")
+    .select("*")
+    .eq("guild_id", guildId)
+    .eq("user_id", userId)
+    .eq("status", "pending")
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+// Owner-only view — every pending request for a guild they created,
+// enriched with the requester's real name/avatar.
+export async function fetchJoinRequestsForGuild(guildId) {
+  const { data, error } = await supabase
+    .from("guild_join_requests")
+    .select("*")
+    .eq("guild_id", guildId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+
+  const profiles = await getPublicProfiles(data.map((r) => r.user_id));
+  const profileById = Object.fromEntries(profiles.map((p) => [p.id, p]));
+  return data.map((r) => ({ ...r, profile: profileById[r.user_id] || null }));
+}
+
+// Approve/decline both go through the same SECURITY DEFINER function
+// since approving also has to insert a membership row for someone who
+// isn't the caller — see respond_to_join_request() in schema.sql.
+export async function respondToJoinRequest(requestId, approve) {
+  const { error } = await supabase.rpc("respond_to_join_request", {
+    p_request_id: requestId,
+    p_approve: approve,
+  });
+  if (error) throw error;
+}
+
+// ---------- Invites ----------
+
+export async function inviteToGuild(guildId, invitedUserId, invitedBy) {
+  const { error } = await supabase
+    .from("guild_invites")
+    .insert({ guild_id: guildId, invited_user_id: invitedUserId, invited_by: invitedBy });
+  if (error) throw error;
+}
+
+export async function fetchMyGuildInvites(userId) {
+  const { data, error } = await supabase
+    .from("guild_invites")
+    .select("*, guilds(name, code, is_private)")
+    .eq("invited_user_id", userId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+// Two plain client-side steps rather than a function: flip the invite
+// to accepted, then insert the membership row — the second insert is
+// self-only (auth.uid() = invited user), already covered by the
+// tightened guild_members INSERT policy once the first step lands.
+export async function acceptGuildInvite(invite) {
+  const { error: updateError } = await supabase
+    .from("guild_invites")
+    .update({ status: "accepted", responded_at: new Date().toISOString() })
+    .eq("id", invite.id);
+  if (updateError) throw updateError;
+  await joinGuild(invite.guild_id, invite.invited_user_id);
+}
+
+export async function declineGuildInvite(inviteId) {
+  const { error } = await supabase
+    .from("guild_invites")
+    .update({ status: "declined", responded_at: new Date().toISOString() })
+    .eq("id", inviteId);
+  if (error) throw error;
+}
+
+export async function revokeGuildInvite(inviteId) {
+  const { error } = await supabase.from("guild_invites").delete().eq("id", inviteId);
+  if (error) throw error;
 }
 
 export async function fetchMyGuilds(userId) {

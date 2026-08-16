@@ -44,6 +44,7 @@ const MtgCollectionPage = lazy(() => import("./components/MtgCollectionPage"));
 const MtgDeckBuilderPage = lazy(() => import("./components/MtgDeckBuilderPage"));
 const MtgScanPage = lazy(() => import("./components/MtgScanPage"));
 const GuildsPage = lazy(() => import("./components/GuildsPage"));
+const FriendsPage = lazy(() => import("./components/FriendsPage"));
 const OverviewPage = lazy(() => import("./components/OverviewPage"));
 const TcgHomePage = lazy(() => import("./components/TcgHomePage"));
 const LibraryPage = lazy(() => import("./components/LibraryPage"));
@@ -301,6 +302,7 @@ export default function App() {
                 selectedColleges={selectedColleges}
                 onSelectedCollegesChange={setSelectedColleges}
                 userId={userId}
+                onGoToFriends={() => goTo("friends")}
               />
             ) : (
               <AccountGatePage
@@ -407,7 +409,17 @@ export default function App() {
 
           {view === "guilds" && (
             <GuildsPage
-              onBack={() => goTo("dashboard")}
+              onBack={() => goTo("overview")}
+              userId={userId}
+              isLoggedIn={isLoggedIn}
+              onSignIn={() => goTo("login", "login")}
+              onCreateAccount={() => goTo("login", "signup")}
+            />
+          )}
+
+          {view === "friends" && (
+            <FriendsPage
+              onBack={() => goTo("overview")}
               userId={userId}
               isLoggedIn={isLoggedIn}
               onSignIn={() => goTo("login", "login")}

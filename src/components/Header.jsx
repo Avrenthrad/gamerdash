@@ -1,15 +1,14 @@
 // Top navigation bar.
-// - Left: clicking the logo opens a full-height drawer linking to each
-//   of the 4 dashboard sections, plus standalone pages like Store
-//   Tracker and Upcoming Releases that get a full page instead of an
-//   in-page scroll (see handleCategoryClick below).
-// - Center: the "Lykodex" banner + logo — clicking it goes back to
-//   the dashboard home.
-// - Right: Login button (small popover with Sign in / New account) or
-//   the user's avatar once signed in, the unified GD Score, and the
-//   gear icon which opens a full-height drawer for account pages.
-// The GD Score is a placeholder for Stage 1 — it gets calculated for
-// real in Stage 9 (the achievement scoring algorithm).
+// - Left: light/dark theme toggle.
+// - Center: the "Lykodex" banner/logo — clicking it goes to Overview.
+// - Right: quick-jump search, the notifications bell (real Guild
+//   activity), the unified GD Score, and — once signed in — the
+//   avatar, which opens ONE consolidated account drawer (Social,
+//   Account Settings, Account Linking, Dashfeed Settings, Log out).
+//   There used to be a second, separate gear-icon menu here with an
+//   overlapping subset of the same destinations — merged into the one
+//   avatar drawer below so there's a single place to look, not two.
+// - Below the header: the College tabs row (Overview + the 5 Colleges).
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import LykodexLogo from "./LykodexLogo";
@@ -49,7 +48,8 @@ const NAV_INDEX = [
   { label: "Entertainment", view: "college-entertainment", keywords: "movies tv anime books" },
   { label: "Collectibles", view: "college-collectibles", keywords: "shelf funko lego statues" },
   { label: "Tabletop", view: "college-tabletop", keywords: "rpg dnd wargames dice" },
-  { label: "Guilds", view: "guilds", keywords: "social friends activity" },
+  { label: "Guilds", view: "guilds", keywords: "social friends activity crew" },
+  { label: "Friends", view: "friends", keywords: "social guilds add friend code" },
   { label: "Account Settings", view: "settings", keywords: "profile avatar theme" },
   { label: "Account Linking", view: "linking", keywords: "steam link connect" },
   { label: "Dashfeed Settings", view: "dashfeed", keywords: "toggles layout" },
@@ -383,9 +383,9 @@ export default function Header({
               <button
                 type="button"
                 className="dash-header__avatar-btn"
-                onClick={() => toggleMenu("avatar")}
-                aria-expanded={openMenu === "avatar"}
-                aria-label="Your account"
+                onClick={() => toggleMenu("settings")}
+                aria-expanded={openMenu === "settings"}
+                aria-label="Account menu"
               >
                 {avatarUrl && !avatarBroken ? (
                   <img
@@ -400,35 +400,6 @@ export default function Header({
                   </span>
                 )}
               </button>
-
-              {openMenu === "avatar" && (
-                <div className="dash-header__popover dash-header__popover--right">
-                  <button
-                    type="button"
-                    className="dash-header__popover-item"
-                    onClick={() => handleAccountClick("guilds")}
-                  >
-                    Guilds
-                  </button>
-                  <button
-                    type="button"
-                    className="dash-header__popover-item"
-                    onClick={() => handleAccountClick("settings")}
-                  >
-                    Account Settings
-                  </button>
-                  <button
-                    type="button"
-                    className="dash-header__popover-item dash-header__popover-item--danger"
-                    onClick={() => {
-                      closeMenu();
-                      onLogout();
-                    }}
-                  >
-                    Log out
-                  </button>
-                </div>
-              )}
             </div>
           ) : (
             <div className="dash-header__menu-wrap">
@@ -462,20 +433,6 @@ export default function Header({
             </div>
           )}
 
-          <div className="dash-header__menu-wrap">
-            <button
-              type="button"
-              className="dash-header__gear"
-              onClick={() => toggleMenu("settings")}
-              aria-expanded={openMenu === "settings"}
-              aria-label="Account menu"
-            >
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-            </button>
-          </div>
         </div>
         </div>
       </header>
@@ -527,19 +484,29 @@ export default function Header({
             </button>
           </div>
           <div className="dash-drawer__list">
+            <span className="dash-drawer__section-label">Social</span>
             <button
               type="button"
               className="dash-drawer__item"
-              onClick={() => handleAccountClick("dashfeed")}
+              onClick={() => handleAccountClick("guilds")}
             >
-              Dashfeed Settings
+              Guilds
             </button>
+            <button
+              type="button"
+              className="dash-drawer__item"
+              onClick={() => handleAccountClick("friends")}
+            >
+              Friends
+            </button>
+
+            <span className="dash-drawer__section-label">Account</span>
             <button
               type="button"
               className="dash-drawer__item"
               onClick={() => handleAccountClick("settings")}
             >
-              Account Management
+              Account Settings
             </button>
             <button
               type="button"
@@ -547,6 +514,25 @@ export default function Header({
               onClick={() => handleAccountClick("linking")}
             >
               Account Linking
+            </button>
+            <button
+              type="button"
+              className="dash-drawer__item"
+              onClick={() => handleAccountClick("dashfeed")}
+            >
+              Dashfeed Settings
+            </button>
+
+            <div className="dash-drawer__divider" />
+            <button
+              type="button"
+              className="dash-drawer__item dash-drawer__item--danger"
+              onClick={() => {
+                closeMenu();
+                onLogout();
+              }}
+            >
+              Log out
             </button>
           </div>
         </div>

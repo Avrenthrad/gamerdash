@@ -818,3 +818,478 @@ alter table public.profiles add column if not exists mastery_level integer defau
 -- final number with no way to see where it came from.
 alter table public.profiles add column if not exists mastery_breakdown jsonb;
 alter table public.profiles add column if not exists mastery_computed_at timestamptz;
+
+-- ============================================================
+-- Social: friend codes, friends, and Guild privacy/invites/join
+-- requests/codes.
+--
+-- Design notes:
+--   - Friends are mutual (request -> accept), same model as Discord/
+--     Steam, not a one-way follow. Stored as two symmetric rows in
+--     `friends` (one per direction) so "who are my friends" is a
+--     single flat query either direction.
+--   - Guilds can be public (browsable, joinable by REQUEST that the
+--     owner approves) or private (hidden from browsing, joinable only
+--     by direct invite from an existing member, or by entering the
+--     guild's own unique code). A guild code is effectively an invite
+--     link substitute — knowing it is enough to join immediately.
+--   - The plain client-side "insert yourself into guild_members"
+--     policy that existed before this migration was WIDE OPEN (any
+--     signed-in user could join literally any guild with no gating at
+--     all) — that's tightened here to only two directly-RLS-provable
+--     cases (you created the guild; you have an accepted invite).
+--     Code-based joins and request-approval both need to insert a
+--     membership row on behalf of a DIFFERENT decision (a code
+--     matching, or an owner's approval) that plain per-row RLS can't
+--     express cleanly, so those go through small SECURITY DEFINER
+--     functions below — same pattern this file already uses for
+--     handle_new_user(), each one narrowly scoped and re-checking
+--     auth.uid() itself rather than trusting the caller.
+--   - Friend-code lookup ("find this user by their code") deliberately
+--     does NOT relax the profiles SELECT policy (auth.uid() = id) —
+--     that would leak xbxprices_key/platprices_key/profile_details
+--     (which holds a phone number) to anyone who can guess a code.
+--     Instead, find_user_by_friend_code() is a SECURITY DEFINER
+--     function that returns only a safe, minimal column subset.
+-- ============================================================
+
+-- ---------- Shared short-code generator ----------
+-- Used for both a user's own friend code and a guild's join code —
+-- same format, different prefix. Not guaranteed globally unique on
+-- its own; every call site loops until a real uniqueness check passes.
+create or replace function public.generate_short_code(p_prefix text)
+returns text as $$
+begin
+  return p_prefix || '-' ||
+    upper(substr(md5(random()::text || clock_timestamp()::text), 1, 4)) || '-' ||
+    upper(substr(md5(random()::text || clock_timestamp()::text), 1, 4));
+end;
+$$ language plpgsql set search_path = public;
+
+-- ---------- profiles: friend_code ----------
+alter table public.profiles add column if not exists friend_code text unique;
+
+-- Backfill real codes for any profile that predates this column
+-- (existing real accounts) — additive, touches nothing else.
+do $$
+declare
+  r record;
+  v_code text;
+begin
+  for r in select id from public.profiles where friend_code is null loop
+    loop
+      v_code := public.generate_short_code('LYK');
+      exit when not exists (select 1 from public.profiles where friend_code = v_code);
+    end loop;
+    update public.profiles set friend_code = v_code where id = r.id;
+  end loop;
+end $$;
+
+-- New signups now get a real code at the same time their blank
+-- profile row is created, instead of the hardcoded placeholder the
+-- UI used to show.
+create or replace function public.handle_new_user()
+returns trigger as $$
+declare
+  v_code text;
+begin
+  loop
+    v_code := public.generate_short_code('LYK');
+    exit when not exists (select 1 from public.profiles where friend_code = v_code);
+  end loop;
+  insert into public.profiles (id, friend_code) values (new.id, v_code);
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+-- Safe, minimal lookup for "add a friend by their code" — never
+-- exposes API keys, phone number, or anything else profiles holds.
+create or replace function public.find_user_by_friend_code(p_code text)
+returns table(id uuid, username text, first_name text, last_name text, avatar_url text) as $$
+  select id, username, first_name, last_name, avatar_url
+  from public.profiles
+  where friend_code = upper(trim(p_code));
+$$ language sql security definer set search_path = public;
+
+-- ---------- Friends (mutual) ----------
+create table public.friends (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  friend_id uuid references auth.users on delete cascade not null,
+  created_at timestamptz default now(),
+  unique (user_id, friend_id),
+  check (user_id <> friend_id)
+);
+
+alter table public.friends enable row level security;
+
+create policy "Users can view their own friend list"
+  on public.friends for select
+  using (auth.uid() = user_id);
+
+-- Either side of a friendship can remove either of the two symmetric
+-- rows — an unfriend shouldn't need the other person's cooperation.
+create policy "Either side can remove a friendship"
+  on public.friends for delete
+  using (auth.uid() = user_id or auth.uid() = friend_id);
+
+create index friends_user_id_idx on public.friends (user_id);
+
+create table public.friend_requests (
+  id uuid default gen_random_uuid() primary key,
+  sender_id uuid references auth.users on delete cascade not null,
+  receiver_id uuid references auth.users on delete cascade not null,
+  status text not null default 'pending' check (status in ('pending', 'accepted', 'declined')),
+  created_at timestamptz default now(),
+  responded_at timestamptz,
+  unique (sender_id, receiver_id),
+  check (sender_id <> receiver_id)
+);
+
+alter table public.friend_requests enable row level security;
+
+create policy "Sender and receiver can view a friend request"
+  on public.friend_requests for select
+  using (auth.uid() = sender_id or auth.uid() = receiver_id);
+
+-- status is forced to 'pending' here so a client can't insert a
+-- pre-approved request for themselves.
+create policy "Users can send a friend request"
+  on public.friend_requests for insert
+  with check (auth.uid() = sender_id and status = 'pending');
+
+-- The receiver can decline directly (a plain status flip, no other
+-- side effect); accepting goes through accept_friend_request() below
+-- since it also has to write the other person's friends row.
+create policy "Receiver can decline a friend request"
+  on public.friend_requests for update
+  using (auth.uid() = receiver_id and status = 'pending')
+  with check (status = 'declined');
+
+-- The sender can delete their own pending/declined request to retry
+-- later (the unique constraint would otherwise block a resend).
+create policy "Sender can withdraw their own request"
+  on public.friend_requests for delete
+  using (auth.uid() = sender_id);
+
+create index friend_requests_receiver_id_idx on public.friend_requests (receiver_id);
+
+-- Accept path: verifies the caller is really the invited recipient,
+-- then writes both symmetric friends rows in one trusted step —
+-- plain RLS can't let the receiver insert a row "on behalf of" the
+-- sender, which is exactly what the reverse-direction row is.
+create or replace function public.accept_friend_request(p_request_id uuid)
+returns void as $$
+declare
+  v_sender uuid;
+  v_receiver uuid;
+begin
+  select sender_id, receiver_id into v_sender, v_receiver
+  from public.friend_requests
+  where id = p_request_id and status = 'pending';
+
+  if v_sender is null then
+    raise exception 'Friend request not found or already handled';
+  end if;
+
+  if auth.uid() is distinct from v_receiver then
+    raise exception 'Only the recipient can accept this request';
+  end if;
+
+  update public.friend_requests set status = 'accepted', responded_at = now() where id = p_request_id;
+
+  insert into public.friends (user_id, friend_id) values (v_sender, v_receiver) on conflict do nothing;
+  insert into public.friends (user_id, friend_id) values (v_receiver, v_sender) on conflict do nothing;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+-- ---------- Guilds: privacy + unique code ----------
+alter table public.guilds add column if not exists is_private boolean not null default false;
+alter table public.guilds add column if not exists code text unique;
+
+do $$
+declare
+  r record;
+  v_code text;
+begin
+  for r in select id from public.guilds where code is null loop
+    loop
+      v_code := public.generate_short_code('GLD');
+      exit when not exists (select 1 from public.guilds where code = v_code);
+    end loop;
+    update public.guilds set code = v_code where id = r.id;
+  end loop;
+end $$;
+
+create or replace function public.handle_new_guild()
+returns trigger as $$
+declare
+  v_code text;
+begin
+  if new.code is null then
+    loop
+      v_code := public.generate_short_code('GLD');
+      exit when not exists (select 1 from public.guilds where code = v_code);
+    end loop;
+    new.code := v_code;
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+create trigger on_guild_created
+  before insert on public.guilds
+  for each row execute procedure public.handle_new_guild();
+
+-- Recursion-safe helper functions for policies elsewhere in this
+-- file that need to check guild ownership/membership. A policy that
+-- queries guild_members (even indirectly — e.g. guilds' own policy
+-- querying guild_members, which then needs guild_members' policy
+-- evaluated, which queries guilds again...) causes Postgres error
+-- 42P17 "infinite recursion detected in policy" — confirmed live via
+-- a real end-to-end signup/guild-create test, not theoretical.
+-- SECURITY DEFINER functions bypass RLS internally (same mechanism as
+-- handle_new_user()), so routing these checks through them instead of
+-- raw subqueries breaks the cycle. (has_pending_guild_invite and
+-- has_accepted_guild_invite are defined further down, right after
+-- guild_invites itself exists.)
+create or replace function public.is_guild_member(p_guild_id uuid, p_user_id uuid)
+returns boolean as $$
+  select exists (select 1 from public.guild_members where guild_id = p_guild_id and user_id = p_user_id);
+$$ language sql security definer set search_path = public stable;
+
+create or replace function public.is_guild_owner(p_guild_id uuid, p_user_id uuid)
+returns boolean as $$
+  select exists (select 1 from public.guilds where id = p_guild_id and created_by = p_user_id);
+$$ language sql security definer set search_path = public stable;
+
+create or replace function public.guild_is_private(p_guild_id uuid)
+returns boolean as $$
+  select coalesce((select is_private from public.guilds where id = p_guild_id), false);
+$$ language sql security definer set search_path = public stable;
+
+-- ---------- guild_join_requests ----------
+create table public.guild_join_requests (
+  id uuid default gen_random_uuid() primary key,
+  guild_id uuid references public.guilds on delete cascade not null,
+  user_id uuid references auth.users on delete cascade not null,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'declined')),
+  created_at timestamptz default now(),
+  responded_at timestamptz,
+  unique (guild_id, user_id)
+);
+
+alter table public.guild_join_requests enable row level security;
+
+create policy "Requester and guild owner can view a join request"
+  on public.guild_join_requests for select
+  using (
+    auth.uid() = user_id
+    or public.is_guild_owner(guild_id, auth.uid())
+  );
+
+-- status forced to 'pending' — same reasoning as friend_requests above.
+create policy "Users can request to join a guild"
+  on public.guild_join_requests for insert
+  with check (auth.uid() = user_id and status = 'pending');
+
+create policy "Requester can withdraw their own request"
+  on public.guild_join_requests for delete
+  using (auth.uid() = user_id);
+
+create index guild_join_requests_guild_id_idx on public.guild_join_requests (guild_id);
+
+-- Approve/decline both go through here rather than a plain UPDATE
+-- policy, since approving also has to insert a membership row for
+-- someone who isn't the caller.
+create or replace function public.respond_to_join_request(p_request_id uuid, p_approve boolean)
+returns void as $$
+declare
+  v_guild_id uuid;
+  v_user_id uuid;
+  v_owner uuid;
+begin
+  select guild_id, user_id into v_guild_id, v_user_id
+  from public.guild_join_requests
+  where id = p_request_id and status = 'pending';
+
+  if v_guild_id is null then
+    raise exception 'Join request not found or already handled';
+  end if;
+
+  select created_by into v_owner from public.guilds where id = v_guild_id;
+  if auth.uid() is distinct from v_owner then
+    raise exception 'Only the guild owner can respond to join requests';
+  end if;
+
+  update public.guild_join_requests
+  set status = case when p_approve then 'approved' else 'declined' end,
+      responded_at = now()
+  where id = p_request_id;
+
+  if p_approve then
+    insert into public.guild_members (guild_id, user_id)
+    values (v_guild_id, v_user_id)
+    on conflict (guild_id, user_id) do nothing;
+  end if;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+-- Instant join for anyone who has the guild's real code — the code
+-- itself is the authorization, same trust model as a Discord invite
+-- link. Looks the guild up internally (bypassing the private-guild
+-- browse restriction above on purpose: knowing the code is enough).
+create or replace function public.join_guild_by_code(p_code text)
+returns public.guilds as $$
+declare
+  v_guild public.guilds;
+begin
+  select * into v_guild from public.guilds where code = upper(trim(p_code));
+  if v_guild.id is null then
+    raise exception 'Invalid guild code';
+  end if;
+
+  insert into public.guild_members (guild_id, user_id)
+  values (v_guild.id, auth.uid())
+  on conflict (guild_id, user_id) do nothing;
+
+  return v_guild;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+-- ---------- guild_invites ----------
+create table public.guild_invites (
+  id uuid default gen_random_uuid() primary key,
+  guild_id uuid references public.guilds on delete cascade not null,
+  invited_user_id uuid references auth.users on delete cascade not null,
+  invited_by uuid references auth.users on delete set null,
+  status text not null default 'pending' check (status in ('pending', 'accepted', 'declined')),
+  created_at timestamptz default now(),
+  responded_at timestamptz,
+  unique (guild_id, invited_user_id)
+);
+
+alter table public.guild_invites enable row level security;
+
+create policy "Invited user, inviter, or guild owner can view an invite"
+  on public.guild_invites for select
+  using (
+    auth.uid() = invited_user_id
+    or auth.uid() = invited_by
+    or public.is_guild_owner(guild_id, auth.uid())
+  );
+
+-- Only an existing member can invite someone else in, and only as
+-- themselves (invited_by) — status forced to 'pending' at insert.
+create policy "Existing members can invite someone to their guild"
+  on public.guild_invites for insert
+  with check (
+    auth.uid() = invited_by
+    and status = 'pending'
+    and public.is_guild_member(guild_id, auth.uid())
+  );
+
+-- The invited person accepts/declines directly — no cross-user insert
+-- needed here (unlike friend requests/join requests), since accepting
+-- just flips this row's status; the actual guild_members insert is a
+-- separate, self-only insert the invited user makes right after (see
+-- lib/guilds.js acceptGuildInvite), already covered by the
+-- guild_members INSERT policy above.
+create policy "Invited user can accept or decline their own invite"
+  on public.guild_invites for update
+  using (auth.uid() = invited_user_id and status = 'pending')
+  with check (status in ('accepted', 'declined'));
+
+create policy "Inviter or guild owner can revoke a pending invite"
+  on public.guild_invites for delete
+  using (
+    (auth.uid() = invited_by and status = 'pending')
+    or public.is_guild_owner(guild_id, auth.uid())
+  );
+
+create index guild_invites_invited_user_id_idx on public.guild_invites (invited_user_id);
+create index guild_invites_guild_id_idx on public.guild_invites (guild_id);
+
+-- Batched version of find_user_by_friend_code's safe-subset pattern —
+-- lets the UI render real names/avatars for a guild roster, pending
+-- invites, or a friends list without broadening the profiles table's
+-- own SELECT policy (which stays strictly self-only).
+create or replace function public.get_public_profiles(p_ids uuid[])
+returns table(id uuid, username text, first_name text, last_name text, avatar_url text) as $$
+  select id, username, first_name, last_name, avatar_url
+  from public.profiles
+  where id = any(p_ids);
+$$ language sql security definer set search_path = public;
+
+-- ---------- guilds / guild_members / guild_invites / guild_join_requests:
+-- privacy policies ----------
+-- is_guild_member/is_guild_owner/guild_is_private are defined earlier
+-- (right after guilds gains is_private/code); these last two need
+-- guild_invites to exist first, so they're defined here instead.
+
+create or replace function public.has_pending_guild_invite(p_guild_id uuid, p_user_id uuid)
+returns boolean as $$
+  select exists (select 1 from public.guild_invites where guild_id = p_guild_id and invited_user_id = p_user_id);
+$$ language sql security definer set search_path = public stable;
+
+create or replace function public.has_accepted_guild_invite(p_guild_id uuid, p_user_id uuid)
+returns boolean as $$
+  select exists (
+    select 1 from public.guild_invites
+    where guild_id = p_guild_id and invited_user_id = p_user_id and status = 'accepted'
+  );
+$$ language sql security definer set search_path = public stable;
+
+-- Private guilds are hidden from browsing unless you're the creator,
+-- an existing member, or someone with a pending invite — replaces the
+-- old "any signed-in user can see every guild" policy.
+drop policy if exists "Any signed-in user can browse guilds" on public.guilds;
+drop policy if exists "Browse public guilds, or private ones you're connected to" on public.guilds;
+
+create policy "Browse public guilds, or private ones you're connected to"
+  on public.guilds for select
+  using (
+    auth.uid() is not null
+    and (
+      not is_private
+      or created_by = auth.uid()
+      or public.is_guild_member(id, auth.uid())
+      or public.has_pending_guild_invite(id, auth.uid())
+    )
+  );
+
+create policy "Only the creator can change privacy/name"
+  on public.guilds for update
+  using (auth.uid() = created_by);
+
+-- Previously: anyone signed in could insert themselves into ANY
+-- guild's membership, no gating at all. Now only two directly-provable
+-- cases go through plain RLS (you created this guild; you have an
+-- accepted invite) — join-by-code and approved join requests both
+-- insert membership via the SECURITY DEFINER functions above instead,
+-- since those depend on a decision (a code matching, an owner's
+-- approval) plain per-row RLS can't express.
+drop policy if exists "Users can join a guild themselves" on public.guild_members;
+drop policy if exists "Join via creating the guild or an accepted invite" on public.guild_members;
+
+create policy "Join via creating the guild or an accepted invite"
+  on public.guild_members for insert
+  with check (
+    auth.uid() = user_id
+    and (
+      public.is_guild_owner(guild_id, auth.uid())
+      or public.has_accepted_guild_invite(guild_id, auth.uid())
+    )
+  );
+
+-- Rosters of private guilds are members-only; public guild rosters
+-- stay visible to anyone signed in, same as before.
+drop policy if exists "Any signed-in user can view guild rosters" on public.guild_members;
+drop policy if exists "View rosters of public guilds, or private ones you're in" on public.guild_members;
+
+create policy "View rosters of public guilds, or private ones you're in"
+  on public.guild_members for select
+  using (
+    not public.guild_is_private(guild_id)
+    or public.is_guild_member(guild_id, auth.uid())
+  );
