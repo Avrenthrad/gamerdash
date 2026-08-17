@@ -4,11 +4,15 @@
 // structure. See Header.jsx for GAMING_SIDEBAR_ITEMS/GAMING_VIEWS.
 
 import { GAMING_SIDEBAR_ITEMS } from "./Header";
+import CollegeIcon from "./CollegeIcon";
 
 export default function GamingSidebar({ currentView, onNavigate }) {
   return (
     <aside className="gaming-sidebar">
-      <span className="gaming-sidebar__label">Gaming</span>
+      <span className="gaming-sidebar__label">
+        <CollegeIcon collegeId="gaming" size={16} />
+        Gaming
+      </span>
       {GAMING_SIDEBAR_ITEMS.map((item) => (
         <button
           key={item.id}

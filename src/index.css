@@ -4627,7 +4627,6 @@ html[data-mode="light"] .current-rotation {
 }
 
 .college-picker-card__icon {
-  color: var(--accent);
   margin-bottom: 2px;
 }
 
@@ -4694,7 +4693,6 @@ html[data-mode="light"] .current-rotation {
 }
 
 .overview-card__icon {
-  color: var(--accent);
   display: flex;
 }
 
@@ -4760,15 +4758,6 @@ html[data-mode="light"] .current-rotation {
     box-shadow 0.2s ease;
 }
 
-.college-tabs__item .college-icon {
-  opacity: 0.75;
-  transition: opacity 0.2s ease;
-}
-
-.college-tabs__item--active .college-icon {
-  opacity: 1;
-}
-
 .college-tabs__item:hover {
   color: var(--text-primary);
   background: var(--surface-raised);
@@ -4828,6 +4817,9 @@ html[data-mode="light"] .current-rotation {
 }
 
 .gaming-sidebar__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
