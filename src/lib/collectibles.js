@@ -31,6 +31,8 @@ export async function addCollectible(userId, entry) {
     acquired_at: entry.acquiredAt || null,
     notes: entry.notes || null,
     is_wishlist: entry.isWishlist || false,
+    source: entry.source || "user",
+    cover_image_url: entry.coverImageUrl || null,
   });
   if (error) throw error;
 }

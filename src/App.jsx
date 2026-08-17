@@ -39,6 +39,7 @@ const PriceComparisonPage = lazy(() => import("./components/PriceComparisonPage"
 const HypeChartsPage = lazy(() => import("./components/HypeChartsPage"));
 const MarketPage = lazy(() => import("./components/MarketPage"));
 const BacklogPage = lazy(() => import("./components/BacklogPage"));
+const AchievementsPage = lazy(() => import("./components/AchievementsPage"));
 const UpcomingReleasesPage = lazy(() => import("./components/UpcomingReleasesPage"));
 const MtgSearchPage = lazy(() => import("./components/MtgSearchPage"));
 const MtgCollectionPage = lazy(() => import("./components/MtgCollectionPage"));
@@ -397,6 +398,17 @@ export default function App() {
             ) : (
               <AccountGatePage
                 title="Backlog"
+                onSignIn={() => goTo("login", "login")}
+                onCreateAccount={() => goTo("login", "signup")}
+              />
+            ))}
+
+          {view === "achievements" &&
+            (isLoggedIn ? (
+              <AchievementsPage onBack={() => goTo("dashboard")} userId={userId} linkedSteamId={linkedSteamId} />
+            ) : (
+              <AccountGatePage
+                title="Achievements"
                 onSignIn={() => goTo("login", "login")}
                 onCreateAccount={() => goTo("login", "signup")}
               />

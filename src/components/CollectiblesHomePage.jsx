@@ -1,11 +1,16 @@
-// Collectibles College — real personal inventory, now with real
-// section navigation (My Shelf / Add Item / Hardware / Wishlist /
-// Stats) matching the approved shell direction. Still pure CRUD, no
-// external API dependency yet — no general catalogue exists for most
-// of these types (Funko, statues, pins), verified during scoping.
+// Collectibles College — real personal inventory, with real section
+// navigation (My Shelf / Add Item / Hardware / Wishlist / Stats).
+// Add Item supports two real lookups: a camera barcode scan against a
+// generic public UPC database (lib/upc.js — covers any retail
+// product, since no general catalogue exists for most collectible
+// types), and a search against the real open Funko Pop catalog
+// (lib/funko.js). Everything else stays honest manual entry.
 
 import { useEffect, useState } from "react";
 import { fetchCollectibles, addCollectible, updateCollectible, removeCollectible } from "../lib/collectibles";
+import { lookupProductByBarcode } from "../lib/upc";
+import { searchFunkoCatalog } from "../lib/funko";
+import ProductBarcodeScanner from "./ProductBarcodeScanner";
 
 const TYPE_GROUPS = [
   { label: "Figures & Statues", types: ["figure", "statue", "funko_pop"] },
@@ -101,7 +106,9 @@ export default function CollectiblesHomePage({ onBack, isLoggedIn, userId, onSig
         <button type="button" className="back-link" onClick={onBack}>← Back to Overview</button>
         <h1 className="price-page__title">Collectibles</h1>
         <p className="price-page__subtitle">
-          My user-entered inventory. Real lookups (LEGO via Rebrickable, vinyl via Discogs) are a planned next step.
+          Scan a barcode or search the real Funko Pop catalog to add items fast — everything else
+          stays honest manual entry. Real lookups for LEGO (Rebrickable) and vinyl (Discogs) are a
+          planned next step.
         </p>
       </div>
 
@@ -158,6 +165,11 @@ function EntryList({ entries, emptyMessage, onStateChange, onRemove }) {
     <ul className="backlog-list">
       {entries.map((entry) => (
         <li key={entry.id} className="backlog-card">
+          {entry.cover_image_url ? (
+            <img src={entry.cover_image_url} alt="" className="backlog-card__thumb" />
+          ) : (
+            <div className="backlog-card__thumb backlog-card__thumb--placeholder" />
+          )}
           <div className="backlog-card__info">
             <span className="backlog-card__title">{entry.title} {entry.qty > 1 && `×${entry.qty}`}</span>
             <div className="backlog-card__meta">
@@ -194,6 +206,64 @@ function AddItemForm({ userId, onAdded }) {
   const [notes, setNotes] = useState("");
   const [isWishlist, setIsWishlist] = useState(false);
 
+  // Set by a barcode scan or a Funko catalog match — never by hand.
+  const [identifier, setIdentifier] = useState(null);
+  const [source, setSource] = useState("user");
+  const [coverImageUrl, setCoverImageUrl] = useState(null);
+
+  const [showScanner, setShowScanner] = useState(false);
+  const [scanStatus, setScanStatus] = useState("idle"); // idle | loading | found | not-found | error
+
+  const [showFunkoSearch, setShowFunkoSearch] = useState(false);
+  const [funkoQuery, setFunkoQuery] = useState("");
+  const [funkoResults, setFunkoResults] = useState([]);
+  const [funkoStatus, setFunkoStatus] = useState("idle"); // idle | loading | ready | error
+
+  async function handleBarcodeDetected(barcode) {
+    setShowScanner(false);
+    setScanStatus("loading");
+    try {
+      const match = await lookupProductByBarcode(barcode);
+      if (match) {
+        setTitle(match.title || title);
+        setCoverImageUrl(match.imageUrl);
+        setIdentifier(barcode);
+        setSource("upc");
+        setScanStatus("found");
+      } else {
+        setIdentifier(barcode);
+        setScanStatus("not-found");
+      }
+    } catch (err) {
+      console.error("Barcode lookup failed:", err);
+      setScanStatus("error");
+    }
+  }
+
+  async function handleFunkoSearch(e) {
+    e.preventDefault();
+    if (!funkoQuery.trim()) return;
+    setFunkoStatus("loading");
+    try {
+      const results = await searchFunkoCatalog(funkoQuery.trim());
+      setFunkoResults(results);
+      setFunkoStatus("ready");
+    } catch (err) {
+      console.error("Funko catalog search failed:", err);
+      setFunkoStatus("error");
+    }
+  }
+
+  function handlePickFunko(pop) {
+    setTitle(pop.series ? `${pop.title} (${pop.series})` : pop.title);
+    setCoverImageUrl(pop.imageUrl);
+    setIdentifier(pop.handle);
+    setSource("funko");
+    setShowFunkoSearch(false);
+    setFunkoResults([]);
+    setFunkoQuery("");
+  }
+
   async function handleAdd(e) {
     e.preventDefault();
     if (!title.trim()) return;
@@ -202,6 +272,7 @@ function AddItemForm({ userId, onAdded }) {
         type, title: title.trim(), packageState, condition,
         qty: Number(qty) || 1, pricePaid: pricePaid ? Number(pricePaid) : null,
         notes: notes.trim() || null, isWishlist,
+        identifier, source, coverImageUrl,
       });
       onAdded();
     } catch (err) {
@@ -211,6 +282,59 @@ function AddItemForm({ userId, onAdded }) {
 
   return (
     <form className="backlog-add" onSubmit={handleAdd} style={{ marginTop: "16px" }}>
+      <div className="settings-form-row">
+        <button type="button" className="quickdash-reset-btn" onClick={() => setShowScanner((v) => !v)}>
+          {showScanner ? "Cancel scan" : "📷 Scan a barcode"}
+        </button>
+        {type === "funko_pop" && (
+          <button type="button" className="quickdash-reset-btn" onClick={() => setShowFunkoSearch((v) => !v)}>
+            {showFunkoSearch ? "Cancel search" : "🔍 Search real Funko catalog"}
+          </button>
+        )}
+      </div>
+
+      {showScanner && <ProductBarcodeScanner onDetected={handleBarcodeDetected} onManualEntry={handleBarcodeDetected} />}
+      {scanStatus === "loading" && <p className="panel__status">Looking up that barcode…</p>}
+      {scanStatus === "found" && <p className="panel__status">Matched a real product — review the fields below before saving.</p>}
+      {scanStatus === "not-found" && <p className="panel__status">No match for that barcode — fill in the details manually below.</p>}
+      {scanStatus === "error" && <p className="panel__status panel__status--error">Barcode lookup failed — fill in the details manually below.</p>}
+
+      {showFunkoSearch && (
+        <div className="backlog-add">
+          <form className="price-search" onSubmit={handleFunkoSearch}>
+            <input
+              className="price-search__input"
+              type="text"
+              placeholder="Search the real Funko Pop catalog…"
+              value={funkoQuery}
+              onChange={(e) => setFunkoQuery(e.target.value)}
+            />
+            <button type="submit" className="price-search__button" disabled={funkoStatus === "loading"}>
+              {funkoStatus === "loading" ? "Searching…" : "Search"}
+            </button>
+          </form>
+          {funkoStatus === "error" && <p className="panel__status panel__status--error">Couldn't load the Funko catalog right now.</p>}
+          {funkoStatus === "ready" && funkoResults.length === 0 && <p className="panel__status">No matches — try a different search.</p>}
+          {funkoResults.length > 0 && (
+            <ul className="backlog-search-results">
+              {funkoResults.map((pop) => (
+                <li key={pop.handle} className="backlog-search-results__row">
+                  {pop.imageUrl && <img src={pop.imageUrl} alt="" />}
+                  <span>{pop.title}{pop.series ? ` — ${pop.series}` : ""}</span>
+                  <button type="button" className="linking-row__connect" onClick={() => handlePickFunko(pop)}>
+                    Use this
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {coverImageUrl && (
+        <img src={coverImageUrl} alt="" className="backlog-card__thumb" style={{ alignSelf: "flex-start" }} />
+      )}
+
       <label className="auth-form__field">
         <span>Type</span>
         <select value={type} onChange={(e) => setType(e.target.value)}>

@@ -42,6 +42,7 @@ export const GAMING_SIDEBAR_ITEMS = [
   { id: "library", label: "Library" },
   { id: "prices", label: "Prices & Wishlist" },
   { id: "backlog", label: "Backlog" },
+  { id: "achievements", label: "Achievements" },
   { id: "upcoming-releases", label: "Upcoming Releases" },
   { id: "guilds", label: "Guilds" },
 ];
@@ -50,7 +51,7 @@ export const GAMING_SIDEBAR_ITEMS = [
 // the Gaming tab should show as active and whether the sidebar shows.
 export const GAMING_VIEWS = [
   "dashboard", "library", "prices", "hype-charts", "market", "sales",
-  "backlog", "upcoming-releases", "linking", "settings", "dashfeed",
+  "backlog", "achievements", "upcoming-releases", "linking", "settings", "dashfeed",
 ];
 
 export const TCG_VIEWS = ["tcg-home", "mtg-search", "mtg-collection", "mtg-decks", "mtg-scan", "mtg-import"];

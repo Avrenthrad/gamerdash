@@ -1475,3 +1475,78 @@ create policy "Users can update their own wallpaper"
 create policy "Users can delete their own wallpaper"
   on storage.objects for delete
   using (bucket_id = 'wallpapers' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ---------- Gaming: Xbox/PlayStation achievement tracker (additive) ----------
+-- Steam achievements are fully real and automatic (GetSchemaForGame +
+-- GetPlayerAchievements, see lib/steam.js) so they're never stored here
+-- — the Steam half of the Achievements page is a live view, not data
+-- this app owns. Xbox and PlayStation have no public API for a user's
+-- own achievement/trophy list at all (same gap mastery_inputs already
+-- works around with self-reported aggregate numbers), so this is a
+-- genuine manual tracker: the person types in the achievement/trophy
+-- names themselves and ticks them off as they earn them. game_name is
+-- free text rather than a foreign key to a games table, same honest
+-- simplification platform_playtime already uses for these two
+-- platforms — there's no stable, app-wide ID system for Xbox/PS games
+-- here to hang a real foreign key off of.
+create table public.platform_achievements (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  platform text not null check (platform in ('xbox', 'playstation')),
+  game_name text not null,
+  achievement_name text not null,
+  description text,
+  unlocked boolean not null default false,
+  unlocked_at timestamptz,
+  added_at timestamptz default now(),
+  unique (user_id, platform, game_name, achievement_name)
+);
+
+alter table public.platform_achievements enable row level security;
+
+create policy "Users can manage their own platform achievements"
+  on public.platform_achievements for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create index platform_achievements_user_id_idx on public.platform_achievements (user_id);
+
+-- ---------- Collectibles: cover images + Funko/barcode provenance (additive) ----------
+-- collectible_entries had no image column at all before this. A Funko
+-- catalog match stores the catalog's own real hosted image URL
+-- directly (same precedent as user_books.cover_url from Open Library
+-- -- no re-upload needed); a barcode scan with no catalog match, or a
+-- plain manual add, can use the new collectible-covers bucket below
+-- for a user-uploaded photo instead.
+alter table public.collectible_entries add column if not exists cover_image_url text;
+
+-- 'funko' = matched against the real open Funko Pop catalog by name/
+-- series search. 'upc' = matched via a generic public UPC/barcode
+-- product database off a scanned barcode -- lower confidence than a
+-- catalog hit (generic retail data, not Funko-specific), but still a
+-- real external source, not invented.
+alter table public.collectible_entries drop constraint collectible_entries_source_check;
+alter table public.collectible_entries add constraint collectible_entries_source_check
+  check (source in ('user', 'rebrickable', 'brickset', 'discogs', 'igdb', 'amiiboapi', 'funko', 'upc'));
+
+-- Cover photo storage for collectibles -- identical pattern to the
+-- avatars/mtg-covers/entertainment-covers buckets above.
+insert into storage.buckets (id, name, public)
+values ('collectible-covers', 'collectible-covers', true)
+on conflict (id) do nothing;
+
+create policy "Collectible cover images are publicly viewable"
+  on storage.objects for select
+  using (bucket_id = 'collectible-covers');
+
+create policy "Users can upload their own collectible cover images"
+  on storage.objects for insert
+  with check (bucket_id = 'collectible-covers' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Users can update their own collectible cover images"
+  on storage.objects for update
+  using (bucket_id = 'collectible-covers' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Users can delete their own collectible cover images"
+  on storage.objects for delete
+  using (bucket_id = 'collectible-covers' and (storage.foldername(name))[1] = auth.uid()::text);
