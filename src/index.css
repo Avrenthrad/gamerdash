@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&family=Rajdhani:wght@600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap');
 
 :root {
   /* Base surfaces — black/red theme */
@@ -30,6 +30,29 @@
   --grad-rose:   linear-gradient(90deg, #F27E97, #B4204A);
   --grad-sky:    linear-gradient(90deg, #74C0F2, #2E5FCB);
   --grad-lime:   linear-gradient(90deg, #ACE063, #4B8A1F);
+
+  /* Radius scale — named steps over the card/control radii already
+     in use throughout the file, so new and touched rules converge on
+     one rhythm instead of each picking its own literal. */
+  --radius-sm: 7px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-pill: 999px;
+
+  /* Ring/glow — named versions of the color-mix() shadow idioms
+     already used ad hoc around the file (selected-card rings,
+     active-tab and boot-splash glows), so they read as one system. */
+  --ring-selected: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+  --ring-focus: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent);
+  --glow-accent-sm: 0 4px 18px color-mix(in srgb, var(--accent) 30%, transparent);
+  --glow-accent-lg: 0 0 46px color-mix(in srgb, var(--accent) 45%, transparent);
+
+  /* Text sitting on a solid accent-color fill (buttons, active nav,
+     badges) must stay white in both light and dark mode — var(--text)
+     flips to near-black in light mode, which would kill contrast on a
+     background that's still red. Not theme-reactive on purpose. */
+  --text-on-accent: #fff;
 
   --font-display: 'Space Grotesk', sans-serif;
   --font-body: 'Inter', sans-serif;
@@ -196,7 +219,7 @@ button { font-family: inherit; }
   border: none;
   cursor: pointer;
   padding: 4px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   justify-self: start;
 }
 
@@ -207,7 +230,7 @@ button { font-family: inherit; }
 .dash-header__mark {
   width: 36px;
   height: 36px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   display: block;
   object-fit: cover;
   filter: drop-shadow(0 0 8px color-mix(in srgb, var(--red) 35%, transparent));
@@ -221,7 +244,7 @@ button { font-family: inherit; }
   border: none;
   cursor: pointer;
   padding: 4px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   position: relative;
 }
 
@@ -282,14 +305,14 @@ button { font-family: inherit; }
 .dash-header__banner-mark {
   width: 34px;
   height: 34px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   display: block;
   object-fit: cover;
   filter: drop-shadow(0 0 8px color-mix(in srgb, var(--red) 35%, transparent));
 }
 
 .dash-header__banner-text {
-  font-family: 'Rajdhani', sans-serif;
+  font-family: var(--font-display);
   font-weight: 700;
   font-size: 26px;
   letter-spacing: 0.03em;
@@ -377,7 +400,7 @@ button { font-family: inherit; }
   background-color: var(--surface);
   background-repeat: no-repeat;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -492,7 +515,7 @@ button { font-family: inherit; }
 
 .deal-card {
   background: var(--surface-raised);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 14px;
   display: flex;
   flex-direction: column;
@@ -839,7 +862,7 @@ button { font-family: inherit; }
   gap: 16px;
   padding: 12px 14px;
   background: var(--surface-raised);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
 }
 
 @media (max-width: 720px) {
@@ -1008,11 +1031,11 @@ button { font-family: inherit; }
   margin-top: 4px;
   background: var(--grad-red);
   border: none;
-  color: #fff;
+  color: var(--text-on-accent);
   font-weight: 600;
   font-size: 14px;
   padding: 11px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 
@@ -1052,7 +1075,7 @@ button { font-family: inherit; }
   font-size: 13px;
   font-weight: 500;
   padding: 9px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 
@@ -1299,7 +1322,7 @@ button { font-family: inherit; }
   font-size: 13px;
   font-weight: 500;
   padding: 7px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 
@@ -1450,7 +1473,7 @@ button { font-family: inherit; }
   font-size: 13.5px;
   font-weight: 500;
   padding: 8px 18px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 
@@ -2219,11 +2242,11 @@ button { font-family: inherit; }
 .price-search__button {
   background: var(--grad-red);
   border: none;
-  color: #fff;
+  color: var(--text-on-accent);
   font-weight: 600;
   font-size: 13.5px;
   padding: 0 20px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 
@@ -2239,7 +2262,7 @@ button { font-family: inherit; }
 .wishlist-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   padding: 18px;
   display: flex;
   flex-direction: column;
@@ -2515,7 +2538,7 @@ button { font-family: inherit; }
   padding: 10px 14px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   width: 100%;
   font-family: inherit;
   color: var(--text);
@@ -2998,7 +3021,7 @@ button { font-family: inherit; }
 .account-gate-popover__primary {
   background: var(--grad-red);
   border: none;
-  color: #fff;
+  color: var(--text-on-accent);
   font-weight: 600;
   font-size: 12.5px;
   padding: 8px;
@@ -3154,7 +3177,7 @@ button { font-family: inherit; }
   font-size: 13px;
   font-weight: 500;
   padding: 8px 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 
@@ -3218,7 +3241,7 @@ button { font-family: inherit; }
   top: -7px;
   right: -6px;
   background: var(--grad-red);
-  color: #fff;
+  color: var(--text-on-accent);
   font-family: var(--font-mono);
   font-size: 9.5px;
   font-weight: 700;
@@ -3358,7 +3381,7 @@ button { font-family: inherit; }
 .fortnite-shop-item {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 10px;
   display: flex;
   flex-direction: column;
@@ -3914,7 +3937,7 @@ button { font-family: inherit; }
   gap: 16px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 16px;
   position: relative;
 }
@@ -4190,9 +4213,9 @@ button { font-family: inherit; }
 
 .current-rotation__btn {
   background: var(--red);
-  color: #fff;
+  color: var(--text-on-accent);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 8px 12px;
   font-size: 13px;
   font-weight: 600;
@@ -4234,11 +4257,22 @@ button { font-family: inherit; }
   position: relative;
   min-height: 72px;
   padding: 14px 12px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--surface-raised);
   border: 1px solid var(--border);
   display: flex;
   align-items: center;
+  overflow: hidden;
+}
+
+.current-rotation__card:not(.current-rotation__card--empty)::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--grad-red);
 }
 
 .current-rotation__card--empty {
@@ -4414,7 +4448,7 @@ button { font-family: inherit; }
 
 /* Calmer wishlist cards */
 .wishlist-card {
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--surface);
   padding: 14px;
@@ -4592,7 +4626,7 @@ html[data-mode="light"] .current-rotation {
   position: relative;
   background: var(--surface-raised);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 16px 14px;
   text-align: left;
   cursor: pointer;
@@ -4609,7 +4643,7 @@ html[data-mode="light"] .current-rotation {
 .college-picker-card--selected {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 10%, var(--surface-raised));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+  box-shadow: var(--ring-selected);
 }
 
 .college-picker-card__check {
@@ -4620,7 +4654,7 @@ html[data-mode="light"] .current-rotation {
   height: 18px;
   border-radius: 50%;
   background: var(--accent);
-  color: #fff;
+  color: var(--text-on-accent);
   display: grid;
   place-items: center;
   animation: popoverIn 0.18s ease-out;
@@ -4667,7 +4701,7 @@ html[data-mode="light"] .current-rotation {
 .overview-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -4675,11 +4709,29 @@ html[data-mode="light"] .current-rotation {
   align-items: flex-start;
   text-align: left;
   cursor: pointer;
+  position: relative;
+  overflow: hidden;
   transition: border-color 0.15s ease;
+}
+
+.overview-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--grad-red);
+  opacity: 0.7;
+  transition: opacity 0.15s ease;
 }
 
 .overview-card:hover {
   border-color: color-mix(in srgb, var(--red) 40%, var(--border));
+}
+
+.overview-card:hover::before {
+  opacity: 1;
 }
 
 .overview-card--disabled {
@@ -4704,12 +4756,15 @@ html[data-mode="light"] .current-rotation {
   font-size: 13px;
   color: var(--text-muted);
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .overview-card__value {
   font-family: var(--font-display);
   font-size: 36px;
   font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .overview-card__unit {
@@ -4750,7 +4805,7 @@ html[data-mode="light"] .current-rotation {
   font-size: 14.5px;
   font-weight: 500;
   padding: 10px 20px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
@@ -4766,10 +4821,10 @@ html[data-mode="light"] .current-rotation {
 }
 
 .college-tabs__item--active {
-  color: #ffffff;
+  color: var(--text-on-accent);
   background: var(--grad-red);
   font-weight: 600;
-  box-shadow: 0 4px 18px color-mix(in srgb, var(--accent) 40%, transparent);
+  box-shadow: var(--glow-accent-sm);
 }
 
 .college-tabs__item--active:hover {
@@ -4846,7 +4901,7 @@ html[data-mode="light"] .current-rotation {
 }
 
 .gaming-sidebar__item--active {
-  color: #ffffff;
+  color: var(--text);
   background: color-mix(in srgb, var(--accent) 16%, transparent);
   font-weight: 600;
   border-left: 3px solid var(--accent);
@@ -4914,7 +4969,7 @@ html[data-mode="light"] .current-rotation {
   position: relative;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   overflow: hidden;
   transition: border-color 0.15s ease;
 }
@@ -5174,7 +5229,7 @@ html[data-mode="light"] .current-rotation {
 .qty-stepper__btn {
   width: 26px;
   height: 26px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--surface-raised);
   border: 1px solid var(--border);
   color: var(--text-secondary);
@@ -5434,7 +5489,7 @@ html[data-mode="light"] .current-rotation {
   padding: 14px 18px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   margin-bottom: 16px;
 }
 
@@ -5465,7 +5520,7 @@ html[data-mode="light"] .current-rotation {
 
 .presence-card__dot--playing {
   background: var(--accent);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent);
+  box-shadow: var(--ring-focus);
   animation: presencePulse 2s ease-in-out infinite;
 }
 
@@ -5569,7 +5624,7 @@ html[data-mode="light"] .current-rotation {
 }
 
 @keyframes presencePulse {
-  0%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent); }
+  0%, 100% { box-shadow: var(--ring-focus); }
   50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 10%, transparent); }
 }
 
@@ -5592,7 +5647,7 @@ html[data-mode="light"] .current-rotation {
   position: relative;
   background: var(--surface-raised);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 16px 14px;
   text-align: left;
   cursor: pointer;
@@ -5609,7 +5664,7 @@ html[data-mode="light"] .current-rotation {
 .import-source-card--selected {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 10%, var(--surface-raised));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+  box-shadow: var(--ring-selected);
 }
 
 .import-source-card__label {
