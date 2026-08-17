@@ -53,10 +53,26 @@ export default function MtgCollectionPage({ onBack, userId, onGoToSearch, onGoTo
   );
 }
 
+const RARITY_ORDER = ["mythic", "rare", "uncommon", "common"];
+
+const SORT_OPTIONS = [
+  { value: "recent", label: "Recently added" },
+  { value: "name", label: "Name" },
+  { value: "price", label: "Price" },
+  { value: "rarity", label: "Rarity" },
+];
+
+function cardPrice(entry) {
+  const price = entry.foil ? entry.card?.prices?.usd_foil : entry.card?.prices?.usd;
+  return Number(price) || 0;
+}
+
 function CardsTab({ userId, onGoToSearch, onGoToScan, onGoToImport }) {
   const [entries, setEntries] = useState([]);
   const [status, setStatus] = useState("loading");
   const [priceHistoryCard, setPriceHistoryCard] = useState(null);
+  const [viewMode, setViewMode] = useState("list"); // list | grid
+  const [sortBy, setSortBy] = useState("recent");
 
   useEffect(() => {
     if (!userId) return;
@@ -111,10 +127,19 @@ function CardsTab({ userId, onGoToSearch, onGoToScan, onGoToImport }) {
   }
 
   const totalCards = entries.reduce((sum, e) => sum + e.quantity, 0);
-  const totalValue = entries.reduce((sum, e) => {
-    const price = e.foil ? e.card?.prices?.usd_foil : e.card?.prices?.usd;
-    return sum + (Number(price) || 0) * e.quantity;
-  }, 0);
+  const totalValue = entries.reduce((sum, e) => sum + cardPrice(e) * e.quantity, 0);
+  const rarityCounts = entries.reduce((counts, e) => {
+    const rarity = e.card?.rarity;
+    if (RARITY_ORDER.includes(rarity)) counts[rarity] = (counts[rarity] || 0) + e.quantity;
+    return counts;
+  }, {});
+
+  const sortedEntries = [...entries].sort((a, b) => {
+    if (sortBy === "name") return a.card_name.localeCompare(b.card_name);
+    if (sortBy === "price") return cardPrice(b) - cardPrice(a);
+    if (sortBy === "rarity") return RARITY_ORDER.indexOf(a.card?.rarity) - RARITY_ORDER.indexOf(b.card?.rarity);
+    return new Date(b.added_at) - new Date(a.added_at);
+  });
 
   return (
     <>
@@ -132,6 +157,12 @@ function CardsTab({ userId, onGoToSearch, onGoToScan, onGoToImport }) {
             <span className="panel__stat-value">${totalValue.toFixed(2)}</span>
             <span className="panel__stat-label">Est. collection value (USD)</span>
           </div>
+          <div className="panel__stat">
+            <span className="panel__stat-value">
+              {RARITY_ORDER.map((r) => rarityCounts[r] || 0).join(" / ")}
+            </span>
+            <span className="panel__stat-label">Mythic / Rare / Uncommon / Common</span>
+          </div>
         </div>
       )}
 
@@ -147,15 +178,88 @@ function CardsTab({ userId, onGoToSearch, onGoToScan, onGoToImport }) {
         </button>
       </div>
 
+      {status === "ready" && entries.length > 0 && (
+        <div className="backlog-add">
+          <label className="currency-picker">
+            <span>Sort by</span>
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+              {SORT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </label>
+          <div className="backlog-status-tabs">
+            <button
+              type="button"
+              className={`quickdash-reset-btn ${viewMode === "list" ? "quickdash-reset-btn--active" : ""}`}
+              onClick={() => setViewMode("list")}
+            >
+              List
+            </button>
+            <button
+              type="button"
+              className={`quickdash-reset-btn ${viewMode === "grid" ? "quickdash-reset-btn--active" : ""}`}
+              onClick={() => setViewMode("grid")}
+            >
+              Grid
+            </button>
+          </div>
+        </div>
+      )}
+
       {status === "loading" && <p className="panel__status">Loading your collection…</p>}
       {status === "error" && <p className="panel__status panel__status--error">Couldn't load your collection right now.</p>}
       {status === "ready" && entries.length === 0 && (
         <p className="panel__status">Nothing in your collection yet — search and add some cards.</p>
       )}
 
-      {status === "ready" && entries.length > 0 && (
+      {status === "ready" && entries.length > 0 && viewMode === "grid" && (
+        <div className="mtg-card-grid">
+          {sortedEntries.map((entry) => (
+            <div key={entry.id} className="mtg-card-grid__item">
+              {entry.card?.image ? (
+                <img src={entry.card.image} alt="" className="mtg-card-grid__img" />
+              ) : (
+                <div className="mtg-card-grid__img mtg-card-grid__img--placeholder" />
+              )}
+              {entry.card && (entry.card.prices?.usd || entry.card.prices?.usd_foil) && (
+                <button
+                  type="button"
+                  className="score-badge mtg-card-grid__price"
+                  onClick={() => setPriceHistoryCard(entry.card)}
+                  title="View real price + history"
+                >
+                  {entry.foil && entry.card.prices?.usd_foil
+                    ? `$${entry.card.prices.usd_foil}`
+                    : entry.card.prices?.usd
+                    ? `$${entry.card.prices.usd}`
+                    : "View price"}
+                </button>
+              )}
+              <div className="mtg-card-grid__footer">
+                <span className="mtg-card-grid__name">{entry.card_name}</span>
+                <div className="mtg-card-grid__controls">
+                  <input
+                    type="number"
+                    min="0"
+                    value={entry.quantity}
+                    onChange={(e) => handleQuantityChange(entry, e.target.value)}
+                  />
+                  <label>
+                    <input type="checkbox" checked={entry.foil} onChange={() => handleFoilToggle(entry)} />
+                    Foil
+                  </label>
+                  <button type="button" className="game-popup__close" onClick={() => handleRemove(entry.id)} aria-label="Remove">✕</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {status === "ready" && entries.length > 0 && viewMode === "list" && (
         <ul className="backlog-list">
-          {entries.map((entry) => (
+          {sortedEntries.map((entry) => (
             <li key={entry.id} className="backlog-card">
               {entry.card?.imageSmall ? (
                 <img src={entry.card.imageSmall} alt="" className="backlog-card__thumb" style={{ width: "56px", height: "78px" }} />

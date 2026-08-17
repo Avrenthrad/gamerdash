@@ -20,7 +20,7 @@ export default function PriceSection({ wishlist, onOpenFullPage, currency }) {
 
   const preview = [...wishlist]
     .sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt))
-    .slice(0, 5);
+    .slice(0, 3);
 
   useEffect(() => {
     getExchangeRates().then(setRates);

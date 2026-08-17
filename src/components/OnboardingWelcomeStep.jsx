@@ -7,7 +7,7 @@ import LykodexLogo from "./LykodexLogo";
 
 export default function OnboardingWelcomeStep({ firstName, onContinue }) {
   return (
-    <div className="onboarding-welcome">
+    <div className="onboarding-welcome onboarding-welcome--hero">
       <LykodexLogo className="onboarding-welcome__logo" />
       <h1 className="onboarding-welcome__title">
         {firstName ? `Welcome to Lykodex, ${firstName}` : "Welcome to Lykodex"}

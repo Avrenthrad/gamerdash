@@ -81,6 +81,7 @@ export async function fetchOwnProgress(steamId) {
   const gameEntry = games.find((g) => String(g.appid) === String(appid));
 
   return {
+    appid,
     gameName: gameName || gameEntry?.name || "Unknown game",
     thumb: gameEntry?.img_icon_url
       ? `https://media.steampowered.com/steamcommunity/public/images/apps/${appid}/${gameEntry.img_icon_url}.jpg`

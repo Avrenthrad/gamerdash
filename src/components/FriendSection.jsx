@@ -1,17 +1,13 @@
-// Friends — combines real Steam friends + live activity with the
-// linked account's own achievement-based progress (formerly its own
-// "Game Progress Tracker" dashboard, merged in here).
-//
-// Everything on this panel is real data once a Steam account is
-// linked: live online/in-game status (GetPlayerSummaries), a real
-// friends list (GetFriendList — only works if the account's friends
-// list is public), and achievement-completion-based progress (a
-// genuine proxy, not a literal "% through the story", since no
-// platform publishes that as a real data point). See
-// lib/friendsData.js for how these combine.
+// Friends — real Steam friends + their live online/in-game status and
+// achievement-completion-based progress (GetPlayerSummaries +
+// GetFriendList, only works if the account's friends list is public).
+// The linked account's OWN progress used to render here too — it now
+// has its own hero card on the Gaming dashboard (see
+// ContinuePlayingCard.jsx, same fetchOwnProgress data) so it isn't
+// duplicated on this panel anymore.
 
 import { useEffect, useState } from "react";
-import { fetchRealFriends, fetchOwnProgress } from "../lib/friendsData";
+import { fetchRealFriends } from "../lib/friendsData";
 import { fetchOwnedGames } from "../lib/steam";
 import { fetchCurrentActivity, fetchPlatformPlaytime } from "../lib/crossPlatformActivity";
 import UnderConstructionOverlay from "./UnderConstructionOverlay";
@@ -27,9 +23,6 @@ function initials(name) {
 }
 
 export default function FriendSection({ isLoggedIn, onSignIn, onCreateAccount, linkedSteamId, onGoToLinking, userId }) {
-  const [ownProgress, setOwnProgress] = useState(null);
-  const [ownStatus, setOwnStatus] = useState("idle"); // idle | loading | ready | error
-
   const [friends, setFriends] = useState([]);
   const [friendsStatus, setFriendsStatus] = useState("idle");
 
@@ -78,17 +71,6 @@ export default function FriendSection({ isLoggedIn, onSignIn, onCreateAccount, l
 
   useEffect(() => {
     if (!linkedSteamId) return;
-
-    setOwnStatus("loading");
-    fetchOwnProgress(linkedSteamId)
-      .then((result) => {
-        setOwnProgress(result);
-        setOwnStatus("ready");
-      })
-      .catch((err) => {
-        console.error("Own progress fetch failed:", err);
-        setOwnStatus("error");
-      });
 
     setFriendsStatus("loading");
     fetchRealFriends(linkedSteamId)
@@ -158,54 +140,6 @@ export default function FriendSection({ isLoggedIn, onSignIn, onCreateAccount, l
               )}
             </div>
           )}
-
-          <div className="friend-section__progress">
-            <span className="feed-col__label">Your progress</span>
-            {ownStatus === "loading" && <p className="panel__status">Loading…</p>}
-            {ownStatus === "error" && (
-              <p className="panel__status panel__status--error">Couldn't load your progress right now.</p>
-            )}
-            {ownStatus === "ready" && !ownProgress && (
-              <p className="panel__status">No owned games visible on this Steam profile.</p>
-            )}
-            {ownStatus === "ready" && ownProgress && (
-              <div className="own-progress-row">
-                {ownProgress.thumb ? (
-                  <img src={ownProgress.thumb} alt="" className="own-progress-row__thumb" />
-                ) : (
-                  <div className="own-progress-row__thumb own-progress-row__thumb--placeholder" />
-                )}
-                <div className="own-progress-row__body">
-                  <span className="own-progress-row__name">
-                    {ownProgress.gameName}
-                    {ownProgress.isCurrentlyPlaying && (
-                      <span className="own-progress-row__live">● Playing now</span>
-                    )}
-                  </span>
-                  {ownProgress.completionPct != null && (
-                    <div className="friend-row__progress-bar">
-                      <div
-                        className="friend-row__progress-fill"
-                        style={{ width: `${ownProgress.completionPct}%` }}
-                      />
-                    </div>
-                  )}
-                </div>
-                <div className="panel__stat-row">
-                  {ownProgress.completionPct != null && (
-                    <div className="panel__stat">
-                      <span className="panel__stat-value">{ownProgress.completionPct}%</span>
-                      <span className="panel__stat-label">Achievements</span>
-                    </div>
-                  )}
-                  <div className="panel__stat">
-                    <span className="panel__stat-value">{ownProgress.playtimeHours}h</span>
-                    <span className="panel__stat-label">Playtime</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
 
           <span className="feed-col__label">Friends</span>
           {friendsStatus === "loading" && <p className="panel__status">Loading your friends…</p>}

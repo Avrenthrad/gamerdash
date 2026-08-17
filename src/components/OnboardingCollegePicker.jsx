@@ -17,7 +17,7 @@ export default function OnboardingCollegePicker({ selected, onChange, onContinue
   }
 
   return (
-    <div className="onboarding-welcome">
+    <div className="onboarding-welcome onboarding-welcome--hero">
       <h1 className="onboarding-welcome__title">What are you into?</h1>
       <p className="onboarding-welcome__body">
         Pick what you want to see — you can change this any time in Account Settings.
