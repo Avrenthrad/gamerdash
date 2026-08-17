@@ -149,7 +149,7 @@ export default function MtgScanPage({ onBack, userId, isLoggedIn, onSignIn, onCr
 
           {selectedCard && (
             <div className="surprise-me__result">
-              {selectedCard.imageSmall && <img src={selectedCard.imageSmall} alt="" />}
+              {selectedCard.imageLarge && <img src={selectedCard.imageLarge} alt="" />}
               <span className="surprise-me__title">{selectedCard.name}</span>
               {added ? (
                 <span className="score-badge">Added</span>

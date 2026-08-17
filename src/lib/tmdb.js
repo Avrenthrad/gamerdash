@@ -9,7 +9,10 @@
 
 import { API_BASE } from "./apiBase";
 
-const IMAGE_BASE = "https://image.tmdb.org/t/p/w342";
+// w500 — sharper than the previous w342 on the poster grid without
+// jumping all the way to w780 (meant for large hero/detail views,
+// which this app doesn't have — everything here is grid-sized cards).
+const IMAGE_BASE = "https://image.tmdb.org/t/p/w500";
 
 function normalizeResult(item, mediaKind) {
   return {

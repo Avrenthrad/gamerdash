@@ -103,6 +103,23 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* User-uploaded site wallpaper — --user-wallpaper is set inline on
+   <html> by AppContext (real Supabase Storage URL, or unset when no
+   wallpaper is chosen). Layered under a scrim that tracks --bg so it
+   stays legible in both light and dark mode rather than assuming
+   dark-mode contrast. Replaces the decorative radial-gradient wash
+   above while active — a photo background and two red glows fighting
+   for attention isn't the goal here. */
+html[data-wallpaper="on"] body {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--bg) 85%, transparent), color-mix(in srgb, var(--bg) 85%, transparent)),
+    var(--user-wallpaper);
+  background-size: cover;
+  background-position: center center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
 a { color: inherit; }
 button { font-family: inherit; }
 
@@ -1295,6 +1312,44 @@ button { font-family: inherit; }
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px;
+}
+
+.settings-wallpaper {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-wallpaper__row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.settings-wallpaper__preview {
+  width: 96px;
+  height: 60px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.settings-wallpaper__placeholder {
+  width: 96px;
+  height: 60px;
+  border-radius: 8px;
+  border: 1px dashed var(--border);
+  display: grid;
+  place-items: center;
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+  text-align: center;
+  padding: 4px;
+  flex-shrink: 0;
 }
 
 @media (max-width: 560px) {
@@ -4571,6 +4626,11 @@ html[data-mode="light"] .current-rotation {
   animation: popoverIn 0.18s ease-out;
 }
 
+.college-picker-card__icon {
+  color: var(--accent);
+  margin-bottom: 2px;
+}
+
 .college-picker-card__label {
   font-weight: 600;
   font-size: 14px;
@@ -4634,7 +4694,12 @@ html[data-mode="light"] .current-rotation {
 }
 
 .overview-card__icon {
-  font-size: 22px;
+  color: var(--accent);
+  display: flex;
+}
+
+.college-icon {
+  flex-shrink: 0;
 }
 
 .overview-card__label {
@@ -4678,6 +4743,9 @@ html[data-mode="light"] .current-rotation {
 }
 
 .college-tabs__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   background: none;
   border: none;
   color: var(--text-secondary);
@@ -4690,6 +4758,15 @@ html[data-mode="light"] .current-rotation {
   transition: background 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
     color 0.2s ease, transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
     box-shadow 0.2s ease;
+}
+
+.college-tabs__item .college-icon {
+  opacity: 0.75;
+  transition: opacity 0.2s ease;
+}
+
+.college-tabs__item--active .college-icon {
+  opacity: 1;
 }
 
 .college-tabs__item:hover {
@@ -5422,6 +5499,81 @@ html[data-mode="light"] .current-rotation {
 .presence-card__meta {
   font-size: 12px;
   color: var(--text-tertiary);
+}
+
+.friends-activity-card {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.friends-activity-card--empty {
+  gap: 8px;
+}
+
+.friends-activity-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.friends-activity-card__link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+}
+
+.friends-activity-card__avatars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.friends-activity-card__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.friends-activity-card__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.friends-activity-card__list {
+  list-style: none;
+  margin: 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.friends-activity-card__list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.friends-activity-card__entry {
+  font-size: 13px;
+  color: var(--text-primary);
 }
 
 @keyframes presencePulse {

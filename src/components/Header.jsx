@@ -15,6 +15,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import LykodexLogo from "./LykodexLogo";
+import CollegeIcon from "./CollegeIcon";
 import { fetchRecentActivityForUser, describeActivity } from "../lib/guilds";
 import { relativeTime } from "./price/priceUtils";
 
@@ -383,6 +384,9 @@ export default function Header({
             className={`college-tabs__item ${activeCollegeId === c.id ? "college-tabs__item--active" : ""}`}
             onClick={() => onNavigateView(c.view)}
           >
+            {c.id !== "overview" && (
+              <CollegeIcon collegeId={c.id} size={16} active={activeCollegeId === c.id} />
+            )}
             {c.label}
           </button>
         ))}

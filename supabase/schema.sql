@@ -1443,3 +1443,35 @@ create policy "Users can update their own entertainment cover images"
 create policy "Users can delete their own entertainment cover images"
   on storage.objects for delete
   using (bucket_id = 'entertainment-covers' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ---------- Appearance: site wallpaper (additive) ----------
+-- wallpaper_url: an uploaded background image shown site-wide behind
+-- a dark scrim (see Account Settings > Appearance). college_theme is
+-- reserved for a real next step (optional per-College accent/wallpaper
+-- overrides) — the column exists so it can be filled in later without
+-- another migration, but no UI writes to it yet, so it stays honestly
+-- unused rather than half-wired.
+alter table public.profiles add column if not exists wallpaper_url text;
+alter table public.profiles add column if not exists college_theme jsonb default '{}'::jsonb;
+
+-- Wallpaper image storage — identical pattern to the avatars/mtg-covers/
+-- entertainment-covers buckets above.
+insert into storage.buckets (id, name, public)
+values ('wallpapers', 'wallpapers', true)
+on conflict (id) do nothing;
+
+create policy "Wallpaper images are publicly viewable"
+  on storage.objects for select
+  using (bucket_id = 'wallpapers');
+
+create policy "Users can upload their own wallpaper"
+  on storage.objects for insert
+  with check (bucket_id = 'wallpapers' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Users can update their own wallpaper"
+  on storage.objects for update
+  using (bucket_id = 'wallpapers' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Users can delete their own wallpaper"
+  on storage.objects for delete
+  using (bucket_id = 'wallpapers' and (storage.foldername(name))[1] = auth.uid()::text);

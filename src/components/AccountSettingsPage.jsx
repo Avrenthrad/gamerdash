@@ -26,6 +26,7 @@ import { faviconFor, shortStoreName } from "./price/priceUtils";
 import { COLLEGES as ALL_COLLEGES } from "../data/colleges";
 import { supabase } from "../lib/supabaseClient";
 import { fetchMyFriendCode } from "../lib/friends";
+import CollegeIcon from "./CollegeIcon";
 
 const platforms = [
   { id: "steam", label: "Steam", placeholder: "e.g. mysteamname" },
@@ -75,6 +76,8 @@ export default function AccountSettingsPage({
   onAccentColorChange,
   themeMode,
   onThemeModeChange,
+  wallpaperUrl,
+  onWallpaperChange,
   platformOrder,
   onPlatformOrderChange,
   xbxpricesKey,
@@ -147,6 +150,35 @@ export default function AccountSettingsPage({
     } catch (err) {
       console.error("Failed to upload avatar:", err);
       setAvatarStatus("error");
+    }
+  }
+
+  const [wallpaperStatus, setWallpaperStatus] = useState("idle"); // idle | uploading | error
+
+  // Real upload to Supabase Storage — same pattern as the avatar
+  // upload above (real public URL, not a throwaway blob: URL).
+  async function handleWallpaperChange(e) {
+    const file = e.target.files?.[0];
+    if (!file || !userId) return;
+
+    setWallpaperStatus("uploading");
+    try {
+      const nameExt = file.name.includes(".") ? file.name.split(".").pop() : "";
+      const mimeExt = file.type?.split("/")?.[1];
+      const ext = (nameExt || mimeExt || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const path = `${userId}/wallpaper.${ext || "jpg"}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("wallpapers")
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from("wallpapers").getPublicUrl(path);
+      onWallpaperChange(`${data.publicUrl}?t=${Date.now()}`);
+      setWallpaperStatus("idle");
+    } catch (err) {
+      console.error("Failed to upload wallpaper:", err);
+      setWallpaperStatus("error");
     }
   }
 
@@ -341,9 +373,9 @@ export default function AccountSettingsPage({
         </div>
       </section>
 
-      {/* Theme */}
+      {/* Appearance */}
       <section className="settings-card">
-        <h2 className="settings-card__title">Theme</h2>
+        <h2 className="settings-card__title">Appearance</h2>
         <p className="settings-card__note">
           Pick a mode and an accent colour — every accent works in both light and dark mode.
         </p>
@@ -391,6 +423,31 @@ export default function AccountSettingsPage({
             </button>
           ))}
         </div>
+
+        <div className="settings-wallpaper">
+          <span className="settings-card__note" style={{ marginTop: 0 }}>Site wallpaper (optional)</span>
+          <div className="settings-wallpaper__row">
+            {wallpaperUrl ? (
+              <img src={wallpaperUrl} alt="" className="settings-wallpaper__preview" />
+            ) : (
+              <span className="settings-wallpaper__placeholder">No wallpaper set</span>
+            )}
+            <div className="settings-avatar__controls">
+              <label className="settings-avatar__upload">
+                {wallpaperUrl ? "Change wallpaper" : "Upload wallpaper"}
+                <input type="file" accept="image/*" onChange={handleWallpaperChange} hidden />
+              </label>
+              {wallpaperUrl && (
+                <button type="button" className="quickdash-reset-btn" onClick={() => onWallpaperChange(null)}>
+                  Clear wallpaper
+                </button>
+              )}
+              <span className="settings-avatar__hint">
+                {wallpaperStatus === "uploading" ? "Uploading…" : wallpaperStatus === "error" ? "Upload failed — try again" : "Shown behind the app with a dark scrim so text stays readable."}
+              </span>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* Colleges — the same picker shown at onboarding, but editable
@@ -401,7 +458,7 @@ export default function AccountSettingsPage({
       <section className="settings-card">
         <h2 className="settings-card__title">Colleges</h2>
         <p className="settings-card__note">
-          Choose what shows up in your top navigation. Gaming and TCG are fully real; the others are marked honestly as not built yet.
+          Choose what shows up in your top navigation.
         </p>
         <div className="college-picker-grid">
           {ALL_COLLEGES.map((college) => (
@@ -418,6 +475,7 @@ export default function AccountSettingsPage({
               }}
               aria-pressed={selectedColleges?.includes(college.id)}
             >
+              <CollegeIcon collegeId={college.id} size={26} className="college-picker-card__icon" />
               <span className="college-picker-card__label">{college.label}</span>
               <span className="college-picker-card__tagline">{college.tagline}</span>
               {!college.built && <span className="college-picker-card__badge">Coming soon</span>}

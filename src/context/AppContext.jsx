@@ -180,6 +180,7 @@ export function AppProvider({ children }) {
 
   const [themeMode, setThemeMode] = useState("dark");
   const [accentColor, setAccentColor] = useState("red");
+  const [wallpaperUrl, setWallpaperUrl] = useState(null);
   const [currency, setCurrency] = useState("AUD");
   const [xbxpricesKey, setXbxpricesKey] = useState("");
   const [platpricesKey, setPlatpricesKey] = useState("");
@@ -268,6 +269,7 @@ export function AppProvider({ children }) {
   // ----- refs for hydration / debounced writes -----
   const hydratedRef = useRef(false);
   const writeTimerRef = useRef(null);
+  const wallpaperWriteTimerRef = useRef(null);
 
   // ---------- derived ----------
   const effectivePlatformOrder = useMemo(
@@ -339,6 +341,16 @@ export function AppProvider({ children }) {
     document.documentElement.dataset.accent = accentColor;
   }, [accentColor]);
 
+  useEffect(() => {
+    if (wallpaperUrl) {
+      document.documentElement.style.setProperty("--user-wallpaper", `url("${wallpaperUrl}")`);
+      document.documentElement.dataset.wallpaper = "on";
+    } else {
+      document.documentElement.style.removeProperty("--user-wallpaper");
+      document.documentElement.dataset.wallpaper = "off";
+    }
+  }, [wallpaperUrl]);
+
   // ---------- effects: GD Score ----------
   useEffect(() => {
     computeGdScore(linkedSteamId, wishlist.length).then(setGdScore);
@@ -378,6 +390,7 @@ export function AppProvider({ children }) {
       setMasteryComputedAt(null);
       setThemeMode("dark");
       setAccentColor("red");
+      setWallpaperUrl(null);
       setCurrency("AUD");
       setXbxpricesKey("");
       setPlatpricesKey("");
@@ -411,6 +424,7 @@ export function AppProvider({ children }) {
         setMasteryComputedAt(profile.mastery_computed_at || null);
         setThemeMode(profile.theme_mode || "dark");
         setAccentColor(profile.accent_color || "red");
+        setWallpaperUrl(profile.wallpaper_url || null);
         setCurrency(profile.currency || "AUD");
         setXbxpricesKey(profile.xbxprices_key || "");
         setPlatpricesKey(profile.platprices_key || "");
@@ -497,6 +511,28 @@ export function AppProvider({ children }) {
     gdScore,
     userId,
   ]);
+
+  // ---------- effects: debounced wallpaper write-back (isolated) ----------
+  // Kept as its own write, deliberately separate from the big bundled
+  // upsertProfile call above. profiles.wallpaper_url is a brand-new
+  // column (see supabase/schema.sql) that may not exist yet on every
+  // deployment until that migration is actually run — bundling it into
+  // the single big .update() would mean one missing column fails that
+  // *entire* update, silently breaking name/theme/avatar saves too.
+  // Isolating it means a not-yet-migrated database only loses the new
+  // wallpaper feature, not every other profile field.
+  useEffect(() => {
+    if (!supabaseConfigured || !userId || !hydratedRef.current) return;
+
+    clearTimeout(wallpaperWriteTimerRef.current);
+    wallpaperWriteTimerRef.current = setTimeout(() => {
+      upsertProfile(userId, { wallpaper_url: wallpaperUrl }).catch((err) =>
+        console.error("Failed to save wallpaper (has the wallpaper_url migration been run?):", err)
+      );
+    }, 500);
+
+    return () => clearTimeout(wallpaperWriteTimerRef.current);
+  }, [wallpaperUrl, userId]);
 
   // ---------- effects: hash routing ----------
   useEffect(() => {
@@ -681,6 +717,8 @@ export function AppProvider({ children }) {
       setThemeMode,
       accentColor,
       setAccentColor,
+      wallpaperUrl,
+      setWallpaperUrl,
       currency,
       setCurrency,
       xbxpricesKey,
@@ -749,6 +787,7 @@ export function AppProvider({ children }) {
       recomputeMastery,
       themeMode,
       accentColor,
+      wallpaperUrl,
       currency,
       xbxpricesKey,
       platpricesKey,

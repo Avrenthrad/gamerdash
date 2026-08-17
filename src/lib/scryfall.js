@@ -30,6 +30,7 @@ function normalizeCard(card) {
     collectorNumber: card.collector_number,
     image: card.image_uris?.normal || face?.image_uris?.normal || null,
     imageSmall: card.image_uris?.small || face?.image_uris?.small || null,
+    imageLarge: card.image_uris?.large || face?.image_uris?.large || null,
     artCrop: card.image_uris?.art_crop || face?.image_uris?.art_crop || null,
     prices: card.prices || {},
     legalities: card.legalities || {},

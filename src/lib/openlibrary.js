@@ -14,7 +14,7 @@ function normalizeResult(doc) {
     title: doc.title || "",
     overview: "", // Open Library's search endpoint doesn't return a synopsis — description would need a separate per-work request, not fetched here to keep this a single request per search
     releaseDate: doc.first_publish_year ? String(doc.first_publish_year) : null,
-    posterUrl: doc.cover_i ? `${COVER_BASE}/${doc.cover_i}-M.jpg` : null,
+    posterUrl: doc.cover_i ? `${COVER_BASE}/${doc.cover_i}-L.jpg` : null,
     voteAverage: null, // Open Library's search endpoint doesn't return a rating
     author: doc.author_name?.[0] || null,
     mediaKind: "book",
@@ -32,7 +32,7 @@ export async function searchBooks(query) {
 // service, verified live (302-redirects to a real cover), same
 // pattern as the cover_i-based URLs above.
 export function coverUrlForIsbn(isbn) {
-  return `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`;
+  return `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`;
 }
 
 // Barcode-scan -> book lookup. Returns null (not an error) for a real

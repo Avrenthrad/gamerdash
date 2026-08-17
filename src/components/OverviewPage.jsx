@@ -13,6 +13,8 @@ import { fetchEntertainmentEntries } from "../lib/entertainment";
 import { fetchCollectibles } from "../lib/collectibles";
 import { fetchCampaigns, fetchArmies } from "../lib/tabletop";
 import SteamPresenceCard from "./SteamPresenceCard";
+import FriendsActivityCard from "./FriendsActivityCard";
+import CollegeIcon from "./CollegeIcon";
 
 const NOT_BUILT_COLLEGES = [];
 
@@ -22,6 +24,7 @@ export default function OverviewPage({
   linkedSteamId,
   selectedColleges,
   onOpenCollege,
+  onGoToFriends,
 }) {
   const [gameCount, setGameCount] = useState(null);
   const [cardCount, setCardCount] = useState(null);
@@ -66,11 +69,12 @@ export default function OverviewPage({
       </div>
 
       {showGaming && isLoggedIn && <SteamPresenceCard linkedSteamId={linkedSteamId} />}
+      {isLoggedIn && <FriendsActivityCard userId={userId} onGoToFriends={onGoToFriends} />}
 
       <div className="overview-grid">
         {showGaming && (
           <button type="button" className="overview-card" onClick={() => onOpenCollege("gaming")}>
-            <span className="overview-card__icon">🎮</span>
+            <span className="overview-card__icon"><CollegeIcon collegeId="gaming" size={22} /></span>
             <span className="overview-card__label">Gaming</span>
             {!linkedSteamId ? (
               <span className="overview-card__empty">Link Steam to see your library here</span>
@@ -87,7 +91,7 @@ export default function OverviewPage({
 
         {showTcg && (
           <button type="button" className="overview-card" onClick={() => onOpenCollege("tcg")}>
-            <span className="overview-card__icon">🃏</span>
+            <span className="overview-card__icon"><CollegeIcon collegeId="tcg" size={22} /></span>
             <span className="overview-card__label">TCG</span>
             {status === "loading" ? (
               <span className="overview-card__value">…</span>
@@ -104,7 +108,7 @@ export default function OverviewPage({
 
         {selectedColleges.includes("entertainment") && (
           <button type="button" className="overview-card" onClick={() => onOpenCollege("entertainment")}>
-            <span className="overview-card__icon">🎬</span>
+            <span className="overview-card__icon"><CollegeIcon collegeId="entertainment" size={22} /></span>
             <span className="overview-card__label">Entertainment</span>
             {status === "loading" ? (
               <span className="overview-card__value">…</span>
@@ -121,7 +125,7 @@ export default function OverviewPage({
 
         {selectedColleges.includes("collectibles") && (
           <button type="button" className="overview-card" onClick={() => onOpenCollege("collectibles")}>
-            <span className="overview-card__icon">⭐</span>
+            <span className="overview-card__icon"><CollegeIcon collegeId="collectibles" size={22} /></span>
             <span className="overview-card__label">Collectibles</span>
             {status === "loading" ? (
               <span className="overview-card__value">…</span>
@@ -138,7 +142,7 @@ export default function OverviewPage({
 
         {selectedColleges.includes("tabletop") && (
           <button type="button" className="overview-card" onClick={() => onOpenCollege("tabletop")}>
-            <span className="overview-card__icon">🎲</span>
+            <span className="overview-card__icon"><CollegeIcon collegeId="tabletop" size={22} /></span>
             <span className="overview-card__label">Tabletop</span>
             {status === "loading" ? (
               <span className="overview-card__value">…</span>

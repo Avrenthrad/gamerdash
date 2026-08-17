@@ -1,11 +1,11 @@
 // Second step of onboarding — which of the 5 Colleges someone
-// actually cares about. Only Gaming and TCG are fully real right now
-// (TCG has MTG built); Entertainment/Collectibles/Tabletop are marked
-// "Coming soon" so this stays honest — selecting one just captures
-// real interest for later, it doesn't unlock functionality that
-// doesn't exist yet.
+// actually cares about. All 5 are real and built; picking one just
+// controls what shows up in their nav and Overview, not what's
+// unlocked (data/colleges.js's `built` flag drives the "Coming soon"
+// badge below if a College is ever added ahead of its data layer).
 
 import { COLLEGES } from "../data/colleges";
+import CollegeIcon from "./CollegeIcon";
 
 export default function OnboardingCollegePicker({ selected, onChange, onContinue }) {
   function toggle(id) {
@@ -32,6 +32,7 @@ export default function OnboardingCollegePicker({ selected, onChange, onContinue
             onClick={() => toggle(college.id)}
             aria-pressed={selected.includes(college.id)}
           >
+            <CollegeIcon collegeId={college.id} size={26} className="college-picker-card__icon" />
             <span className="college-picker-card__label">{college.label}</span>
             <span className="college-picker-card__tagline">{college.tagline}</span>
             {!college.built && <span className="college-picker-card__badge">Coming soon</span>}

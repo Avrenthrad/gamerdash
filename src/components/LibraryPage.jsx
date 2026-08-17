@@ -16,7 +16,7 @@
 // version of that same idea.
 
 import { useEffect, useState } from "react";
-import { fetchOwnedGames } from "../lib/steam";
+import { fetchOwnedGames, steamHeaderArt } from "../lib/steam";
 import { fetchBacklog } from "../lib/backlog";
 import UnderConstructionOverlay from "./UnderConstructionOverlay";
 import { AccountGatePanel } from "./AccountGate";
@@ -121,15 +121,19 @@ export default function LibraryPage({
             <ul className="backlog-list">
               {games.slice(0, 6).map((g) => (
                 <li key={g.appid} className="backlog-card">
-                  {g.img_icon_url ? (
-                    <img
-                      src={`https://media.steampowered.com/steamcommunity/public/images/apps/${g.appid}/${g.img_icon_url}.jpg`}
-                      alt=""
-                      className="backlog-card__thumb"
-                    />
-                  ) : (
-                    <div className="backlog-card__thumb backlog-card__thumb--placeholder" />
-                  )}
+                  <img
+                    src={steamHeaderArt(g.appid)}
+                    alt=""
+                    className="backlog-card__thumb"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      if (g.img_icon_url) {
+                        e.target.src = `https://media.steampowered.com/steamcommunity/public/images/apps/${g.appid}/${g.img_icon_url}.jpg`;
+                      } else {
+                        e.target.style.display = "none";
+                      }
+                    }}
+                  />
                   <div className="backlog-card__info">
                     <span className="backlog-card__title">{g.name}</span>
                     <span className="backlog-card__meta">{Math.round((g.playtime_forever || 0) / 60)}h played</span>

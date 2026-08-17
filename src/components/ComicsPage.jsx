@@ -10,6 +10,14 @@ import { fetchComicIssues, addComicIssue, updateComicIssue, removeComicIssue, up
 const STATUS_LABELS = { owned: "Owned", pull_list: "Pull list", wishlist: "Wishlist" };
 const CONDITIONS = ["Near Mint", "Very Fine", "Fine", "Good", "Fair", "Poor"];
 
+// No Marvel API is wired in (Marvel Unlimited/Comics API access isn't
+// something this project has scoped or verified) — for Marvel-
+// published issues this is just a plain external link out to
+// marvel.com's real comics section, not a data integration.
+function isMarvelPublisher(publisher) {
+  return Boolean(publisher && /marvel/i.test(publisher));
+}
+
 export default function ComicsPage({ onBack, userId, isLoggedIn, onSignIn, onCreateAccount }) {
   const [issues, setIssues] = useState([]);
   const [status, setStatus] = useState("loading");
@@ -199,6 +207,17 @@ export default function ComicsPage({ onBack, userId, isLoggedIn, onSignIn, onCre
                   <option key={id} value={id}>{label}</option>
                 ))}
               </select>
+              {isMarvelPublisher(issue.publisher) && (
+                <a
+                  href="https://www.marvel.com/comics"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="quickdash-reset-btn"
+                  title="Open Marvel's comics site in a new tab"
+                >
+                  Marvel ↗
+                </a>
+              )}
               <button type="button" className="game-popup__close" onClick={() => handleRemove(issue.id)} aria-label="Remove">✕</button>
             </li>
           ))}

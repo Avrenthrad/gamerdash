@@ -94,6 +94,8 @@ export default function App() {
     themeMode,
     accentColor,
     setAccentColor,
+    wallpaperUrl,
+    setWallpaperUrl,
     currency,
     setCurrency,
     xbxpricesKey,
@@ -310,6 +312,8 @@ export default function App() {
                 onThemeModeChange={toggleThemeMode}
                 accentColor={accentColor}
                 onAccentColorChange={setAccentColor}
+                wallpaperUrl={wallpaperUrl}
+                onWallpaperChange={setWallpaperUrl}
                 currency={currency}
                 onCurrencyChange={setCurrency}
                 platformOrder={platformOrder}
@@ -473,6 +477,7 @@ export default function App() {
                 else if (collegeId === "collectibles") goTo("college-collectibles");
                 else if (collegeId === "tabletop") goTo("college-tabletop");
               }}
+              onGoToFriends={() => goTo("friends")}
             />
           )}
 
