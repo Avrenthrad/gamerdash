@@ -98,9 +98,17 @@ export async function getLinkedProviders() {
 // own session rather than requiring a userId param, so it's safe to
 // call from anywhere right after checking Discord is linked.
 //
-// NOTE: Discord's identity_data field holding the raw snowflake isn't
-// 100% certain from my side (couldn't test this live) — tries a few
-// likely field names defensively rather than assuming one exact shape.
+// Field priority: Supabase's own top-level Identity.id is documented
+// as "the provider identifier of the user" (the cleanest, most
+// abstracted source) — checked first. identity_data.id is the second
+// choice since Discord's own raw OAuth user object (what identity_data
+// actually holds) genuinely uses the field name "id" for the snowflake
+// per Discord's API docs, not "provider_id"/"sub" (those aren't real
+// Discord field names — kept only as a last-resort fallback in case
+// Supabase normalizes the payload differently than expected). Never
+// tested against a real live Discord link, so the warning below logs
+// the raw shape if all of these come up empty, rather than failing
+// silently with no way to diagnose it.
 export async function syncDiscordLink() {
   const { data, error } = await supabase.auth.getUserIdentities();
   if (error) throw error;
@@ -109,11 +117,15 @@ export async function syncDiscordLink() {
   if (!discordIdentity) return; // not linked (yet, or unlinked) — nothing to sync
 
   const discordUserId =
+    discordIdentity.id ||
+    discordIdentity.identity_data?.id ||
     discordIdentity.identity_data?.provider_id ||
-    discordIdentity.identity_data?.sub ||
-    discordIdentity.identity_data?.id;
+    discordIdentity.identity_data?.sub;
   if (!discordUserId) {
-    console.warn("Couldn't find a Discord user ID in the linked identity data — check the raw shape and adjust syncDiscordLink().");
+    console.warn(
+      "Couldn't find a Discord user ID in the linked identity — raw identity for debugging:",
+      discordIdentity
+    );
     return;
   }
 

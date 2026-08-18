@@ -55,6 +55,23 @@ always-on host like Railway, Fly.io, Render, or a basic VPS all work
 fine for a single lightweight bot like this. `npm start` locally is
 fine for testing it, but it'll stop the moment you close the terminal.
 
+### Deploying to Railway
+
+This folder already has a `railway.json` (build + restart policy). Since
+the bot lives in a subdirectory of the main Lykodex repo, not its own
+repo, one manual setting is required:
+
+1. [railway.com](https://railway.com) → **New Project** → **Deploy from
+   GitHub repo** → pick this repo.
+2. In the new service's **Settings → Source**, set **Root Directory** to
+   `discord-bot` — otherwise Railway tries to build the whole monorepo
+   (and the main app's `package.json`) instead of just the bot.
+3. **Variables** tab → add `DISCORD_BOT_TOKEN`, `SUPABASE_URL`,
+   `SUPABASE_SERVICE_ROLE_KEY` (same values as your local `.env`).
+4. Deploy. Railway runs `npm start` automatically and restarts the
+   process if it crashes (`railway.json`'s restart policy) — no
+   further config needed for an always-on worker like this.
+
 ## What it does and doesn't do
 
 - Shows real-time "currently playing X" for Xbox, PlayStation, and
