@@ -43,6 +43,7 @@ import { setPersonalPlatPricesKey } from "../lib/platprices";
 import { computeGdScore } from "../lib/gdScore";
 import { logActivityForUser } from "../lib/guilds";
 import { recomputeMastery as recomputeMasteryData } from "../lib/gameMasteryData";
+import { recomputeOverallMastery as recomputeOverallMasteryData } from "../lib/overallMasteryData";
 
 // ---------- constants (same as before) ----------
 
@@ -177,6 +178,17 @@ export function AppProvider({ children }) {
   const [masteryLevel, setMasteryLevel] = useState(0);
   const [masteryBreakdown, setMasteryBreakdown] = useState([]);
   const [masteryComputedAt, setMasteryComputedAt] = useState(null);
+
+  // ----- Overall Mastery Score (all 5 Colleges combined) -----
+  // Gaming Mastery above is one of its inputs, reused as-is. Same
+  // cached-on-profile / recompute-on-key-events pattern, not the
+  // header badge's live-on-every-render style. See
+  // lib/overallMasteryData.js.
+  const [overallMasteryScore, setOverallMasteryScore] = useState(0);
+  const [overallMasteryXp, setOverallMasteryXp] = useState(0);
+  const [overallMasteryLevel, setOverallMasteryLevel] = useState(0);
+  const [overallMasteryBreakdown, setOverallMasteryBreakdown] = useState([]);
+  const [overallMasteryComputedAt, setOverallMasteryComputedAt] = useState(null);
 
   const [themeMode, setThemeMode] = useState("dark");
   const [accentColor, setAccentColor] = useState("red");
@@ -388,6 +400,11 @@ export function AppProvider({ children }) {
       setMasteryLevel(0);
       setMasteryBreakdown([]);
       setMasteryComputedAt(null);
+      setOverallMasteryScore(0);
+      setOverallMasteryXp(0);
+      setOverallMasteryLevel(0);
+      setOverallMasteryBreakdown([]);
+      setOverallMasteryComputedAt(null);
       setThemeMode("dark");
       setAccentColor("red");
       setWallpaperUrl(null);
@@ -422,6 +439,11 @@ export function AppProvider({ children }) {
         setMasteryLevel(profile.mastery_level || 0);
         setMasteryBreakdown(profile.mastery_breakdown || []);
         setMasteryComputedAt(profile.mastery_computed_at || null);
+        setOverallMasteryScore(profile.overall_mastery_score || 0);
+        setOverallMasteryXp(profile.overall_mastery_xp || 0);
+        setOverallMasteryLevel(profile.overall_mastery_level || 0);
+        setOverallMasteryBreakdown(profile.overall_mastery_breakdown || []);
+        setOverallMasteryComputedAt(profile.overall_mastery_computed_at || null);
         setThemeMode(profile.theme_mode || "dark");
         setAccentColor(profile.accent_color || "red");
         setWallpaperUrl(profile.wallpaper_url || null);
@@ -445,6 +467,23 @@ export function AppProvider({ children }) {
           setSelectedColleges(profile.selected_colleges);
         }
         hydratedRef.current = true;
+
+        // First-time real number for existing accounts, without
+        // requiring a manual "Recompute" click — fires once, only when
+        // this profile has genuinely never had an overall score
+        // computed. Fire-and-forget: doesn't block hydration.
+        if (!profile.overall_mastery_computed_at) {
+          recomputeOverallMasteryData(userId, profile.mastery_score || 0)
+            .then((result) => {
+              if (cancelled) return;
+              setOverallMasteryScore(result.overallScore);
+              setOverallMasteryXp(result.accountXp);
+              setOverallMasteryLevel(result.accountLevel);
+              setOverallMasteryBreakdown(result.breakdown);
+              setOverallMasteryComputedAt(result.computedAt);
+            })
+            .catch((err) => console.error("Initial Overall Mastery compute failed:", err));
+        }
       })
       .catch((err) => {
         console.error("Failed to load profile/wishlist:", err);
@@ -677,6 +716,24 @@ export function AppProvider({ children }) {
     }
   }, [userId, linkedSteamId]);
 
+  // Recomputes the Overall Mastery Score (all 5 Colleges combined).
+  // Uses whatever Gaming Mastery score is currently in state — call
+  // recomputeMastery() first if that also needs a fresh Steam pull;
+  // this doesn't duplicate that fetch itself.
+  const recomputeOverallMastery = useCallback(async () => {
+    if (!supabaseConfigured || !userId) return;
+    try {
+      const result = await recomputeOverallMasteryData(userId, masteryScore);
+      setOverallMasteryScore(result.overallScore);
+      setOverallMasteryXp(result.accountXp);
+      setOverallMasteryLevel(result.accountLevel);
+      setOverallMasteryBreakdown(result.breakdown);
+      setOverallMasteryComputedAt(result.computedAt);
+    } catch (err) {
+      console.error("Failed to recompute Overall Mastery:", err);
+    }
+  }, [userId, masteryScore]);
+
   // ---------- value (memoized so consumers don't re-render for nothing) ----------
   const value = useMemo(
     () => ({
@@ -713,6 +770,12 @@ export function AppProvider({ children }) {
       masteryBreakdown,
       masteryComputedAt,
       recomputeMastery,
+      overallMasteryScore,
+      overallMasteryXp,
+      overallMasteryLevel,
+      overallMasteryBreakdown,
+      overallMasteryComputedAt,
+      recomputeOverallMastery,
       themeMode,
       setThemeMode,
       accentColor,
@@ -785,6 +848,12 @@ export function AppProvider({ children }) {
       masteryBreakdown,
       masteryComputedAt,
       recomputeMastery,
+      overallMasteryScore,
+      overallMasteryXp,
+      overallMasteryLevel,
+      overallMasteryBreakdown,
+      overallMasteryComputedAt,
+      recomputeOverallMastery,
       themeMode,
       accentColor,
       wallpaperUrl,

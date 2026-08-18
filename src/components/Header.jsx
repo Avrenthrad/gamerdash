@@ -33,6 +33,10 @@ const COLLEGES = [
   { id: "tabletop", label: "Tabletop", view: "college-tabletop" },
 ];
 
+// The 5 real Colleges the Mastery Score dropdown breaks down by —
+// same set as COLLEGES minus the "Overview" pseudo-entry.
+const MASTERY_COLLEGES = COLLEGES.filter((c) => c.id !== "overview");
+
 // Gaming's own sub-pages — shown as a left sidebar only while inside
 // the Gaming College specifically (see App.jsx's GamingSidebar usage).
 // Kept here since it's genuinely Header-adjacent navigation data, not
@@ -96,7 +100,11 @@ export default function Header({
   onNavigateHome,
   isLoggedIn,
   avatarUrl,
-  gdScore,
+  overallMasteryScore = 0,
+  overallMasteryLevel = 0,
+  overallMasteryBreakdown = [],
+  overallMasteryComputedAt,
+  onRecomputeOverallMastery,
   onLogout,
   mode,
   onToggleMode,
@@ -110,6 +118,7 @@ export default function Header({
   // just navigates straight to Overview, and the College tabs replace
   // what that drawer used to list.
   const [openMenu, setOpenMenu] = useState(null);
+  const [recomputingMastery, setRecomputingMastery] = useState(false);
   // Tracks a broken/failed avatar image load so we fall back to the
   // default icon instead of showing a broken-image glyph. Reset
   // whenever the URL itself changes (new upload, re-hydrate) so a
@@ -174,6 +183,13 @@ export default function Header({
   function handleAccountClick(viewId, mode) {
     closeMenu();
     onNavigateView(viewId, mode);
+  }
+
+  async function handleRecomputeOverallMastery() {
+    if (!onRecomputeOverallMastery) return;
+    setRecomputingMastery(true);
+    await onRecomputeOverallMastery();
+    setRecomputingMastery(false);
   }
 
   const showBackdrop = openMenu === "settings";
@@ -297,12 +313,79 @@ export default function Header({
             </div>
           )}
 
-          <div className="dash-header__score" title="Unified Lykodex score">
-            <span className="dash-header__score-label">GD Score</span>
-            <span className="dash-header__score-value">
-              {isLoggedIn ? gdScore.toLocaleString() : "--"}
-            </span>
-          </div>
+          {isLoggedIn ? (
+            <div className="dash-header__menu-wrap">
+              <button
+                type="button"
+                className="dash-header__score dash-header__score--interactive"
+                onClick={() => toggleMenu("mastery")}
+                aria-expanded={openMenu === "mastery"}
+                title="Mastery Score — combines a real score from each College"
+              >
+                <span className="dash-header__score-label">Mastery Score</span>
+                <span className="dash-header__score-value">
+                  {Math.round(overallMasteryScore).toLocaleString()}
+                </span>
+              </button>
+
+              {openMenu === "mastery" && (
+                <div className="dash-header__popover dash-header__popover--right dash-header__mastery-popover">
+                  <div className="dash-header__mastery-total">
+                    <span className="dash-header__mastery-total-value">
+                      {Math.round(overallMasteryScore).toLocaleString()}
+                    </span>
+                    <span className="dash-header__mastery-total-label">Level {overallMasteryLevel}</span>
+                  </div>
+
+                  {overallMasteryBreakdown.length === 0 ? (
+                    <p className="dash-header__search-empty">
+                      Nothing tracked yet — add real progress in any College to start building this.
+                    </p>
+                  ) : (
+                    <div className="dash-header__mastery-breakdown">
+                      {MASTERY_COLLEGES.map((c) => {
+                        const entry = overallMasteryBreakdown.find((b) => b.college === c.id);
+                        return (
+                          <div key={c.id} className="dash-header__mastery-row">
+                            <CollegeIcon collegeId={c.id} size={16} />
+                            <span className="dash-header__mastery-row-label">{c.label}</span>
+                            <span className="dash-header__mastery-row-value">
+                              {entry ? Math.round(entry.normalized) : "—"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {overallMasteryComputedAt && (
+                    <p className="dash-header__search-empty">Last computed {relativeTime(overallMasteryComputedAt)}.</p>
+                  )}
+
+                  <button
+                    type="button"
+                    className="dash-header__popover-item"
+                    onClick={handleRecomputeOverallMastery}
+                    disabled={recomputingMastery}
+                  >
+                    {recomputingMastery ? "Recomputing…" : "Recompute"}
+                  </button>
+                  <button
+                    type="button"
+                    className="dash-header__popover-item"
+                    onClick={() => handleAccountClick("linking")}
+                  >
+                    View Gaming Mastery breakdown →
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="dash-header__score" title="Sign in to build your Mastery Score">
+              <span className="dash-header__score-label">Mastery Score</span>
+              <span className="dash-header__score-value">--</span>
+            </div>
+          )}
 
           {isLoggedIn ? (
             <div className="dash-header__menu-wrap">

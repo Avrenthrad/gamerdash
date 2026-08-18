@@ -69,9 +69,9 @@ export default function ProfileHeading({
           <span className="profile-heading__stat-label">GD Score</span>
         </div>
         {isLoggedIn && masteryScore > 0 && (
-          <div className="profile-heading__stat" title="Cross-platform Game Mastery Score — see Account Linking for the breakdown">
+          <div className="profile-heading__stat" title="Cross-platform Gaming Mastery Score — see Account Linking for the breakdown">
             <span className="profile-heading__stat-value">{Math.round(masteryScore)}</span>
-            <span className="profile-heading__stat-label">Mastery · Lvl {masteryLevel}</span>
+            <span className="profile-heading__stat-label">Gaming Mastery · Lvl {masteryLevel}</span>
           </div>
         )}
         {typeof wishlistCount === "number" && (

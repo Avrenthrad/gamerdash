@@ -1550,3 +1550,18 @@ create policy "Users can update their own collectible cover images"
 create policy "Users can delete their own collectible cover images"
   on storage.objects for delete
   using (bucket_id = 'collectible-covers' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ---------- Overall Mastery Score (additive) ----------
+-- Combines a real score from each of the 5 Colleges into one number,
+-- shown in the header (see lib/overallMastery.js for the math,
+-- lib/overallMasteryData.js for gathering the real per-College
+-- inputs). Deliberately separate from mastery_score/mastery_level
+-- above -- those stay Gaming-only internally (user-facing label
+-- renamed to "Gaming Mastery" to disambiguate) and are reused
+-- directly as this score's Gaming input, not duplicated or
+-- recomputed differently.
+alter table public.profiles add column if not exists overall_mastery_score numeric default 0;
+alter table public.profiles add column if not exists overall_mastery_xp integer default 0;
+alter table public.profiles add column if not exists overall_mastery_level integer default 0;
+alter table public.profiles add column if not exists overall_mastery_breakdown jsonb;
+alter table public.profiles add column if not exists overall_mastery_computed_at timestamptz;

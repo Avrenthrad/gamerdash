@@ -85,6 +85,11 @@ export default function App() {
     masteryBreakdown,
     masteryComputedAt,
     recomputeMastery,
+    overallMasteryScore,
+    overallMasteryLevel,
+    overallMasteryBreakdown,
+    overallMasteryComputedAt,
+    recomputeOverallMastery,
     themeMode,
     accentColor,
     setAccentColor,
@@ -247,7 +252,11 @@ export default function App() {
           onNavigateHome={navigateHome}
           isLoggedIn={isLoggedIn}
           avatarUrl={avatarUrl}
-          gdScore={gdScore}
+          overallMasteryScore={overallMasteryScore}
+          overallMasteryLevel={overallMasteryLevel}
+          overallMasteryBreakdown={overallMasteryBreakdown}
+          overallMasteryComputedAt={overallMasteryComputedAt}
+          onRecomputeOverallMastery={recomputeOverallMastery}
           onLogout={handleLogout}
           mode={themeMode}
           onToggleMode={toggleThemeMode}
@@ -269,11 +278,11 @@ export default function App() {
                 linkedSteamId={linkedSteamId}
                 onLinkSteam={(steamId) => {
                   setLinkedSteamId(steamId);
-                  recomputeMastery(steamId);
+                  recomputeMastery(steamId).then(recomputeOverallMastery);
                 }}
                 onUnlinkSteam={() => {
                   setLinkedSteamId(null);
-                  recomputeMastery(null);
+                  recomputeMastery(null).then(recomputeOverallMastery);
                 }}
                 onAddToWishlist={addToWishlist}
                 masteryScore={masteryScore}

@@ -1,0 +1,91 @@
+// Overall Mastery Score — combines a real score from each of the 5
+// Colleges into one 0-1000 number, the same honest way
+// lib/gameMastery.js already combines Steam/Xbox/PlayStation: real
+// weighted counts -> a diminishing-returns normalize curve -> average
+// only across Colleges that actually have real data. A College with
+// nothing added contributes nothing — never a fabricated default.
+//
+// Gaming's real cross-platform Mastery Score (see lib/gameMastery.js,
+// user-facing as "Gaming Mastery") is reused directly as this
+// College's contribution — it's already on the same 0-1000 normalized
+// scale, so no extra transform is needed or wanted.
+//
+// Every function here is pure (no network, no Supabase) — real inputs
+// get gathered in lib/overallMasteryData.js, which calls into this
+// module. Weights/typicalMax below are a reasoned starting point, not
+// fixed constants handed down from anywhere real — they're isolated
+// here specifically so they're easy to retune later.
+
+import { normalize, accountXpFromMastery, levelFromXp } from "./gameMastery";
+
+export { accountXpFromMastery, levelFromXp };
+
+export const TYPICAL_MAX = {
+  tcg: 1500,
+  entertainment: 750,
+  collectibles: 1000,
+  tabletop: 900,
+};
+
+// entries: [{ card_name, quantity, foil, card: { rarity, prices } }]
+// decks: [{ ... }] (just needs .length)
+export function computeTcgRaw(entries, deckCount) {
+  const uniqueCards = entries.length;
+  const totalValueUSD = entries.reduce((sum, e) => {
+    const price = e.foil ? e.card?.prices?.usd_foil : e.card?.prices?.usd;
+    return sum + (Number(price) || 0) * e.quantity;
+  }, 0);
+  return uniqueCards * 2 + totalValueUSD * 0.5 + (deckCount || 0) * 20;
+}
+
+// entries: entertainment_entries rows, each with .status
+export function computeEntertainmentRaw(entries) {
+  const completedCount = entries.filter((e) => e.status === "completed").length;
+  const inProgressCount = entries.filter(
+    (e) => e.status === "watching" || e.status === "want_to_watch"
+  ).length;
+  return completedCount * 15 + inProgressCount * 2;
+}
+
+// entries: collectible_entries rows, each with .qty, .price_paid, .is_wishlist
+// Wishlist-only entries aren't real owned items, so they don't count.
+export function computeCollectiblesRaw(entries) {
+  const owned = entries.filter((e) => !e.is_wishlist);
+  const itemCount = owned.reduce((sum, e) => sum + (e.qty || 0), 0);
+  const totalSpendUSD = owned.reduce((sum, e) => sum + (Number(e.price_paid) || 0) * (e.qty || 0), 0);
+  return itemCount * 8 + totalSpendUSD * 0.3;
+}
+
+// campaigns: tabletop_campaigns rows (each has .total_session_minutes)
+export function computeTabletopRaw(campaigns, characterCount, armyCount) {
+  const sessionMinutes = campaigns.reduce((sum, c) => sum + (c.total_session_minutes || 0), 0);
+  const sessionHours = sessionMinutes / 60;
+  return sessionHours * 15 + campaigns.length * 40 + (characterCount || 0) * 10 + (armyCount || 0) * 15;
+}
+
+// collegeScores: { gaming?: number (already 0-1000 normalized),
+//   tcg?: number (raw), entertainment?: number (raw),
+//   collectibles?: number (raw), tabletop?: number (raw) }
+// A key is only present when that College actually has real data —
+// same "missing = not counted" rule as computeMasteryScore.
+// Returns null when every College is empty (never a fabricated 0).
+export function computeOverallScore(collegeScores) {
+  const entries = Object.entries(collegeScores || {}).filter(
+    ([, v]) => v !== null && v !== undefined
+  );
+  if (entries.length === 0) return null;
+
+  const normalized = entries.map(([college, raw]) => ({
+    college,
+    raw,
+    // Gaming's score is already normalized (it's Gaming Mastery
+    // itself) -- everything else runs through the same curve the
+    // other Colleges use, keyed by their own typicalMax.
+    normalized: college === "gaming" ? raw : normalize(raw, TYPICAL_MAX[college] || 1000),
+  }));
+
+  const overallScore =
+    normalized.reduce((sum, n) => sum + n.normalized, 0) / normalized.length;
+
+  return { overallScore, breakdown: normalized };
+}

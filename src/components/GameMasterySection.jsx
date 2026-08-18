@@ -122,7 +122,7 @@ export default function GameMasterySection({
 
   return (
     <div className="steam-link-card">
-      <h2 className="settings-card__title">Game Mastery Score</h2>
+      <h2 className="settings-card__title">Gaming Mastery</h2>
       <p className="settings-card__note">
         A cross-platform "Gamerscore equivalent." Steam's share is computed live from your real
         unlocked achievements and Steam's own global rarity data. Xbox and PlayStation have no
@@ -135,7 +135,7 @@ export default function GameMasterySection({
           <div className="backlog-summary">
             <div className="panel__stat">
               <span className="panel__stat-value">{Math.round(masteryScore)}</span>
-              <span className="panel__stat-label">Mastery Score</span>
+              <span className="panel__stat-label">Gaming Mastery</span>
             </div>
             <div className="panel__stat">
               <span className="panel__stat-value">{masteryLevel}</span>
@@ -179,7 +179,7 @@ export default function GameMasterySection({
       )}
 
       <button type="button" className="linking-row__connect" onClick={handleRecompute} disabled={recomputing}>
-        {recomputing ? "Recomputing…" : "Recompute Mastery Score"}
+        {recomputing ? "Recomputing…" : "Recompute Gaming Mastery"}
       </button>
 
       {!linkedSteamId && (
