@@ -724,6 +724,45 @@ button { font-family: inherit; }
   margin: 0 0 10px;
 }
 
+.achievement-group__thumb {
+  width: 48px;
+  height: 27px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.achievement-pager {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.live-achievement {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  margin: 16px 0;
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--amber) 40%, var(--border));
+  border-radius: var(--radius-lg);
+}
+
+.live-achievement__body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.live-achievement__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
 /* ---------- Progress section ---------- */
 
 .progress-chart {
@@ -2168,9 +2207,14 @@ button { font-family: inherit; }
   flex-shrink: 0;
 }
 
-.quickdash-reset-btn:hover {
+.quickdash-reset-btn:hover:not(:disabled) {
   border-color: var(--red);
   color: var(--red);
+}
+
+.quickdash-reset-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* ---------- Quickdash draggable/resizable grid ---------- */

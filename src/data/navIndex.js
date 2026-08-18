@@ -10,6 +10,7 @@ export const NAV_INDEX = [
   { label: "Library", view: "library", keywords: "gaming games owned" },
   { label: "Market", view: "prices", keywords: "gaming deals prices wishlist" },
   { label: "Backlog", view: "backlog", keywords: "gaming games" },
+  { label: "Achievements", view: "achievements", keywords: "gaming trophies xbox playstation steam" },
   { label: "Upcoming Releases", view: "upcoming-releases", keywords: "gaming calendar market" },
   { label: "TCG Home", view: "tcg-home", keywords: "mtg magic cards" },
   { label: "MTG Search", view: "mtg-search", keywords: "tcg magic cards scryfall" },

@@ -78,6 +78,7 @@ const KNOWN_VIEWS = [
   "market",
   "sales",
   "backlog",
+  "achievements",
   "upcoming-releases",
   "mtg-search",
   "mtg-collection",
