@@ -1651,3 +1651,12 @@ with ranked as (
 delete from public.wishlist_items where id in (select id from ranked where rn > 1);
 
 alter table public.wishlist_items add constraint wishlist_items_user_title_unique unique (user_id, title);
+
+-- ---------- Backlog: which platform (additive) ----------
+-- Which real platform the person picked when adding this game — see
+-- BacklogPage.jsx's search redesign. Self-selected from RAWG's own
+-- real per-game platform list (lib/rawg.js searchRawgGames), not
+-- guessed or defaulted silently. Nullable: existing rows and anything
+-- added before this feature just don't have one, same honest-gap
+-- pattern as steam_appid/hours_estimate above.
+alter table public.backlog_items add column if not exists platform text;

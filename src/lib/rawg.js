@@ -74,6 +74,23 @@ export async function searchRawgGame(title) {
   return data.results?.[0] || null; // best match, or null
 }
 
+// Up to 8 matches, each with its real list of platforms (from RAWG's
+// own catalog, not guessed) — powers Backlog's "add from any
+// platform" search, since Steam's own search only ever finds Steam
+// titles and misses anything console-exclusive.
+export async function searchRawgGames(title) {
+  const res = await fetch(`${API_BASE}/api/rawg?mode=search&q=${encodeURIComponent(title)}`);
+  const data = await res.json();
+  if (data.error === "no_key") return "no_key";
+  return (data.results || []).map((g) => ({
+    id: g.id,
+    name: g.name,
+    backgroundImage: g.background_image,
+    metacritic: g.metacritic,
+    platforms: (g.platforms || []).map((p) => p.platform?.name).filter(Boolean),
+  }));
+}
+
 export async function fetchAdditionsForGame(gameId) {
   const cacheKey = `gd-rawg-additions:${gameId}`;
   const cached = getCached(cacheKey, CACHE_TTL.ONE_DAY);

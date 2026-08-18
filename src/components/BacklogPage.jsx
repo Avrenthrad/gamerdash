@@ -17,6 +17,7 @@
 
 import { useEffect, useState } from "react";
 import { fetchOwnedGames, searchSteamGames } from "../lib/steam";
+import { searchRawgGames } from "../lib/rawg";
 import { logActivityForUser } from "../lib/guilds";
 import {
   fetchBacklog,
@@ -53,6 +54,9 @@ export default function BacklogPage({ onBack, userId, linkedSteamId }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState(null);
+  const [platformByResult, setPlatformByResult] = useState({}); // rawgId -> chosen platform
+  const [addingId, setAddingId] = useState(null);
 
   const [importCandidates, setImportCandidates] = useState([]);
   const [importLoaded, setImportLoaded] = useState(false);
@@ -78,27 +82,58 @@ export default function BacklogPage({ onBack, userId, linkedSteamId }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
+  // Real per-game platform list via RAWG (lib/rawg.js) — Steam's own
+  // search only ever finds Steam titles and misses anything console-
+  // exclusive, which is exactly what "add from any platform" needs.
   async function handleSearch(e) {
     e.preventDefault();
     if (!searchTerm.trim()) return;
     setSearching(true);
+    setSearchError(null);
     try {
-      const results = await searchSteamGames(searchTerm.trim());
-      setSearchResults(results.slice(0, 8));
+      const results = await searchRawgGames(searchTerm.trim());
+      if (results === "no_key") {
+        setSearchError("Platform search isn't configured yet.");
+        setSearchResults([]);
+        return;
+      }
+      setSearchResults(results);
+      setPlatformByResult(
+        Object.fromEntries(results.map((r) => [r.id, r.platforms[0] || ""]))
+      );
     } catch (err) {
       console.error("Backlog search failed:", err);
+      setSearchError("Couldn't search right now.");
     } finally {
       setSearching(false);
     }
   }
 
-  async function handleAdd(title, appid) {
+  // Real appid only attempted for a PC add — RAWG doesn't carry a
+  // Steam appid itself, and resolving one for a console platform would
+  // be meaningless (achievement enrichment below is Steam-only). Best-
+  // effort name match against Steam's own search, same trust level
+  // already used for CheapShark's title-search fallback elsewhere.
+  async function handleAdd(result) {
+    const platform = platformByResult[result.id] || null;
+    setAddingId(result.id);
     try {
-      await addToBacklog(userId, title, appid);
-      setSearchResults((prev) => prev.filter((r) => r.id !== appid));
+      let steamAppid = null;
+      if (platform?.toLowerCase().includes("pc")) {
+        try {
+          const matches = await searchSteamGames(result.name);
+          steamAppid = matches[0]?.id || null;
+        } catch {
+          // No Steam match found — still add with the real platform, just no enrichment.
+        }
+      }
+      await addToBacklog(userId, result.name, steamAppid, platform);
+      setSearchResults((prev) => prev.filter((r) => r.id !== result.id));
       loadBacklog();
     } catch (err) {
       console.error("Failed to add to backlog:", err);
+    } finally {
+      setAddingId(null);
     }
   }
 
@@ -121,7 +156,7 @@ export default function BacklogPage({ onBack, userId, linkedSteamId }) {
 
   async function handleImport(game) {
     try {
-      await addToBacklog(userId, game.name, game.appid);
+      await addToBacklog(userId, game.name, game.appid, "PC");
       setImportCandidates((prev) => prev.filter((g) => g.appid !== game.appid));
       loadBacklog();
     } catch (err) {
@@ -257,14 +292,36 @@ export default function BacklogPage({ onBack, userId, linkedSteamId }) {
           </button>
         </form>
 
+        {searchError && <p className="panel__status panel__status--error">{searchError}</p>}
+
         {searchResults.length > 0 && (
           <ul className="backlog-search-results">
             {searchResults.map((r) => (
               <li key={r.id} className="backlog-search-results__row">
-                {r.tiny_image && <img src={r.tiny_image} alt="" />}
+                {r.backgroundImage && <img src={r.backgroundImage} alt="" />}
                 <span>{r.name}</span>
-                <button type="button" className="linking-row__connect" onClick={() => handleAdd(r.name, r.id)}>
-                  Add
+                {r.platforms.length > 0 ? (
+                  <label className="currency-picker" style={{ flexShrink: 0 }}>
+                    <span>Platform</span>
+                    <select
+                      value={platformByResult[r.id] || ""}
+                      onChange={(e) => setPlatformByResult((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                    >
+                      {r.platforms.map((p) => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <span className="panel__status" style={{ margin: 0 }}>No platform data</span>
+                )}
+                <button
+                  type="button"
+                  className="linking-row__connect"
+                  onClick={() => handleAdd(r)}
+                  disabled={addingId === r.id}
+                >
+                  {addingId === r.id ? "Adding…" : "Add"}
                 </button>
               </li>
             ))}
@@ -345,6 +402,7 @@ export default function BacklogPage({ onBack, userId, linkedSteamId }) {
               <div className="backlog-card__info">
                 <span className="backlog-card__title">{item.title}</span>
                 <div className="backlog-card__meta">
+                  {item.platform && <span className="tag tag--muted">{item.platform}</span>}
                   {item.metacriticScore != null && <span className="score-badge">Metacritic {item.metacriticScore}</span>}
                   {item.releaseDate && <span>{item.releaseDate}</span>}
                   {item.totalAchievements != null && item.totalAchievements > 0 && (

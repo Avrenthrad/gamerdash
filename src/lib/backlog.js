@@ -30,10 +30,15 @@ export async function fetchBacklog(userId) {
   return data || [];
 }
 
-export async function addToBacklog(userId, title, steamAppid = null) {
+export async function addToBacklog(userId, title, steamAppid = null, platform = null) {
   const { error } = await supabase
     .from("backlog_items")
-    .insert({ user_id: userId, title, steam_appid: steamAppid ? String(steamAppid) : null });
+    .insert({
+      user_id: userId,
+      title,
+      steam_appid: steamAppid ? String(steamAppid) : null,
+      platform,
+    });
   if (error) throw error;
 }
 
