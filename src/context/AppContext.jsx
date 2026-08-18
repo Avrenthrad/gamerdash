@@ -650,10 +650,12 @@ export function AppProvider({ children }) {
 
   const addToWishlist = useCallback(
     (title) => {
+      let wasNew = false;
       setWishlist((prev) => {
         if (prev.some((entry) => entry.title.toLowerCase() === title.toLowerCase())) {
           return prev;
         }
+        wasNew = true;
         return [
           ...prev,
           {
@@ -664,7 +666,13 @@ export function AppProvider({ children }) {
           },
         ];
       });
-      if (supabaseConfigured && userId) {
+      // Only reaches Supabase when it's genuinely new by the local
+      // check above — insertWishlistItem is also a real upsert with a
+      // DB-level unique(user_id, title) constraint as the actual
+      // safety net (this local check alone can't catch every race,
+      // e.g. two tabs, or a resync running before the wishlist finishes
+      // loading) — see schema.sql for why that constraint exists.
+      if (wasNew && supabaseConfigured && userId) {
         insertWishlistItem(userId, title).catch((err) =>
           console.error("Failed to save wishlist add:", err)
         );

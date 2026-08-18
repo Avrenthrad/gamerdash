@@ -193,6 +193,25 @@ export function buildStoreRow(deal, meta, platformOrder = PRIORITY_STORE_NAMES) 
 }
 
 /**
+ * Which of the 4 Market columns a wishlist entry belongs in — real
+ * signals only: appType comes straight from Steam's own appdetails
+ * classification (see api/steam.js), comingSoon from Steam's own
+ * release_date.coming_soon, on-sale from the same getCheapestInfo
+ * math the "On sale only" filter already trusts. Mutually exclusive,
+ * in this precedence order, so every entry lands in exactly one
+ * column: DLC first (it's the most specific real classification),
+ * then Preorder (not out yet), then On Sale, with Games as the
+ * default bucket for everything else.
+ */
+export function categorizeWishlistEntry(deal, meta, rates) {
+  if (meta?.appType === "dlc") return "dlc";
+  if (meta?.comingSoon) return "preorder";
+  const info = getCheapestInfo(deal, meta, rates);
+  if (info && info.rrp > info.price) return "onSale";
+  return "games";
+}
+
+/**
  * Cheapest store on a common AUD basis (internal yardstick only —
  * display currency is handled separately by formatPrice).
  */

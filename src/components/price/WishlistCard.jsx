@@ -12,7 +12,10 @@ import {
 } from "./priceUtils";
 
 /**
- * One wishlist entry with full pricing, scores, and store chips.
+ * One wishlist entry — a compact, square-ish grid card (image on top,
+ * everything else stacked below) so it fits well in Market's 4-column
+ * layout. Store comparison is collapsed behind one toggle by default
+ * since a narrow column can't comfortably show 7+ store chips at once.
  */
 export default function WishlistCard({
   entry,
@@ -67,73 +70,80 @@ export default function WishlistCard({
     secondary: secondaryChips,
   } = buildStoreRow(deal, meta, platformOrder);
   const cheapest = getCheapestInfo(deal, meta, rates);
+  const storeCount = [...primaryChips, ...secondaryChips].filter((s) => s.state === "price").length;
 
   return (
     <li className="wishlist-card">
-      <div className="wishlist-card__main">
-        <div className="wishlist-card__thumb-wrap">
-          {deal.thumb ? (
-            <img src={deal.thumb} alt="" className="wishlist-card__thumb" />
-          ) : (
-            <div className="wishlist-card__thumb wishlist-card__thumb--placeholder" />
-          )}
-          <a
-            href={hltbLinkFor(deal.game)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hltb-badge"
-            title="How long to beat this — opens HowLongToBeat"
-          >
-            <img src={hltbLogo} alt="HowLongToBeat" className="hltb-badge__icon" />
-          </a>
+      <div className="wishlist-card__thumb-wrap">
+        {deal.thumb ? (
+          <img src={deal.thumb} alt="" className="wishlist-card__thumb" />
+        ) : (
+          <div className="wishlist-card__thumb wishlist-card__thumb--placeholder" />
+        )}
+        <a
+          href={hltbLinkFor(deal.game)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hltb-badge"
+          title="How long to beat this — opens HowLongToBeat"
+        >
+          <img src={hltbLogo} alt="HowLongToBeat" className="hltb-badge__icon" />
+        </a>
+        <div className="wishlist-card__toggle-overlay">
+          <WishlistToggle
+            isWishlisted
+            onRemove={() => onRemove(deal.game)}
+            isLoggedIn={isLoggedIn}
+            onSignIn={onSignIn}
+            onCreateAccount={onCreateAccount}
+          />
         </div>
+        {meta?.comingSoon && <span className="score-badge score-badge--preorder wishlist-card__preorder-badge">Preorder</span>}
+      </div>
 
-        <div className="wishlist-card__info">
-          <span className="wishlist-card__title">{deal.game}</span>
-          <span className="wishlist-card__meta">
-            Added {relativeTime(entry.addedAt)}
-            {typeof players === "number" && ` · ${players.toLocaleString()} playing now`}
+      <div className="wishlist-card__body">
+        <span className="wishlist-card__title">{deal.game}</span>
+        <span className="wishlist-card__meta">
+          Added {relativeTime(entry.addedAt)}
+          {typeof players === "number" && ` · ${players.toLocaleString()} playing now`}
+        </span>
+        <span className="wishlist-card__lowest">
+          Lowest ever {formatPrice(deal.lowest, "USD", rates, currency)} · {deal.lowestDate}
+        </span>
+        {meta?.releaseDate && (
+          <span className="wishlist-card__release">
+            {meta.comingSoon ? "Releases " : "Released "}{meta.releaseDate}
           </span>
-          <span className="wishlist-card__lowest">
-            Lowest ever {formatPrice(deal.lowest, "USD", rates, currency)} · {deal.lowestDate}
-          </span>
-          {meta?.releaseDate && (
-            <span className="wishlist-card__release">
-              {meta.comingSoon ? "Releases " : "Released "}{meta.releaseDate}
-              {meta.comingSoon && <span className="score-badge score-badge--preorder"> Preorder</span>}
-            </span>
-          )}
+        )}
 
-          {(meta?.metacriticScore != null || meta?.scoreDesc) && (
-            <div className="wishlist-card__scores">
-              {meta.metacriticScore != null && (
-                <a
-                  href={meta.metacriticUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`score-badge score-badge--metacritic ${
-                    meta.metacriticScore >= 75
-                      ? "score-badge--good"
-                      : meta.metacriticScore >= 50
-                        ? "score-badge--mid"
-                        : "score-badge--low"
-                  }`}
-                >
-                  Metacritic {meta.metacriticScore}
-                </a>
-              )}
-              {meta.scoreDesc && (
-                <span
-                  className="score-badge score-badge--steam"
-                  style={steamReviewStyle(meta)}
-                >
-                  Steam: {meta.scoreDesc}
-                  {meta.totalReviews ? ` (${meta.totalReviews.toLocaleString()})` : ""}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
+        {(meta?.metacriticScore != null || meta?.scoreDesc) && (
+          <div className="wishlist-card__scores">
+            {meta.metacriticScore != null && (
+              <a
+                href={meta.metacriticUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`score-badge score-badge--metacritic ${
+                  meta.metacriticScore >= 75
+                    ? "score-badge--good"
+                    : meta.metacriticScore >= 50
+                      ? "score-badge--mid"
+                      : "score-badge--low"
+                }`}
+              >
+                Metacritic {meta.metacriticScore}
+              </a>
+            )}
+            {meta.scoreDesc && (
+              <span
+                className="score-badge score-badge--steam"
+                style={steamReviewStyle(meta)}
+              >
+                Steam: {meta.scoreDesc}
+              </span>
+            )}
+          </div>
+        )}
 
         <div className="wishlist-card__cheapest">
           {cheapest?.rrp > cheapest?.price && (
@@ -147,62 +157,52 @@ export default function WishlistCard({
           <span className="wishlist-card__cheapest-store">{cheapest?.store}</span>
         </div>
 
-        <WishlistToggle
-          isWishlisted
-          onRemove={() => onRemove(deal.game)}
-          isLoggedIn={isLoggedIn}
-          onSignIn={onSignIn}
-          onCreateAccount={onCreateAccount}
-        />
-      </div>
+        <button
+          type="button"
+          className="store-row-toggle"
+          onClick={() => setShowStores(!showStores)}
+          aria-expanded={showStores}
+        >
+          {showStores ? "Hide store comparison ▲" : `Compare ${storeCount} stores ▾`}
+        </button>
 
-      <div className="store-row">
-        {primaryChips.map((s) => (
-          <StoreChip key={s.name} {...s} rates={rates} currency={currency} />
-        ))}
-      </div>
-
-      <button
-        type="button"
-        className="store-row-toggle"
-        onClick={() => setShowPhysical(!showPhysical)}
-        aria-expanded={showPhysical}
-      >
-        {showPhysical
-          ? "Hide physical retailers ▲"
-          : `Physical retailers (${physicalChips.length}) ▾`}
-      </button>
-
-      {showPhysical && (
-        <div className="store-row">
-          {physicalChips.map((s) => (
-            <StoreChip key={s.name} {...s} rates={rates} currency={currency} />
-          ))}
-        </div>
-      )}
-
-      {secondaryChips.length > 0 && (
-        <>
-          <button
-            type="button"
-            className="store-row-toggle"
-            onClick={() => setShowStores(!showStores)}
-            aria-expanded={showStores}
-          >
-            {showStores
-              ? "Hide additional sellers ▲"
-              : `Additional sellers (${secondaryChips.length}) ▾`}
-          </button>
-
-          {showStores && (
+        {showStores && (
+          <>
             <div className="store-row">
-              {secondaryChips.map((s) => (
+              {primaryChips.map((s) => (
                 <StoreChip key={s.name} {...s} rates={rates} currency={currency} />
               ))}
             </div>
-          )}
-        </>
-      )}
+
+            <button
+              type="button"
+              className="store-row-toggle"
+              onClick={() => setShowPhysical(!showPhysical)}
+              aria-expanded={showPhysical}
+            >
+              {showPhysical
+                ? "Hide physical retailers ▲"
+                : `Physical retailers (${physicalChips.length}) ▾`}
+            </button>
+
+            {showPhysical && (
+              <div className="store-row">
+                {physicalChips.map((s) => (
+                  <StoreChip key={s.name} {...s} rates={rates} currency={currency} />
+                ))}
+              </div>
+            )}
+
+            {secondaryChips.length > 0 && (
+              <div className="store-row">
+                {secondaryChips.map((s) => (
+                  <StoreChip key={s.name} {...s} rates={rates} currency={currency} />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </li>
   );
 }

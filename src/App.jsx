@@ -270,7 +270,7 @@ export default function App() {
           {GAMING_VIEWS.includes(view) && (
             <GamingSidebar currentView={view} onNavigate={(id) => goTo(id)} />
           )}
-          <div className="dash">
+          <div className={`dash ${view === "prices" ? "dash--wide" : ""}`}>
           {view === "linking" &&
             (isLoggedIn ? (
               <AccountLinkingPage

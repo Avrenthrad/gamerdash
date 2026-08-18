@@ -22,9 +22,16 @@ import {
 } from "../lib/steam";
 import { importSteamWishlist } from "../lib/wishlistImport";
 import { getExchangeRates, SUPPORTED_CURRENCIES, formatPrice } from "../lib/currency";
-import { getCheapestInfo } from "./price/priceUtils";
+import { getCheapestInfo, categorizeWishlistEntry } from "./price/priceUtils";
 import WishlistCard from "./price/WishlistCard";
 import PriceSearch from "./price/PriceSearch";
+
+const WISHLIST_COLUMNS = [
+  { id: "onSale", label: "On Sale" },
+  { id: "preorder", label: "Preorders" },
+  { id: "games", label: "Games" },
+  { id: "dlc", label: "DLC" },
+];
 
 export default function PriceComparisonPage({
   wishlist,
@@ -48,8 +55,6 @@ export default function PriceComparisonPage({
   const [rates, setRates] = useState(null);
   const [errorByTitle, setErrorByTitle] = useState({});
   const [sortBy, setSortBy] = useState("newest");
-  const [saleOnly, setSaleOnly] = useState(false);
-  const [preorderOnly, setPreorderOnly] = useState(false);
   const [resyncStatus, setResyncStatus] = useState("idle");
   const [resyncMessage, setResyncMessage] = useState("");
 
@@ -307,31 +312,13 @@ export default function PriceComparisonPage({
 
   const sortedWishlist = sortWishlist(wishlist);
 
-  // Both filters are independent and combine as AND — checking both
-  // shows only unreleased games currently on presale/discount, not
-  // "either one." comingSoon is real Steam data (release_date.coming_soon),
-  // already fetched into metaByTitle for every wishlist item via
-  // resolveGameName — not a guess or a date-math heuristic.
-  const visibleWishlist = sortedWishlist.filter((entry) => {
-    if (saleOnly) {
-      const info = getCheapestInfo(
-        dealsByTitle[entry.title],
-        metaByTitle[entry.title],
-        rates
-      );
-      if (!info || info.rrp <= info.price) return false;
-    }
-    if (preorderOnly && !metaByTitle[entry.title]?.comingSoon) return false;
-    return true;
-  });
-
-  // Real stat summary — same getCheapestInfo already trusted for the
-  // "On sale only" filter, not a separate/different calculation that
-  // could drift out of sync with it. Each entry's cheapest price can
-  // be natively AUD or USD depending on which store won — converting
-  // every entry to a single currency (AUD) before summing, rather
-  // than adding raw numbers across mismatched currencies, which
-  // would silently produce a meaningless total.
+  // Real stat summary — same getCheapestInfo/categorizeWishlistEntry
+  // already trusted for the column split below, not a separate
+  // calculation that could drift out of sync with it. Each entry's
+  // cheapest price can be natively AUD or USD depending on which store
+  // won — converting every entry to a single currency (AUD) before
+  // summing, rather than adding raw numbers across mismatched
+  // currencies, which would silently produce a meaningless total.
   let onSaleCount = 0;
   let totalEstimatedValueAud = 0;
   for (const entry of wishlist) {
@@ -342,6 +329,27 @@ export default function PriceComparisonPage({
       if (info.rrp > info.price) onSaleCount += 1;
     }
   }
+
+  // Every entry lands in exactly one of the 4 columns — see
+  // categorizeWishlistEntry for the real signals + precedence order.
+  // Entries whose deal hasn't loaded yet (still fetching, or errored)
+  // are shown separately above the columns rather than guessed into one.
+  const pendingEntries = sortedWishlist.filter((entry) => !dealsByTitle[entry.title]);
+  const readyEntries = sortedWishlist.filter((entry) => dealsByTitle[entry.title]);
+
+  const columns = WISHLIST_COLUMNS.map((col) => {
+    const items = readyEntries.filter(
+      (entry) => categorizeWishlistEntry(dealsByTitle[entry.title], metaByTitle[entry.title], rates) === col.id
+    );
+    let valueAud = 0;
+    items.forEach((entry) => {
+      const info = getCheapestInfo(dealsByTitle[entry.title], metaByTitle[entry.title], rates);
+      if (info && rates) {
+        valueAud += info.nativeCurrency === "AUD" ? info.price : info.price * rates.AUD;
+      }
+    });
+    return { ...col, items, valueAud };
+  });
 
   // ---------- render ----------
   return (
@@ -483,34 +491,9 @@ export default function PriceComparisonPage({
       <div className="wishlist-sort-row">
         <span className="feed-col__label">
           Your wishlist
-          <span className="feed-col__count">
-            {visibleWishlist.length}
-            {saleOnly && preorderOnly
-              ? " on sale · preorder"
-              : saleOnly
-              ? " on sale"
-              : preorderOnly
-              ? " preorder"
-              : ""}
-          </span>
+          <span className="feed-col__count">{wishlist.length}</span>
         </span>
         <div className="wishlist-sort-row__controls">
-          <label className="wishlist-filter-toggle">
-            <input
-              type="checkbox"
-              checked={saleOnly}
-              onChange={(e) => setSaleOnly(e.target.checked)}
-            />
-            <span>On sale only</span>
-          </label>
-          <label className="wishlist-filter-toggle">
-            <input
-              type="checkbox"
-              checked={preorderOnly}
-              onChange={(e) => setPreorderOnly(e.target.checked)}
-            />
-            <span>Preorders only</span>
-          </label>
           <label className="wishlist-sort-row__control">
             <span>Sort by</span>
             <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
@@ -533,52 +516,70 @@ export default function PriceComparisonPage({
             when something finally drops.
           </p>
         </div>
-      ) : visibleWishlist.length === 0 ? (
-        <div className="empty-state">
-          <p className="empty-state__title">
-            {saleOnly && preorderOnly
-              ? "Nothing unreleased and on sale right now."
-              : preorderOnly
-              ? "No preorders in your wishlist right now."
-              : "Nothing on sale right now."}
-          </p>
-          <p className="empty-state__body">
-            {preorderOnly
-              ? "Turn off the filters above to see the full list, or check back once something new gets announced."
-              : "Turn off \"On sale only\" to see the full list, or wait for the next wave of discounts."}
-          </p>
-          <button
-            type="button"
-            className="current-rotation__btn"
-            onClick={() => {
-              setSaleOnly(false);
-              setPreorderOnly(false);
-            }}
-          >
-            Show everything
-          </button>
-        </div>
       ) : (
-        <ul className="wishlist-list">
-          {visibleWishlist.map((entry) => (
-            <WishlistCard
-              key={entry.id}
-              entry={entry}
-              deal={dealsByTitle[entry.title]}
-              players={playersByTitle[entry.title]}
-              meta={metaByTitle[entry.title]}
-              rates={rates}
-              currency={currency}
-              onRemove={onRemoveFromWishlist}
-              error={errorByTitle[entry.title]}
-              onRetry={loadDealForTitle}
-              isLoggedIn={isLoggedIn}
-              onSignIn={onSignIn}
-              onCreateAccount={onCreateAccount}
-              platformOrder={platformOrder}
-            />
-          ))}
-        </ul>
+        <>
+          {pendingEntries.length > 0 && (
+            <ul className="wishlist-list" style={{ marginBottom: "20px" }}>
+              {pendingEntries.map((entry) => (
+                <WishlistCard
+                  key={entry.id}
+                  entry={entry}
+                  deal={dealsByTitle[entry.title]}
+                  players={playersByTitle[entry.title]}
+                  meta={metaByTitle[entry.title]}
+                  rates={rates}
+                  currency={currency}
+                  onRemove={onRemoveFromWishlist}
+                  error={errorByTitle[entry.title]}
+                  onRetry={loadDealForTitle}
+                  isLoggedIn={isLoggedIn}
+                  onSignIn={onSignIn}
+                  onCreateAccount={onCreateAccount}
+                  platformOrder={platformOrder}
+                />
+              ))}
+            </ul>
+          )}
+
+          <div className="wishlist-columns">
+            {columns.map((col) => (
+              <div key={col.id}>
+                <div className="wishlist-column__head">
+                  <span className="wishlist-column__label">{col.label} ({col.items.length})</span>
+                  {rates && col.items.length > 0 && (
+                    <span className="wishlist-column__value">
+                      {formatPrice(col.valueAud, "AUD", rates, currency)}
+                    </span>
+                  )}
+                </div>
+                {col.items.length === 0 ? (
+                  <p className="panel__status">Nothing here yet.</p>
+                ) : (
+                  <ul className="wishlist-list">
+                    {col.items.map((entry) => (
+                      <WishlistCard
+                        key={entry.id}
+                        entry={entry}
+                        deal={dealsByTitle[entry.title]}
+                        players={playersByTitle[entry.title]}
+                        meta={metaByTitle[entry.title]}
+                        rates={rates}
+                        currency={currency}
+                        onRemove={onRemoveFromWishlist}
+                        error={errorByTitle[entry.title]}
+                        onRetry={loadDealForTitle}
+                        isLoggedIn={isLoggedIn}
+                        onSignIn={onSignIn}
+                        onCreateAccount={onCreateAccount}
+                        platformOrder={platformOrder}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

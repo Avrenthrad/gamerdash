@@ -35,7 +35,7 @@ export async function fetchWishlist(userId) {
 export async function insertWishlistItem(userId, title) {
   const { error } = await supabase
     .from("wishlist_items")
-    .insert({ user_id: userId, title });
+    .upsert({ user_id: userId, title }, { onConflict: "user_id,title", ignoreDuplicates: true });
   if (error) throw error;
 }
 

@@ -84,6 +84,10 @@ export default async function handler(req, res) {
         thumb: entry.data.header_image,
         releaseDate: entry.data.release_date?.date || null,
         comingSoon: entry.data.release_date?.coming_soon || false,
+        // Real Steam classification — "game", "dlc", "demo", "music",
+        // etc. Used to honestly split DLC out from base games rather
+        // than guessing from the title.
+        appType: entry.data.type || null,
         metacriticScore: entry.data.metacritic?.score ?? null,
         metacriticUrl: entry.data.metacritic?.url ?? null,
         // Real genre tags Steam assigns per game — used for the Hype

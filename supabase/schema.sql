@@ -1597,23 +1597,57 @@ create policy "Guild media is publicly viewable"
   on storage.objects for select
   using (bucket_id = 'guild-media');
 
+-- NOTE: the three policies below reference storage.objects.name
+-- explicitly, not just "name" — an earlier version of this migration
+-- wrote a bare "name" inside a subquery that also selects FROM
+-- guilds, and since guilds has its own "name" column, Postgres bound
+-- the unqualified reference to guilds.name (the guild's own display
+-- name) instead of the outer storage.objects row being inserted. That
+-- made the EXISTS check always false, so every real logo/banner
+-- upload failed with an RLS violation — caught and fixed live while
+-- verifying this feature, corrected here so this file matches what's
+-- actually deployed.
 create policy "Guild owners can upload guild media"
   on storage.objects for insert
   with check (
     bucket_id = 'guild-media'
-    and exists (select 1 from public.guilds where id::text = (storage.foldername(name))[1] and created_by = auth.uid())
+    and exists (select 1 from public.guilds where guilds.id::text = (storage.foldername(storage.objects.name))[1] and guilds.created_by = auth.uid())
   );
 
 create policy "Guild owners can update guild media"
   on storage.objects for update
   using (
     bucket_id = 'guild-media'
-    and exists (select 1 from public.guilds where id::text = (storage.foldername(name))[1] and created_by = auth.uid())
+    and exists (select 1 from public.guilds where guilds.id::text = (storage.foldername(storage.objects.name))[1] and guilds.created_by = auth.uid())
   );
 
 create policy "Guild owners can delete guild media"
   on storage.objects for delete
   using (
     bucket_id = 'guild-media'
-    and exists (select 1 from public.guilds where id::text = (storage.foldername(name))[1] and created_by = auth.uid())
+    and exists (select 1 from public.guilds where guilds.id::text = (storage.foldername(storage.objects.name))[1] and guilds.created_by = auth.uid())
   );
+
+-- ---------- Wishlist duplicate fix ----------
+-- Real bug: addToWishlist() in AppContext.jsx fired an unconditional
+-- Supabase insert on every call regardless of whether its own local
+-- dedup check found the title already present, and importSteamWishlist
+-- (used by both the initial Steam link AND the "Resync Steam wishlist"
+-- button) calls addToWishlist for every item on every run with no
+-- existing-item check. Confirmed live: 568 rows for only 161 real
+-- unique (user_id, title) pairs — every resync had been re-inserting
+-- the whole wishlist as fresh duplicate rows. Cleaned up the existing
+-- duplicates (kept the earliest real added_at per pair) and added a
+-- real DB-level constraint so it can't happen again regardless of what
+-- the client does — insertWishlistItem (lib/userData.js) now upserts
+-- against this constraint with ignoreDuplicates instead of a plain
+-- insert, and addToWishlist only calls it when genuinely new.
+with ranked as (
+  select id, row_number() over (
+    partition by user_id, title order by added_at asc, id asc
+  ) as rn
+  from public.wishlist_items
+)
+delete from public.wishlist_items where id in (select id from ranked where rn > 1);
+
+alter table public.wishlist_items add constraint wishlist_items_user_title_unique unique (user_id, title);

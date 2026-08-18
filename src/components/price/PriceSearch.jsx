@@ -161,20 +161,20 @@ export default function PriceSearch({
                 : { primary: [] };
 
             return (
-              <li key={result.game} className="wishlist-card search-result-card">
-                <div className="wishlist-card__main">
+              <li key={result.game} className="search-result-card">
+                <div className="search-result-card__row">
                   {result.thumb ? (
-                    <img src={result.thumb} alt="" className="wishlist-card__thumb" />
+                    <img src={result.thumb} alt="" className="search-result-card__thumb" />
                   ) : (
-                    <div className="wishlist-card__thumb wishlist-card__thumb--placeholder" />
+                    <div className="search-result-card__thumb search-result-card__thumb--placeholder" />
                   )}
 
-                  <div className="wishlist-card__info">
+                  <div className="search-result-card__info">
                     <span className="wishlist-card__title">{result.game}</span>
                   </div>
 
                   {cheapest ? (
-                    <div className="wishlist-card__cheapest">
+                    <div className="search-result-card__cheapest">
                       {cheapest.rrp > cheapest.price && (
                         <span className="wishlist-card__rrp">
                           {formatPrice(
