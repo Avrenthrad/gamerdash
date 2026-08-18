@@ -150,6 +150,26 @@ export async function fetchWishlist(steamId) {
   return data?.items || [];
 }
 
+// Real, official dev-posted news for one app — patch notes, beta
+// access, preorder/launch announcements, whatever the developer
+// actually posted to their Steam Community hub. Public, no key
+// needed. Not a general gaming-news aggregator (no honest free source
+// for that was found) — scoped to games a person actually tracks.
+export async function fetchNewsForApp(appId, count = 5) {
+  const res = await fetch(`${API_BASE}/api/steam?appid=${appId}&mode=news&count=${count}`);
+  if (!res.ok) throw new Error("Failed to load news for this game");
+  const data = await res.json();
+  return (data.newsitems || []).map((item) => ({
+    id: item.gid,
+    title: item.title,
+    url: item.url,
+    author: item.author,
+    contents: item.contents,
+    feedLabel: item.feedlabel,
+    date: item.date ? new Date(item.date * 1000).toISOString() : null,
+  }));
+}
+
 // Accepts a raw SteamID64, a full profile URL (either /profiles/ID or
 // /id/vanityname), or just a vanity name, and resolves it down to a
 // real SteamID64 ready for fetchWishlist.

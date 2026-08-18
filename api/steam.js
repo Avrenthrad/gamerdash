@@ -18,6 +18,7 @@
 //                           fetch("/api/steam?appid=...&mode=globalAchievementPercentages") -> global unlock rarity per achievement
 //                           fetch("/api/steam?steamid=...&mode=friendList")                 -> a person's real Steam friends (public profiles only)
 //                           fetch("/api/steam?steamids=id1,id2,...&mode=playerSummaries")    -> live online/in-game status for up to 100 people
+//                           fetch("/api/steam?appid=...&mode=news")                          -> real dev-posted announcements/patch notes for one app
 
 export default async function handler(req, res) {
   const apiKey = process.env.STEAM_API_KEY;
@@ -259,6 +260,29 @@ export default async function handler(req, res) {
       }
       const data = await steamRes.json();
       return res.status(200).json(data);
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
+  // Real, official dev-posted news for one app — patch notes, beta
+  // access, preorder/launch announcements, whatever the developer
+  // actually posts to their Steam Community hub. Public, no key
+  // needed. This is Steam's real content, not a scrape or a general
+  // news aggregator guessing at relevance.
+  if (mode === "news") {
+    if (!appid) {
+      return res.status(400).json({ error: "Missing appid query parameter" });
+    }
+    try {
+      const count = req.query.count || "5";
+      const url = `https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=${appid}&count=${count}&maxlength=300&format=json`;
+      const steamRes = await fetch(url);
+      if (!steamRes.ok) {
+        return res.status(steamRes.status).json({ error: "Steam news request failed" });
+      }
+      const data = await steamRes.json();
+      return res.status(200).json(data.appnews || { newsitems: [] });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }

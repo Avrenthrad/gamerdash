@@ -19,6 +19,7 @@ import GuildSpotlightCard from "./GuildSpotlightCard";
 import RecentActivityCard from "./RecentActivityCard";
 import GamingMasteryContributionCard from "./GamingMasteryContributionCard";
 import ReleaseCalendarCard from "./ReleaseCalendarCard";
+import NewsAnnouncementsCard from "./NewsAnnouncementsCard";
 import PageLoadingFallback from "./PageLoadingFallback";
 
 const GridLayout = lazy(() => import("react-grid-layout"));
@@ -103,6 +104,7 @@ export default function GamingDashboard({
           </div>
         )}
         <NowTrendingCard onOpenHypeCharts={() => goTo("hype-charts")} />
+        <NewsAnnouncementsCard linkedSteamId={linkedSteamId} />
       </div>
 
       <FriendSection

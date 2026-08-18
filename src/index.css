@@ -3974,6 +3974,39 @@ button { font-family: inherit; }
   font-size: 13.5px;
 }
 
+.news-announcements-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.news-announcements-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.news-announcements-row__title {
+  font-size: 13.5px;
+  color: var(--text-primary);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.news-announcements-row__title:hover {
+  color: var(--accent);
+}
+
+.news-announcements-row__meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 .guild-spotlight__identity {
   display: flex;
   align-items: center;
