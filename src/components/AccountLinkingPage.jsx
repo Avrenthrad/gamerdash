@@ -1,44 +1,101 @@
 // Account linking screen — connect gaming and streaming platforms.
 //
-// Genuinely working pieces: Steam (public-profile wishlist sync),
-// Destiny 2 (real Bungie OAuth, paused until deployed — needs a real
-// public redirect URL registered with Bungie directly), and now
+// Genuinely working pieces: Steam (public-profile wishlist sync), and
 // Discord + Twitch (real OAuth via Supabase's own built-in provider
-// support — see lib/auth.js for why that one specifically ISN'T
-// blocked on deployment the way Destiny 2 is: Supabase's OAuth
-// callback is its own fixed domain, not ours).
+// support — see lib/auth.js for why that one specifically isn't
+// blocked on deployment the way a directly-registered OAuth app is:
+// Supabase's OAuth callback is its own fixed domain, not ours).
 //
-// Everything else below is an honest "not available" listing, updated
-// with what this project actually found out researching each one
-// (Riot's RSO needs their manual approval — not simply a self-service
-// key the way the label used to imply; Xbox's real API is gated
-// behind being an approved game developer, not open to companion
-// apps; PlayStation and Nintendo have no public API at all).
+// Xbox/PlayStation/Nintendo have no public API for a person's own
+// library/achievements/trophies at all — confirmed while researching
+// each one, not an oversight. Rather than a dead "not available" row,
+// each gets a real self-reported handle field (their actual Gamertag/
+// Online ID/Friend Code) — honest reference info a person can save
+// themselves, never presented as verified or live-synced. The scored
+// numbers (Gamerscore, PS trophy counts) are entered separately below
+// in GameMasterySection, which already has its own real "Recompute"
+// action — the small refresh button next to each handle here just
+// calls that same recompute, it isn't a second, different mechanism.
+//
+// Removed entirely: Destiny 2 (real working Bungie OAuth, but paused
+// on a Bungie-registered redirect URL — dropped from this screen per
+// product decision, not because the code doesn't work), Riot Games,
+// Epic Games, and Kick (none had a realistic path to real data for
+// this project's scope).
 
 import { useState, useEffect } from "react";
 import { importSteamWishlist } from "../lib/wishlistImport";
-import { checkBungieStatus, connectBungie, disconnectBungie } from "../lib/bungie";
 import { linkIdentity, unlinkProviderIdentity, getLinkedProviders, syncDiscordLink, removeDiscordLink } from "../lib/auth";
 import { supabase } from "../lib/supabaseClient";
 import GameMasterySection from "./GameMasterySection";
 
-const platforms = [
-  { name: "Xbox", support: "No self-service API", note: "The real Xbox Live API is gated behind Microsoft's ID@Xbox / Creators Program — for approved game developers, not companion apps like this one." },
-  { name: "PlayStation", support: "No public API", note: "Sony has never published a public API for this, official or otherwise — nothing to apply for." },
-  { name: "Riot Games", support: "Gated by Riot", note: "League/Valorant access (RSO) needs Riot's manual review and approval, not a self-service key — not guaranteed for a project this size." },
-  { name: "Epic Games", support: "Limited", note: "Friends-list access is generally restricted to Epic-built titles." },
-  { name: "Nintendo", support: "No public API", note: "No public API currently available." },
-  { name: "Kick", support: "Limited", note: "Newer platform API — functionality may change as it matures." },
+const HANDLE_PLATFORMS = [
+  { id: "xbox_gamertag", label: "Xbox", fieldLabel: "Gamertag", placeholder: "Your Xbox Gamertag", note: "The real Xbox Live API is gated behind Microsoft's ID@Xbox / Creators Program — for approved game developers, not companion apps like this one." },
+  { id: "playstation_online_id", label: "PlayStation", fieldLabel: "Online ID", placeholder: "Your PSN Online ID", note: "Sony has never published a public API for this, official or otherwise — nothing to apply for." },
+  { id: "nintendo_friend_code", label: "Nintendo", fieldLabel: "Friend Code", placeholder: "SW-0000-0000-0000", note: "Nintendo has never published a public API for this either." },
 ];
 
-const supportStyles = {
-  "Full support": "tag--support-full",
-  "Identity only": "tag--support-partial",
-  "Limited": "tag--support-partial",
-  "Gated by Riot": "tag--support-partial",
-  "No public API": "tag--support-none",
-  "No self-service API": "tag--support-none",
-};
+function PlatformHandleCard({ platform, value: initialValue, onSaved, onRecomputeMastery }) {
+  const [value, setValue] = useState(initialValue || "");
+  const [status, setStatus] = useState("idle"); // idle | saving | saved | error
+  const [recomputing, setRecomputing] = useState(false);
+
+  // initialValue arrives asynchronously (parent fetches the profile
+  // after this card has already mounted with an empty default) — sync
+  // once the real value shows up, without clobbering anything the
+  // person's already typed.
+  useEffect(() => {
+    if (initialValue) setValue(initialValue);
+  }, [initialValue]);
+
+  async function handleSave(e) {
+    e.preventDefault();
+    setStatus("saving");
+    try {
+      await onSaved(platform.id, value.trim());
+      setStatus("saved");
+    } catch (err) {
+      console.error(`Failed to save ${platform.label} handle:`, err);
+      setStatus("error");
+    }
+  }
+
+  async function handleRefresh() {
+    if (!onRecomputeMastery) return;
+    setRecomputing(true);
+    await onRecomputeMastery();
+    setRecomputing(false);
+  }
+
+  return (
+    <div className="steam-link-card">
+      <h2 className="settings-card__title">{platform.label}</h2>
+      <p className="settings-card__note">{platform.note}</p>
+      <form className="price-search" onSubmit={handleSave}>
+        <input
+          className="price-search__input"
+          type="text"
+          placeholder={platform.placeholder}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+        />
+        <button type="submit" className="price-search__button" disabled={status === "saving"}>
+          {status === "saving" ? "Saving…" : `Save ${platform.fieldLabel}`}
+        </button>
+        <button
+          type="button"
+          className="linking-row__connect"
+          onClick={handleRefresh}
+          disabled={recomputing}
+          title="Recompute your Gaming Mastery from whatever Gamerscore/trophy numbers you've saved — there's no live sync to pull from for this platform, so this replays your own saved numbers, not a fresh scrape."
+        >
+          {recomputing ? "Refreshing…" : "↻ Refresh"}
+        </button>
+      </form>
+      {status === "error" && <p className="panel__status panel__status--error">Couldn't save — try again.</p>}
+    </div>
+  );
+}
 
 function OAuthProviderCard({ label, provider, note, linkedProviders, onChanged }) {
   const [status, setStatus] = useState("idle"); // idle | loading | error
@@ -116,19 +173,31 @@ export default function AccountLinkingPage({
   const [status, setStatus] = useState("idle"); // idle | loading | done | error
   const [message, setMessage] = useState("");
 
-  // Bungie/Destiny 2 — real OAuth, but blocked on deployment (needs
-  // our own real public redirect URL registered directly with
-  // Bungie). See api/bungie.js for the full flow (merged with the old bungie-auth.js).
-  const [bungieStatus, setBungieStatus] = useState("checking"); // checking | connected | disconnected | no_key
+  // Self-reported Xbox/PlayStation/Nintendo handles — real reference
+  // info the person saves themselves, no API to sync from for any of
+  // the three. See PlatformHandleCard above and platform_handles in
+  // schema.sql.
+  const [handles, setHandles] = useState({});
   useEffect(() => {
-    checkBungieStatus()
-      .then((connected) => setBungieStatus(connected ? "connected" : "disconnected"))
-      .catch(() => setBungieStatus("disconnected"));
-  }, []);
+    if (!userId) return;
+    supabase
+      .from("profiles")
+      .select("xbox_gamertag, playstation_online_id, nintendo_friend_code")
+      .eq("id", userId)
+      .single()
+      .then(({ data, error }) => {
+        if (error) { console.error("Failed to load platform handles:", error); return; }
+        setHandles(data || {});
+      });
+  }, [userId]);
 
-  async function handleBungieDisconnect() {
-    await disconnectBungie();
-    setBungieStatus("disconnected");
+  async function saveHandle(fieldId, value) {
+    const { error } = await supabase
+      .from("profiles")
+      .update({ [fieldId]: value || null })
+      .eq("id", userId);
+    if (error) throw error;
+    setHandles((prev) => ({ ...prev, [fieldId]: value }));
   }
 
   // Discord/Twitch — real Supabase-native OAuth linking, NOT blocked
@@ -236,25 +305,6 @@ export default function AccountLinkingPage({
         />
       )}
 
-      <div className="steam-link-card">
-        <h2 className="settings-card__title">Destiny 2 (Eververse store)</h2>
-        <p className="settings-card__note">
-          Real OAuth login through Bungie — paused until this app is deployed, since Bungie needs a
-          real public redirect URL registered directly with them (unlike Discord/Twitch below).
-        </p>
-        {bungieStatus === "connected" && (
-          <button type="button" className="linking-row__connect" onClick={handleBungieDisconnect}>
-            Disconnect Destiny 2
-          </button>
-        )}
-        {bungieStatus === "disconnected" && (
-          <button type="button" className="price-search__button" onClick={connectBungie} style={{ alignSelf: "flex-start" }}>
-            Connect with Bungie
-          </button>
-        )}
-        {bungieStatus === "checking" && <p className="panel__status">Checking connection…</p>}
-      </div>
-
       {providersLoaded && (
         <>
           <OAuthProviderCard
@@ -274,20 +324,15 @@ export default function AccountLinkingPage({
         </>
       )}
 
-      <div className="linking-list">
-        {platforms.map((p) => (
-          <div key={p.name} className="linking-row linking-row--disabled">
-            <div className="linking-row__identity">
-              <span className="linking-row__name">{p.name}</span>
-              <span className={`tag ${supportStyles[p.support]}`}>{p.support}</span>
-            </div>
-            <p className="linking-row__note">{p.note}</p>
-            <button type="button" className="linking-row__connect" disabled>
-              Not available
-            </button>
-          </div>
-        ))}
-      </div>
+      {HANDLE_PLATFORMS.map((platform) => (
+        <PlatformHandleCard
+          key={platform.id}
+          platform={platform}
+          value={handles[platform.id]}
+          onSaved={saveHandle}
+          onRecomputeMastery={onRecomputeMastery}
+        />
+      ))}
     </div>
   );
 }

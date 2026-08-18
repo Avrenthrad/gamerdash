@@ -1565,3 +1565,16 @@ alter table public.profiles add column if not exists overall_mastery_xp integer 
 alter table public.profiles add column if not exists overall_mastery_level integer default 0;
 alter table public.profiles add column if not exists overall_mastery_breakdown jsonb;
 alter table public.profiles add column if not exists overall_mastery_computed_at timestamptz;
+
+-- ---------- Self-reported platform handles (additive) ----------
+-- Xbox/PlayStation/Nintendo have no public API for a person's own
+-- library/achievements/trophies at all — confirmed while building
+-- Account Linking. Rather than a dead "not available" row, each gets
+-- a real self-reported handle field (their actual Gamertag/Online ID/
+-- Friend Code) — honest reference info the person saves themselves,
+-- never presented as verified or live-synced. The scored numbers
+-- (Gamerscore, PS trophy counts) already live in mastery_inputs —
+-- these are separate, purely for display/reference.
+alter table public.profiles add column if not exists xbox_gamertag text;
+alter table public.profiles add column if not exists playstation_online_id text;
+alter table public.profiles add column if not exists nintendo_friend_code text;
