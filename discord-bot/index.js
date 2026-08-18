@@ -181,7 +181,7 @@ client.on("presenceUpdate", async (_oldPresence, newPresence) => {
   await updateCurrentActivity(userId, activity);
 });
 
-client.once("ready", () => {
+client.once("clientReady", () => {
   console.log(`Lykodex Presence Bot online as ${client.user.tag}`);
 });
 
