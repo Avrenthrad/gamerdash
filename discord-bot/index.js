@@ -50,7 +50,13 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildPresences, // privileged — must also be toggled on for this bot in the Discord Developer Portal
+    // Both of these are privileged and must be toggled on for this bot
+    // under Developer Portal > Bot > Privileged Gateway Intents:
+    // "Presence Intent" AND "Server Members Intent". Missing either one
+    // makes the gateway connection fail outright with "Used disallowed
+    // intents" — confirmed live, the error doesn't say which intent is
+    // the problem, so toggle both rather than guessing.
+    GatewayIntentBits.GuildPresences,
     GatewayIntentBits.GuildMembers,
   ],
   partials: [Partials.User, Partials.GuildMember],

@@ -20,7 +20,10 @@ needs its own long-running host.
 3. Go to the **Bot** tab → **Add Bot** if there isn't one yet
 4. Copy the **bot token** — this goes in `.env` as `DISCORD_BOT_TOKEN`
 5. On the same page, under **Privileged Gateway Intents**, toggle on
-   **Presence Intent**. The bot silently receives nothing without this.
+   **both Presence Intent AND Server Members Intent** — the bot uses
+   both, and Discord's gateway refuses the connection outright
+   ("Used disallowed intents") if either one is off, without saying
+   which one's missing.
 
 ### 2. Create a Lykodex Discord server
 
