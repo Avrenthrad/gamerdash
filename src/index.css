@@ -3893,6 +3893,87 @@ button { font-family: inherit; }
   flex-shrink: 0;
 }
 
+.mastery-contribution__headline {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.mastery-contribution__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mastery-contribution__row {
+  display: grid;
+  grid-template-columns: 76px 1fr 34px;
+  align-items: center;
+  gap: 10px;
+}
+
+.mastery-contribution__platform {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.mastery-contribution__bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.mastery-contribution__bar-fill {
+  height: 100%;
+  background: var(--grad-red);
+  border-radius: 999px;
+}
+
+.mastery-contribution__score {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+  text-align: right;
+}
+
+.release-calendar-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.release-calendar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.release-calendar-row__countdown {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+  flex-shrink: 0;
+  width: 78px;
+}
+
+.release-calendar-row__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+}
+
 .guild-spotlight__identity {
   display: flex;
   align-items: center;

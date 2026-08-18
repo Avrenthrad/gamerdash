@@ -606,6 +606,7 @@ export default function App() {
               gdScore={gdScore}
               masteryScore={masteryScore}
               masteryLevel={masteryLevel}
+              masteryBreakdown={masteryBreakdown}
               wishlist={wishlist}
               linkedSteamId={linkedSteamId}
               userId={userId}
