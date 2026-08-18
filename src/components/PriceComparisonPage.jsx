@@ -33,6 +33,7 @@ export default function PriceComparisonPage({
   onOpenHypeCharts,
   onOpenMarket,
   onOpenSales,
+  onOpenUpcomingReleases,
   isLoggedIn,
   onSignIn,
   onCreateAccount,
@@ -348,9 +349,9 @@ export default function PriceComparisonPage({
       <div className="price-page__head">
         <div className="price-page__head-row">
           <div>
-            <h1 className="price-page__title">Store Tracker</h1>
+            <h1 className="price-page__title">Market</h1>
             <p className="price-page__subtitle">
-              Your wishlist, newest additions first.
+              Your wishlist, real prices across stores, and what's launching next.
             </p>
           </div>
           {onCurrencyChange && (
@@ -422,6 +423,18 @@ export default function PriceComparisonPage({
             <span className="price-nav-card__title">In Game Stores</span>
             <span className="price-nav-card__subtitle">
               Live rotating shops — Fortnite, Marvel Rivals & more
+            </span>
+          </button>
+        )}
+        {onOpenUpcomingReleases && (
+          <button
+            type="button"
+            className="price-nav-card"
+            onClick={onOpenUpcomingReleases}
+          >
+            <span className="price-nav-card__title">Upcoming Releases</span>
+            <span className="price-nav-card__subtitle">
+              Real release-date calendar for what's coming
             </span>
           </button>
         )}

@@ -30,7 +30,7 @@ export default function CurrentSalesPage({ onBack, currency }) {
   return (
     <div className="price-page">
       <div className="price-page__head">
-        <button type="button" className="back-link" onClick={onBack}>← Back to Store Tracker</button>
+        <button type="button" className="back-link" onClick={onBack}>← Back to Market</button>
         <h1 className="price-page__title">Current Sales</h1>
         <p className="price-page__subtitle">Biggest current discounts across every store you compare.</p>
       </div>

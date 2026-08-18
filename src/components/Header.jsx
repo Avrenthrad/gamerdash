@@ -43,12 +43,10 @@ const MASTERY_COLLEGES = COLLEGES.filter((c) => c.id !== "overview");
 // because Header renders it directly.
 export const GAMING_SIDEBAR_ITEMS = [
   { id: "dashboard", label: "Overview" },
-  { id: "library", label: "Library" },
-  { id: "prices", label: "Prices & Wishlist" },
   { id: "backlog", label: "Backlog" },
+  { id: "prices", label: "Market" },
   { id: "achievements", label: "Achievements" },
-  { id: "upcoming-releases", label: "Upcoming Releases" },
-  { id: "guilds", label: "Guilds" },
+  { id: "library", label: "Library" },
 ];
 
 // Views that belong to the Gaming College — used to decide whether

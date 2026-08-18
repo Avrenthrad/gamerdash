@@ -111,7 +111,7 @@ export default function UpcomingReleasesPage({ onBack, isLoggedIn, userId, wishl
   return (
     <div className="price-page">
       <div className="price-page__head">
-        <button type="button" className="back-link" onClick={onBack}>← Back to Dashboard</button>
+        <button type="button" className="back-link" onClick={onBack}>← Back to Market</button>
         <h1 className="price-page__title">Upcoming Releases</h1>
         <p className="price-page__subtitle">
           {mode === "mine"

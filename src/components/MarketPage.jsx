@@ -14,7 +14,6 @@
 
 import { useEffect, useState } from "react";
 import { fetchFortniteShop } from "../lib/fortnite";
-import { checkBungieStatus, fetchEververseStore } from "../lib/bungie";
 
 const PREVIEW_COUNT = 6;
 
@@ -102,90 +101,15 @@ function FortniteSection() {
   );
 }
 
-function DestinySection() {
-  const [connected, setConnected] = useState(null); // null = checking
-  const [items, setItems] = useState([]);
-  const [status, setStatus] = useState("idle");
-  const [expanded, setExpanded] = useState(true);
-
-  useEffect(() => {
-    checkBungieStatus().then(setConnected);
-  }, []);
-
-  useEffect(() => {
-    if (!connected) return;
-    setStatus("loading");
-    fetchEververseStore()
-      .then((result) => {
-        if (result === "no_key" || result === "not_connected") {
-          setStatus("error");
-          return;
-        }
-        setItems(result.items || []);
-        setStatus("ready");
-      })
-      .catch((err) => {
-        console.error("Eververse store failed:", err);
-        setStatus("error");
-      });
-  }, [connected]);
-
-  if (connected === null || connected === false) return null; // not linked — nothing to show
-
-  return (
-    <div className="ingame-store">
-      <button
-        type="button"
-        className="ingame-store__banner ingame-store__banner--destiny"
-        onClick={() => setExpanded(!expanded)}
-        aria-expanded={expanded}
-      >
-        <span className="ingame-store__banner-title">DESTINY 2</span>
-        <span className="ingame-store__banner-sub">Eververse</span>
-        <span className="ingame-store__chevron">{expanded ? "▲" : "▼"}</span>
-      </button>
-
-      {expanded && (
-        <div className="ingame-store__body">
-          {status === "loading" && <p className="panel__status">Loading Eververse…</p>}
-          {status === "error" && (
-            <p className="panel__status panel__status--error">Couldn't load the Eververse store right now.</p>
-          )}
-          {status === "ready" && items.length === 0 && (
-            <p className="panel__status">Nothing in the Eververse store right now.</p>
-          )}
-          {status === "ready" && items.length > 0 && (
-            <>
-              <p className="panel__status">
-                Groundwork only — item names/icons need a manifest lookup that isn't built yet,
-                so these show as raw item IDs for now.
-              </p>
-              <div className="fortnite-shop-grid">
-                {items.slice(0, 6).map((item, i) => (
-                  <div key={`${item.itemHash}-${i}`} className="fortnite-shop-item">
-                    <div className="fortnite-shop-item__image fortnite-shop-item__image--placeholder" />
-                    <span className="fortnite-shop-item__name">Item #{item.itemHash}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function MarketPage({ onBack }) {
   return (
     <div className="price-page">
       <div className="price-page__head">
-        <button type="button" className="back-link" onClick={onBack}>← Back to Store Tracker</button>
+        <button type="button" className="back-link" onClick={onBack}>← Back to Market</button>
         <h1 className="price-page__title">In Game Stores</h1>
       </div>
 
       <FortniteSection />
-      <DestinySection />
 
       <div className="ingame-store ingame-store--coming-soon">
         <div className="ingame-store__banner ingame-store__banner--placeholder">

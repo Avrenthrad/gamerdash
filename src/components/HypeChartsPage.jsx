@@ -94,7 +94,7 @@ export default function HypeChartsPage({
   return (
     <div className="price-page">
       <div className="price-page__head">
-        <button type="button" className="back-link" onClick={onBack}>← Back to Store Tracker</button>
+        <button type="button" className="back-link" onClick={onBack}>← Back to Market</button>
         <h1 className="price-page__title">Hype Charts</h1>
         <p className="price-page__subtitle">
           Steam's official top {TOTAL_COUNT} most-played games right now, ranked by concurrent players.

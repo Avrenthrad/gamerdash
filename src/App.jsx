@@ -366,6 +366,7 @@ export default function App() {
               onOpenHypeCharts={() => goTo("hype-charts")}
               onOpenMarket={() => goTo("market")}
               onOpenSales={() => goTo("sales")}
+              onOpenUpcomingReleases={() => goTo("upcoming-releases")}
               linkedSteamId={linkedSteamId}
               currency={currency}
               onCurrencyChange={setCurrency}
@@ -418,7 +419,7 @@ export default function App() {
 
           {view === "upcoming-releases" && (
             <UpcomingReleasesPage
-              onBack={() => goTo("dashboard")}
+              onBack={() => goTo("prices")}
               isLoggedIn={isLoggedIn}
               userId={userId}
               wishlist={wishlist}
