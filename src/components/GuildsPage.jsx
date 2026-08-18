@@ -12,11 +12,12 @@ import { useEffect, useState } from "react";
 import {
   fetchGuilds, createGuild, joinGuildByCode, leaveGuild,
   fetchMyGuilds, fetchGuildMembersWithProfiles, fetchGuildActivity,
-  describeActivity, updateGuildPrivacy, requestToJoinGuild, withdrawJoinRequest,
+  describeActivity, updateGuildPrivacy, updateGuildProfile, requestToJoinGuild, withdrawJoinRequest,
   fetchMyJoinRequest, fetchJoinRequestsForGuild, respondToJoinRequest,
   inviteToGuild, fetchMyGuildInvites, acceptGuildInvite, declineGuildInvite,
 } from "../lib/guilds";
 import { findUserByFriendCode } from "../lib/friends";
+import { supabase } from "../lib/supabaseClient";
 
 function displayName(profile) {
   if (!profile) return "Someone";
@@ -268,6 +269,13 @@ function GuildRow({ guild, userId, isMember, onView, onRequestJoin }) {
 
   return (
     <li className="backlog-card">
+      {guild.logo_url ? (
+        <img src={guild.logo_url} alt="" className="guild-row__logo" />
+      ) : (
+        <div className="guild-row__logo guild-row__logo--placeholder" aria-hidden="true">
+          {guild.name.slice(0, 1).toUpperCase()}
+        </div>
+      )}
       <div className="backlog-card__info">
         <span className="backlog-card__title">{guild.name}</span>
         <span className="backlog-card__meta">{guild.is_private ? "Private" : "Public"}</span>
@@ -286,7 +294,8 @@ function GuildRow({ guild, userId, isMember, onView, onRequestJoin }) {
   );
 }
 
-function GuildDetail({ guild, userId, isMember, isOwner, onBack, onLeave, onPrivacyChanged }) {
+function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, onLeave, onPrivacyChanged }) {
+  const [guild, setGuild] = useState(initialGuild);
   const [members, setMembers] = useState([]);
   const [activity, setActivity] = useState([]);
   const [joinRequests, setJoinRequests] = useState([]);
@@ -294,6 +303,71 @@ function GuildDetail({ guild, userId, isMember, isOwner, onBack, onLeave, onPriv
   const [inviteCode, setInviteCode] = useState("");
   const [inviteStatus, setInviteStatus] = useState("idle");
   const [inviteMessage, setInviteMessage] = useState("");
+  const [descriptionInput, setDescriptionInput] = useState(initialGuild.description || "");
+  const [descriptionStatus, setDescriptionStatus] = useState("idle");
+  const [logoStatus, setLogoStatus] = useState("idle"); // idle | uploading | error
+  const [bannerStatus, setBannerStatus] = useState("idle");
+
+  function extFor(file, fallback) {
+    const nameExt = file.name.includes(".") ? file.name.split(".").pop() : "";
+    const mimeExt = file.type?.split("/")?.[1];
+    return (nameExt || mimeExt || fallback).toLowerCase().replace(/[^a-z0-9]/g, "") || fallback;
+  }
+
+  async function handleLogoChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoStatus("uploading");
+    try {
+      const path = `${guild.id}/logo.${extFor(file, "png")}`;
+      const { error: uploadError } = await supabase.storage
+        .from("guild-media")
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (uploadError) throw uploadError;
+      const { data } = supabase.storage.from("guild-media").getPublicUrl(path);
+      const logoUrl = `${data.publicUrl}?t=${Date.now()}`;
+      await updateGuildProfile(guild.id, { logoUrl });
+      setGuild((g) => ({ ...g, logo_url: logoUrl }));
+      setLogoStatus("idle");
+    } catch (err) {
+      console.error("Failed to upload guild logo:", err);
+      setLogoStatus("error");
+    }
+  }
+
+  async function handleBannerChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBannerStatus("uploading");
+    try {
+      const path = `${guild.id}/banner.${extFor(file, "jpg")}`;
+      const { error: uploadError } = await supabase.storage
+        .from("guild-media")
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (uploadError) throw uploadError;
+      const { data } = supabase.storage.from("guild-media").getPublicUrl(path);
+      const bannerUrl = `${data.publicUrl}?t=${Date.now()}`;
+      await updateGuildProfile(guild.id, { bannerUrl });
+      setGuild((g) => ({ ...g, banner_url: bannerUrl }));
+      setBannerStatus("idle");
+    } catch (err) {
+      console.error("Failed to upload guild banner:", err);
+      setBannerStatus("error");
+    }
+  }
+
+  async function handleSaveDescription(e) {
+    e.preventDefault();
+    setDescriptionStatus("saving");
+    try {
+      await updateGuildProfile(guild.id, { description: descriptionInput.trim() || null });
+      setGuild((g) => ({ ...g, description: descriptionInput.trim() || null }));
+      setDescriptionStatus("saved");
+    } catch (err) {
+      console.error("Failed to save guild description:", err);
+      setDescriptionStatus("error");
+    }
+  }
 
   useEffect(() => {
     load();
@@ -320,8 +394,10 @@ function GuildDetail({ guild, userId, isMember, isOwner, onBack, onLeave, onPriv
 
   async function handleTogglePrivacy() {
     try {
-      await updateGuildPrivacy(guild.id, !guild.is_private);
-      onPrivacyChanged(!guild.is_private);
+      const nextPrivate = !guild.is_private;
+      await updateGuildPrivacy(guild.id, nextPrivate);
+      setGuild((g) => ({ ...g, is_private: nextPrivate }));
+      onPrivacyChanged(nextPrivate);
     } catch (err) {
       console.error("Failed to update guild privacy:", err);
     }
@@ -361,12 +437,26 @@ function GuildDetail({ guild, userId, isMember, isOwner, onBack, onLeave, onPriv
 
   return (
     <div className="price-page">
+      {guild.banner_url && <img src={guild.banner_url} alt="" className="guild-detail__banner" />}
+
       <div className="price-page__head">
         <button type="button" className="back-link" onClick={onBack}>← Back to Guilds</button>
-        <h1 className="price-page__title">{guild.name}</h1>
-        <p className="price-page__subtitle">
-          {members.length} member{members.length === 1 ? "" : "s"} · {guild.is_private ? "Private" : "Public"}
-        </p>
+        <div className="guild-detail__identity">
+          {guild.logo_url ? (
+            <img src={guild.logo_url} alt="" className="guild-detail__logo" />
+          ) : (
+            <div className="guild-detail__logo guild-detail__logo--placeholder" aria-hidden="true">
+              {guild.name.slice(0, 1).toUpperCase()}
+            </div>
+          )}
+          <div>
+            <h1 className="price-page__title">{guild.name}</h1>
+            <p className="price-page__subtitle">
+              {members.length} member{members.length === 1 ? "" : "s"} · {guild.is_private ? "Private" : "Public"}
+            </p>
+          </div>
+        </div>
+        {guild.description && <p className="settings-card__note">{guild.description}</p>}
       </div>
 
       {isMember && (
@@ -389,6 +479,60 @@ function GuildDetail({ guild, userId, isMember, isOwner, onBack, onLeave, onPriv
             <input type="checkbox" checked={guild.is_private} onChange={handleTogglePrivacy} />
             <span>Private (hidden from browsing — joinable by invite or code only)</span>
           </label>
+
+          <div className="settings-avatar-row" style={{ marginTop: "14px" }}>
+            {guild.logo_url ? (
+              <img src={guild.logo_url} alt="" className="settings-avatar" style={{ objectFit: "cover" }} />
+            ) : (
+              <div className="settings-avatar">
+                <span className="settings-avatar__placeholder">{guild.name.slice(0, 1).toUpperCase()}</span>
+              </div>
+            )}
+            <div className="settings-avatar__controls">
+              <label className="settings-avatar__upload">
+                {guild.logo_url ? "Change logo" : "Upload logo"}
+                <input type="file" accept="image/*" onChange={handleLogoChange} hidden />
+              </label>
+              <span className="settings-avatar__hint">
+                {logoStatus === "uploading" ? "Uploading…" : logoStatus === "error" ? "Upload failed — try again" : "Square image recommended."}
+              </span>
+            </div>
+          </div>
+
+          <div className="settings-wallpaper" style={{ marginTop: "14px" }}>
+            <span className="settings-card__note" style={{ marginTop: 0 }}>Banner (optional)</span>
+            <div className="settings-wallpaper__row">
+              {guild.banner_url ? (
+                <img src={guild.banner_url} alt="" className="settings-wallpaper__preview" />
+              ) : (
+                <span className="settings-wallpaper__placeholder">No banner set</span>
+              )}
+              <div className="settings-avatar__controls">
+                <label className="settings-avatar__upload">
+                  {guild.banner_url ? "Change banner" : "Upload banner"}
+                  <input type="file" accept="image/*" onChange={handleBannerChange} hidden />
+                </label>
+                <span className="settings-avatar__hint">
+                  {bannerStatus === "uploading" ? "Uploading…" : bannerStatus === "error" ? "Upload failed — try again" : "Shown across the top of this page."}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <p className="settings-card__note">Description:</p>
+          <form className="price-search" onSubmit={handleSaveDescription}>
+            <input
+              className="price-search__input"
+              type="text"
+              placeholder="What's this guild about?"
+              value={descriptionInput}
+              onChange={(e) => setDescriptionInput(e.target.value)}
+            />
+            <button type="submit" className="price-search__button" disabled={descriptionStatus === "saving"}>
+              {descriptionStatus === "saving" ? "Saving…" : "Save"}
+            </button>
+          </form>
+          {descriptionStatus === "error" && <p className="panel__status panel__status--error">Couldn't save — try again.</p>}
 
           <p className="settings-card__note">Invite someone by their friend code:</p>
           <form className="price-search" onSubmit={handleInvite}>

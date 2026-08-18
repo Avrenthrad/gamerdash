@@ -103,6 +103,17 @@ export async function updateGuildPrivacy(guildId, isPrivate) {
   if (error) throw error;
 }
 
+// ---------- Customization: logo, banner, description ----------
+
+export async function updateGuildProfile(guildId, { logoUrl, bannerUrl, description } = {}) {
+  const updates = {};
+  if (logoUrl !== undefined) updates.logo_url = logoUrl;
+  if (bannerUrl !== undefined) updates.banner_url = bannerUrl;
+  if (description !== undefined) updates.description = description;
+  const { error } = await supabase.from("guilds").update(updates).eq("id", guildId);
+  if (error) throw error;
+}
+
 export async function requestToJoinGuild(guildId, userId) {
   const { error } = await supabase.from("guild_join_requests").insert({ guild_id: guildId, user_id: userId });
   if (error) throw error;

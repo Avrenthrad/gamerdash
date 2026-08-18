@@ -1578,3 +1578,42 @@ alter table public.profiles add column if not exists overall_mastery_computed_at
 alter table public.profiles add column if not exists xbox_gamertag text;
 alter table public.profiles add column if not exists playstation_online_id text;
 alter table public.profiles add column if not exists nintendo_friend_code text;
+
+-- ---------- Guild customization: logo, banner, description (additive) ----------
+-- Same real-upload pattern as avatars/wallpapers above — a public
+-- bucket, folder-per-guild (guild_id as the top-level folder), writes
+-- restricted to the guild's creator via a subquery against guilds
+-- rather than a plain foldername-equals-uid check (there's no single
+-- "owning user id" folder here — it's owning-guild scoped instead).
+alter table public.guilds add column if not exists logo_url text;
+alter table public.guilds add column if not exists banner_url text;
+alter table public.guilds add column if not exists description text;
+
+insert into storage.buckets (id, name, public)
+values ('guild-media', 'guild-media', true)
+on conflict (id) do nothing;
+
+create policy "Guild media is publicly viewable"
+  on storage.objects for select
+  using (bucket_id = 'guild-media');
+
+create policy "Guild owners can upload guild media"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'guild-media'
+    and exists (select 1 from public.guilds where id::text = (storage.foldername(name))[1] and created_by = auth.uid())
+  );
+
+create policy "Guild owners can update guild media"
+  on storage.objects for update
+  using (
+    bucket_id = 'guild-media'
+    and exists (select 1 from public.guilds where id::text = (storage.foldername(name))[1] and created_by = auth.uid())
+  );
+
+create policy "Guild owners can delete guild media"
+  on storage.objects for delete
+  using (
+    bucket_id = 'guild-media'
+    and exists (select 1 from public.guilds where id::text = (storage.foldername(name))[1] and created_by = auth.uid())
+  );

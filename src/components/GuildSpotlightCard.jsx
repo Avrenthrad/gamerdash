@@ -59,9 +59,13 @@ export default function GuildSpotlightCard({ userId, onOpenGuilds }) {
       {status === "ready" && guild && (
         <>
           <div className="guild-spotlight__identity">
-            <div className="guild-spotlight__avatar" aria-hidden="true">
-              {guild.name.slice(0, 1).toUpperCase()}
-            </div>
+            {guild.logo_url ? (
+              <img src={guild.logo_url} alt="" className="guild-spotlight__avatar" style={{ objectFit: "cover" }} />
+            ) : (
+              <div className="guild-spotlight__avatar" aria-hidden="true">
+                {guild.name.slice(0, 1).toUpperCase()}
+              </div>
+            )}
             <div>
               <span className="hero-card__title">{guild.name}</span>
               <span className="panel__status" style={{ margin: 0 }}>
