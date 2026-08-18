@@ -45,7 +45,12 @@ async function fetchMergedAchievements(steamId, appid) {
     fetchGlobalAchievementPercentages(appid).catch(() => []),
   ]);
   const unlockedByName = new Map(unlocked.map((a) => [a.apiname, a]));
-  const rarityByName = new Map(rarity.map((a) => [a.name, a.percent]));
+  // Steam returns percent as a string (e.g. "75.0"), not a number —
+  // same real quirk lib/achievements.js and lib/gameMasteryData.js
+  // already cast around; this file just hadn't been fixed yet, since
+  // it never actually rendered in production before the routing bug
+  // above was fixed (row.rarity.toFixed(1) below throws on a string).
+  const rarityByName = new Map(rarity.map((a) => [a.name, Number(a.percent)]));
   const merged = schema.map((def) => ({
     apiname: def.name,
     displayName: def.displayName || def.name,

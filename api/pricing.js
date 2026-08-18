@@ -87,7 +87,7 @@ async function handleCheapshark(searchParams, res) {
 
   try {
     const csRes = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; Lykodex/1.0)", "Accept": "application/json" },
+      headers: { "User-Agent": "Lykodex/1.0 (+https://gamerdash.vercel.app)", "Accept": "application/json" },
     });
     if (!csRes.ok) {
       const bodyText = await csRes.text().catch(() => "");
@@ -190,7 +190,7 @@ async function handleCurrency(res) {
   try {
     const url = "https://api.frankfurter.app/latest?from=USD&to=AUD,CAD,NZD,GBP,EUR";
     const fxRes = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; Lykodex/1.0)", "Accept": "application/json" },
+      headers: { "User-Agent": "Lykodex/1.0 (+https://gamerdash.vercel.app)", "Accept": "application/json" },
     });
     if (!fxRes.ok) return res.status(fxRes.status).json({ error: "Exchange rate request failed" });
     const data = await fxRes.json();
