@@ -57,37 +57,101 @@ export async function fetchRealFriends(steamId) {
   );
 }
 
-// The linked account's own current activity: whatever they're playing
-// right now, or their most-played game if they're not currently in
-// anything — with real playtime and achievement-based progress.
-export async function fetchOwnProgress(steamId) {
+// Two real, honestly-distinct "what have you been playing" slides for
+// ContinuePlayingCard's auto-rotation:
+//   - "Last Played": live "currently playing" status if there is one
+//     (the single most-recent real signal Steam offers), otherwise the
+//     top game by playtime_2weeks as the best available recency proxy.
+//   - "Most Played This Week": top game by playtime_2weeks specifically
+//     (Steam's own real rolling ~2-week window — same data source as
+//     the "Recently Played" shelf on an actual Steam profile).
+// There is deliberately no true "last played" TIMESTAMP here — Steam's
+// rtime_last_played field only populates when the calling API key
+// belongs to the account being queried, not for a shared server key
+// looking up an arbitrary linked account (confirmed live against a
+// real linked account's own data, same limitation already documented
+// for LibraryPage's "last played X days ago"). When someone isn't
+// currently playing anything, both slides can honestly end up
+// pointing at the same real game — that's not a bug, it just means
+// that game really is both.
+export async function fetchContinuePlayingSlides(steamId) {
   const [summary] = await fetchPlayerSummaries([steamId]);
   const isCurrentlyPlaying = Boolean(summary?.gameid);
-
-  let appid = summary?.gameid;
-  let gameName = summary?.gameextrainfo;
-
   const games = await fetchOwnedGames(steamId);
 
-  if (!appid) {
-    const topGame = [...games].sort(
-      (a, b) => (b.playtime_forever || 0) - (a.playtime_forever || 0)
-    )[0];
-    if (!topGame) return null; // no owned games visible at all
-    appid = topGame.appid;
-    gameName = topGame.name;
+  async function buildSlide({ label, appid, gameName, statMinutes, statLabel, live }) {
+    const gameEntry = games.find((g) => String(g.appid) === String(appid));
+    return {
+      label,
+      appid,
+      gameName: gameName || gameEntry?.name || "Unknown game",
+      thumb: gameEntry?.img_icon_url
+        ? `https://media.steampowered.com/steamcommunity/public/images/apps/${appid}/${gameEntry.img_icon_url}.jpg`
+        : null,
+      statHours: Math.round((statMinutes || 0) / 60),
+      statLabel,
+      completionPct: await achievementCompletion(steamId, appid),
+      isCurrentlyPlaying: live,
+    };
   }
 
-  const gameEntry = games.find((g) => String(g.appid) === String(appid));
+  if (games.length === 0 && !isCurrentlyPlaying) return [];
 
-  return {
-    appid,
-    gameName: gameName || gameEntry?.name || "Unknown game",
-    thumb: gameEntry?.img_icon_url
-      ? `https://media.steampowered.com/steamcommunity/public/images/apps/${appid}/${gameEntry.img_icon_url}.jpg`
-      : null,
-    playtimeHours: Math.round((gameEntry?.playtime_forever || 0) / 60),
-    completionPct: await achievementCompletion(steamId, appid),
-    isCurrentlyPlaying,
-  };
+  const byRecent = [...games]
+    .filter((g) => (g.playtime_2weeks || 0) > 0)
+    .sort((a, b) => (b.playtime_2weeks || 0) - (a.playtime_2weeks || 0));
+  const byAllTime = [...games].sort((a, b) => (b.playtime_forever || 0) - (a.playtime_forever || 0));
+
+  const slides = [];
+
+  if (isCurrentlyPlaying) {
+    slides.push(await buildSlide({
+      label: "Last Played",
+      appid: summary.gameid,
+      gameName: summary.gameextrainfo,
+      statMinutes: games.find((g) => String(g.appid) === String(summary.gameid))?.playtime_forever,
+      statLabel: "Playing now",
+      live: true,
+    }));
+  } else if (byRecent[0]) {
+    slides.push(await buildSlide({
+      label: "Last Played",
+      appid: byRecent[0].appid,
+      gameName: byRecent[0].name,
+      statMinutes: byRecent[0].playtime_forever,
+      statLabel: "Total playtime",
+      live: false,
+    }));
+  } else if (byAllTime[0]) {
+    slides.push(await buildSlide({
+      label: "Last Played",
+      appid: byAllTime[0].appid,
+      gameName: byAllTime[0].name,
+      statMinutes: byAllTime[0].playtime_forever,
+      statLabel: "Total playtime",
+      live: false,
+    }));
+  }
+
+  if (byRecent[0]) {
+    slides.push(await buildSlide({
+      label: "Most Played This Week",
+      appid: byRecent[0].appid,
+      gameName: byRecent[0].name,
+      statMinutes: byRecent[0].playtime_2weeks,
+      statLabel: "Last 2 weeks",
+      live: false,
+    }));
+  } else if (byAllTime[0]) {
+    slides.push(await buildSlide({
+      label: "Most Played",
+      appid: byAllTime[0].appid,
+      gameName: byAllTime[0].name,
+      statMinutes: byAllTime[0].playtime_forever,
+      statLabel: "Total playtime",
+      live: false,
+    }));
+  }
+
+  return slides;
 }

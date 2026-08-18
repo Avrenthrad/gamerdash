@@ -3854,6 +3854,25 @@ button { font-family: inherit; }
   color: #fff;
 }
 
+.hero-card__dots {
+  display: flex;
+  gap: 6px;
+}
+
+.hero-card__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  padding: 0;
+  border: none;
+  background: var(--border);
+  cursor: pointer;
+}
+
+.hero-card__dot--active {
+  background: var(--accent);
+}
+
 .trending-list {
   list-style: none;
   margin: 0;

@@ -21,8 +21,8 @@
 //
 // The linked account's OWN progress used to render here too — it now
 // has its own hero card on the Gaming dashboard (see
-// ContinuePlayingCard.jsx, same fetchOwnProgress data) so it isn't
-// duplicated on this panel anymore.
+// ContinuePlayingCard.jsx, lib/friendsData.js's fetchContinuePlayingSlides)
+// so it isn't duplicated on this panel anymore.
 
 import { useEffect, useState } from "react";
 import { fetchRealFriends } from "../lib/friendsData";
