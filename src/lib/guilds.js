@@ -304,3 +304,127 @@ export async function logActivityForUser(userId, eventType, eventData) {
     console.error("Failed to log guild activity for user:", err);
   }
 }
+
+// ---------- Posts (the real Reddit-like feed) ----------
+// Score is summed client-side from a single batched vote fetch rather
+// than a trigger/materialized column — guild feeds are small enough
+// that this is simpler and just as honest.
+
+export async function fetchGuildPosts(guildId, viewerId) {
+  const { data: posts, error } = await supabase
+    .from("guild_posts")
+    .select("*")
+    .eq("guild_id", guildId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  if (!posts || posts.length === 0) return [];
+
+  const postIds = posts.map((p) => p.id);
+
+  const [profiles, votesResult, commentsResult] = await Promise.all([
+    getPublicProfiles([...new Set(posts.map((p) => p.user_id))]),
+    supabase.from("guild_post_votes").select("post_id, user_id, value").in("post_id", postIds),
+    supabase.from("guild_post_comments").select("post_id").in("post_id", postIds),
+  ]);
+  if (votesResult.error) throw votesResult.error;
+  if (commentsResult.error) throw commentsResult.error;
+
+  const profileById = Object.fromEntries(profiles.map((p) => [p.id, p]));
+
+  const scoreByPost = {};
+  const myVoteByPost = {};
+  (votesResult.data || []).forEach((v) => {
+    scoreByPost[v.post_id] = (scoreByPost[v.post_id] || 0) + v.value;
+    if (v.user_id === viewerId) myVoteByPost[v.post_id] = v.value;
+  });
+
+  const commentCountByPost = {};
+  (commentsResult.data || []).forEach((c) => {
+    commentCountByPost[c.post_id] = (commentCountByPost[c.post_id] || 0) + 1;
+  });
+
+  return posts.map((p) => ({
+    ...p,
+    author: profileById[p.user_id] || null,
+    score: scoreByPost[p.id] || 0,
+    myVote: myVoteByPost[p.id] || 0,
+    commentCount: commentCountByPost[p.id] || 0,
+  }));
+}
+
+export async function createGuildPost(userId, guildId, { title, body, imageUrl }) {
+  const { error } = await supabase.from("guild_posts").insert({
+    guild_id: guildId,
+    user_id: userId,
+    title,
+    body: body || null,
+    image_url: imageUrl || null,
+  });
+  if (error) throw error;
+}
+
+export async function deleteGuildPost(postId) {
+  const { error } = await supabase.from("guild_posts").delete().eq("id", postId);
+  if (error) throw error;
+}
+
+// Clicking the same direction again removes the vote (toggle off);
+// clicking the opposite direction flips it — never a separate "undo"
+// control, matches how every real upvote/downvote UI behaves.
+export async function voteOnPost(userId, postId, value, currentVote) {
+  if (currentVote === value) {
+    const { error } = await supabase
+      .from("guild_post_votes")
+      .delete()
+      .eq("post_id", postId)
+      .eq("user_id", userId);
+    if (error) throw error;
+    return 0;
+  }
+  const { error } = await supabase
+    .from("guild_post_votes")
+    .upsert({ post_id: postId, user_id: userId, value }, { onConflict: "post_id,user_id" });
+  if (error) throw error;
+  return value;
+}
+
+export async function fetchPostComments(postId) {
+  const { data, error } = await supabase
+    .from("guild_post_comments")
+    .select("*")
+    .eq("post_id", postId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+
+  const profiles = await getPublicProfiles([...new Set((data || []).map((c) => c.user_id))]);
+  const profileById = Object.fromEntries(profiles.map((p) => [p.id, p]));
+  return (data || []).map((c) => ({ ...c, author: profileById[c.user_id] || null }));
+}
+
+export async function addPostComment(userId, postId, body) {
+  const { error } = await supabase.from("guild_post_comments").insert({ post_id: postId, user_id: userId, body });
+  if (error) throw error;
+}
+
+export async function deletePostComment(commentId) {
+  const { error } = await supabase.from("guild_post_comments").delete().eq("id", commentId);
+  if (error) throw error;
+}
+
+// Same real Supabase Storage upload pattern as everywhere else in
+// this app (avatars/wallpapers/guild-media) — folder-scoped to the
+// uploader, since a post image belongs to whoever posted it.
+export async function uploadPostImage(userId, file) {
+  const nameExt = file.name.includes(".") ? file.name.split(".").pop() : "";
+  const mimeExt = file.type?.split("/")?.[1];
+  const ext = (nameExt || mimeExt || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const path = `${userId}/${Date.now()}.${ext || "jpg"}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("guild-post-images")
+    .upload(path, file, { upsert: true, contentType: file.type });
+  if (uploadError) throw uploadError;
+
+  const { data } = supabase.storage.from("guild-post-images").getPublicUrl(path);
+  return `${data.publicUrl}?t=${Date.now()}`;
+}

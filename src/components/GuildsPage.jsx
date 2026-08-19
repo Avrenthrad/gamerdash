@@ -15,6 +15,8 @@ import {
   describeActivity, updateGuildPrivacy, updateGuildProfile, requestToJoinGuild, withdrawJoinRequest,
   fetchMyJoinRequest, fetchJoinRequestsForGuild, respondToJoinRequest,
   inviteToGuild, fetchMyGuildInvites, acceptGuildInvite, declineGuildInvite,
+  fetchGuildPosts, createGuildPost, deleteGuildPost, voteOnPost,
+  fetchPostComments, addPostComment, deletePostComment, uploadPostImage,
 } from "../lib/guilds";
 import { findUserByFriendCode } from "../lib/friends";
 import { supabase } from "../lib/supabaseClient";
@@ -277,7 +279,10 @@ function GuildRow({ guild, userId, isMember, onView, onRequestJoin }) {
         </div>
       )}
       <div className="backlog-card__info">
-        <span className="backlog-card__title">{guild.name}</span>
+        <span className="backlog-card__title">
+          {guild.name}
+          {guild.is_official && <span className="tag tag--rose-outline" style={{ marginLeft: "8px" }}>Official</span>}
+        </span>
         <span className="backlog-card__meta">{guild.is_private ? "Private" : "Public"}</span>
       </div>
       <button type="button" className="linking-row__connect" onClick={onView}>View</button>
@@ -296,6 +301,7 @@ function GuildRow({ guild, userId, isMember, onView, onRequestJoin }) {
 
 function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, onLeave, onPrivacyChanged }) {
   const [guild, setGuild] = useState(initialGuild);
+  const [tab, setTab] = useState("posts");
   const [members, setMembers] = useState([]);
   const [activity, setActivity] = useState([]);
   const [joinRequests, setJoinRequests] = useState([]);
@@ -450,7 +456,10 @@ function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, o
             </div>
           )}
           <div>
-            <h1 className="price-page__title">{guild.name}</h1>
+            <h1 className="price-page__title">
+              {guild.name}
+              {guild.is_official && <span className="tag tag--rose-outline" style={{ marginLeft: "10px" }}>Official Lykodex Guild</span>}
+            </h1>
             <p className="price-page__subtitle">
               {members.length} member{members.length === 1 ? "" : "s"} · {guild.is_private ? "Private" : "Public"}
             </p>
@@ -472,7 +481,18 @@ function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, o
         </button>
       )}
 
-      {isOwner && (
+      <div className="backlog-status-tabs">
+        <button type="button" className={`quickdash-reset-btn ${tab === "posts" ? "quickdash-reset-btn--active" : ""}`} onClick={() => setTab("posts")}>Posts</button>
+        <button type="button" className={`quickdash-reset-btn ${tab === "members" ? "quickdash-reset-btn--active" : ""}`} onClick={() => setTab("members")}>Members</button>
+        <button type="button" className={`quickdash-reset-btn ${tab === "activity" ? "quickdash-reset-btn--active" : ""}`} onClick={() => setTab("activity")}>Activity</button>
+        {isOwner && (
+          <button type="button" className={`quickdash-reset-btn ${tab === "settings" ? "quickdash-reset-btn--active" : ""}`} onClick={() => setTab("settings")}>Settings</button>
+        )}
+      </div>
+
+      {tab === "posts" && <PostsTab guildId={guild.id} userId={userId} isMember={isMember} />}
+
+      {tab === "settings" && isOwner && (
         <section className="settings-card">
           <h2 className="settings-card__title">Guild settings</h2>
           <label className="pref-choice">
@@ -570,39 +590,286 @@ function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, o
         </section>
       )}
 
-      <div className="backlog-summary">
-        <span className="feed-col__label">Members</span>
-      </div>
-      {status === "loading" && <p className="panel__status">Loading…</p>}
-      {status === "ready" && (
-        <ul className="backlog-list">
-          {members.map((m) => (
-            <li key={m.id} className="backlog-card">
-              <div className="backlog-card__info">
-                <span className="backlog-card__title">{displayName(m.profile)}</span>
-                {m.user_id === guild.created_by && <span className="backlog-card__meta">Owner</span>}
+      {tab === "members" && (
+        <>
+          <div className="backlog-summary">
+            <span className="feed-col__label">Members</span>
+          </div>
+          {status === "loading" && <p className="panel__status">Loading…</p>}
+          {status === "ready" && (
+            <ul className="backlog-list">
+              {members.map((m) => (
+                <li key={m.id} className="backlog-card">
+                  <div className="backlog-card__info">
+                    <span className="backlog-card__title">{displayName(m.profile)}</span>
+                    {m.user_id === guild.created_by && <span className="backlog-card__meta">Owner</span>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+
+      {tab === "activity" && (
+        <>
+          <div className="backlog-summary">
+            <span className="feed-col__label">Activity feed</span>
+          </div>
+          {activity.length === 0 ? (
+            <p className="panel__status">No activity yet — real activity from members will show up here.</p>
+          ) : (
+            <ul className="calendar-list">
+              {activity.map((entry) => (
+                <li key={entry.id} className="calendar-row">
+                  <span className="calendar-row__date">{new Date(entry.created_at).toLocaleDateString()}</span>
+                  <div className="calendar-row__body">
+                    <span className="calendar-row__event">{describeActivity(entry)}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function PostsTab({ guildId, userId, isMember }) {
+  const [posts, setPosts] = useState([]);
+  const [status, setStatus] = useState("loading");
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [postStatus, setPostStatus] = useState("idle");
+  const [expandedPostId, setExpandedPostId] = useState(null);
+
+  function load() {
+    setStatus("loading");
+    fetchGuildPosts(guildId, userId)
+      .then((rows) => {
+        setPosts(rows);
+        setStatus("ready");
+      })
+      .catch((err) => {
+        console.error("Failed to load guild posts:", err);
+        setStatus("error");
+      });
+  }
+
+  useEffect(load, [guildId, userId]);
+
+  function handleImageChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  }
+
+  async function handlePost(e) {
+    e.preventDefault();
+    if (!title.trim()) return;
+    setPostStatus("saving");
+    try {
+      let imageUrl = null;
+      if (imageFile) imageUrl = await uploadPostImage(userId, imageFile);
+      await createGuildPost(userId, guildId, { title: title.trim(), body: body.trim(), imageUrl });
+      setTitle("");
+      setBody("");
+      setImageFile(null);
+      setImagePreview(null);
+      setPostStatus("idle");
+      load();
+    } catch (err) {
+      console.error("Failed to post:", err);
+      setPostStatus("error");
+    }
+  }
+
+  async function handleVote(post, value) {
+    const prevVote = post.myVote;
+    const prevScore = post.score;
+    // Optimistic update — same pattern used elsewhere in this app for
+    // toggles (e.g. achievement checkboxes) so voting feels instant.
+    const delta = value === prevVote ? -prevVote : value - prevVote;
+    setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, myVote: value === prevVote ? 0 : value, score: p.score + delta } : p)));
+    try {
+      await voteOnPost(userId, post.id, value, prevVote);
+    } catch (err) {
+      console.error("Failed to vote:", err);
+      setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, myVote: prevVote, score: prevScore } : p)));
+    }
+  }
+
+  async function handleDelete(postId) {
+    try {
+      await deleteGuildPost(postId);
+      setPosts((prev) => prev.filter((p) => p.id !== postId));
+    } catch (err) {
+      console.error("Failed to delete post:", err);
+    }
+  }
+
+  return (
+    <div>
+      {isMember ? (
+        <form className="backlog-add" onSubmit={handlePost} style={{ flexDirection: "column", alignItems: "stretch", gap: "10px" }}>
+          <input
+            className="price-search__input"
+            type="text"
+            placeholder="Title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+          />
+          <textarea
+            className="price-search__input"
+            placeholder="What's on your mind? (optional)"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={3}
+          />
+          <label className="settings-avatar__upload" style={{ alignSelf: "flex-start" }}>
+            {imageFile ? "Change image" : "Add an image"}
+            <input type="file" accept="image/*" onChange={handleImageChange} hidden />
+          </label>
+          {imagePreview && <img src={imagePreview} alt="" className="search-result-card__thumb" style={{ width: "160px", height: "90px" }} />}
+          <button type="submit" className="price-search__button" disabled={postStatus === "saving"} style={{ alignSelf: "flex-start" }}>
+            {postStatus === "saving" ? "Posting…" : "Post"}
+          </button>
+          {postStatus === "error" && <p className="panel__status panel__status--error">Couldn't post — try again.</p>}
+        </form>
+      ) : (
+        <p className="panel__status">Join this guild to post.</p>
+      )}
+
+      {status === "loading" && <p className="panel__status">Loading posts…</p>}
+      {status === "error" && <p className="panel__status panel__status--error">Couldn't load posts right now.</p>}
+      {status === "ready" && posts.length === 0 && <p className="panel__status">No posts yet — be the first.</p>}
+
+      {status === "ready" && posts.length > 0 && (
+        <ul className="backlog-list" style={{ marginTop: "16px" }}>
+          {posts.map((post) => (
+            <li key={post.id} className="backlog-card" style={{ flexDirection: "column", alignItems: "stretch" }}>
+              <div style={{ display: "flex", gap: "12px" }}>
+                <div className="vote-column">
+                  <button
+                    type="button"
+                    className={`vote-column__btn ${post.myVote === 1 ? "vote-column__btn--active-up" : ""}`}
+                    onClick={() => handleVote(post, 1)}
+                    aria-label="Upvote"
+                  >▲</button>
+                  <span className="vote-column__score">{post.score}</span>
+                  <button
+                    type="button"
+                    className={`vote-column__btn ${post.myVote === -1 ? "vote-column__btn--active-down" : ""}`}
+                    onClick={() => handleVote(post, -1)}
+                    aria-label="Downvote"
+                  >▼</button>
+                </div>
+                <div className="backlog-card__info">
+                  <span className="backlog-card__title">{post.title}</span>
+                  <span className="backlog-card__meta">
+                    {displayName(post.author)} · {new Date(post.created_at).toLocaleDateString()}
+                  </span>
+                  {post.body && <p className="settings-card__note" style={{ margin: "6px 0" }}>{post.body}</p>}
+                  {post.image_url && <img src={post.image_url} alt="" style={{ maxWidth: "320px", borderRadius: "8px", marginTop: "6px" }} />}
+                  <button
+                    type="button"
+                    className="store-row-toggle"
+                    onClick={() => setExpandedPostId(expandedPostId === post.id ? null : post.id)}
+                  >
+                    {expandedPostId === post.id ? "Hide comments ▲" : `${post.commentCount} comment${post.commentCount === 1 ? "" : "s"} ▾`}
+                  </button>
+                </div>
+                {post.user_id === userId && (
+                  <button type="button" className="game-popup__close" onClick={() => handleDelete(post.id)} aria-label="Delete post">✕</button>
+                )}
               </div>
+              {expandedPostId === post.id && (
+                <CommentsPanel postId={post.id} userId={userId} isMember={isMember} onCommentAdded={() => setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, commentCount: p.commentCount + 1 } : p)))} />
+              )}
             </li>
           ))}
         </ul>
       )}
+    </div>
+  );
+}
 
-      <div className="backlog-summary">
-        <span className="feed-col__label">Activity feed</span>
-      </div>
-      {activity.length === 0 ? (
-        <p className="panel__status">No activity yet — real activity from members will show up here.</p>
-      ) : (
-        <ul className="calendar-list">
-          {activity.map((entry) => (
-            <li key={entry.id} className="calendar-row">
-              <span className="calendar-row__date">{new Date(entry.created_at).toLocaleDateString()}</span>
-              <div className="calendar-row__body">
-                <span className="calendar-row__event">{describeActivity(entry)}</span>
-              </div>
-            </li>
-          ))}
-        </ul>
+function CommentsPanel({ postId, userId, isMember, onCommentAdded }) {
+  const [comments, setComments] = useState([]);
+  const [status, setStatus] = useState("loading");
+  const [text, setText] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetchPostComments(postId)
+      .then((rows) => {
+        setComments(rows);
+        setStatus("ready");
+      })
+      .catch((err) => {
+        console.error("Failed to load comments:", err);
+        setStatus("error");
+      });
+  }, [postId]);
+
+  async function handleAdd(e) {
+    e.preventDefault();
+    if (!text.trim()) return;
+    setSaving(true);
+    try {
+      await addPostComment(userId, postId, text.trim());
+      setText("");
+      const rows = await fetchPostComments(postId);
+      setComments(rows);
+      onCommentAdded();
+    } catch (err) {
+      console.error("Failed to add comment:", err);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(commentId) {
+    try {
+      await deletePostComment(commentId);
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+    } catch (err) {
+      console.error("Failed to delete comment:", err);
+    }
+  }
+
+  return (
+    <div className="comments-panel">
+      {status === "loading" && <p className="panel__status">Loading comments…</p>}
+      {status === "error" && <p className="panel__status panel__status--error">Couldn't load comments.</p>}
+      {status === "ready" && comments.length === 0 && <p className="panel__status">No comments yet.</p>}
+      {comments.map((c) => (
+        <div key={c.id} className="comments-panel__row">
+          <span className="comments-panel__author">{displayName(c.author)}</span>
+          <span className="comments-panel__body">{c.body}</span>
+          {c.user_id === userId && (
+            <button type="button" className="game-popup__close" onClick={() => handleDelete(c.id)} aria-label="Delete comment">✕</button>
+          )}
+        </div>
+      ))}
+      {isMember && (
+        <form className="price-search" onSubmit={handleAdd} style={{ marginTop: "8px" }}>
+          <input
+            className="price-search__input"
+            type="text"
+            placeholder="Add a comment…"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+          <button type="submit" className="price-search__button" disabled={saving}>
+            {saving ? "Posting…" : "Comment"}
+          </button>
+        </form>
       )}
     </div>
   );

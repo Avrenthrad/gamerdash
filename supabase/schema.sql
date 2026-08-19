@@ -1731,3 +1731,141 @@ create policy "Users can update their own marketplace photos"
 create policy "Users can delete their own marketplace photos"
   on storage.objects for delete
   using (bucket_id = 'marketplace-photos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ---------- Guild social feed + official guilds (additive) ----------
+-- Real Reddit-like posts within a Guild: members post (title/body/
+-- optional image), other members upvote/downvote and comment.
+-- guild_posts has guild_id directly so its own RLS reuses the
+-- existing is_guild_member() SECURITY DEFINER helper exactly like
+-- guild_activity already does. Votes/comments only carry post_id, not
+-- guild_id, so is_guild_post_member() below routes that lookup
+-- through one more SECURITY DEFINER function rather than a raw
+-- subquery into guild_posts from two different tables — keeps the
+-- same "never let two RLS-protected tables' policies query each
+-- other" discipline this project adopted after hitting a real
+-- Postgres 42P17 infinite-recursion error with guild_join_requests.
+create table public.guild_posts (
+  id uuid default gen_random_uuid() primary key,
+  guild_id uuid references public.guilds on delete cascade not null,
+  user_id uuid references auth.users on delete cascade not null,
+  title text not null,
+  body text,
+  image_url text,
+  created_at timestamptz default now()
+);
+
+create table public.guild_post_votes (
+  id uuid default gen_random_uuid() primary key,
+  post_id uuid references public.guild_posts on delete cascade not null,
+  user_id uuid references auth.users on delete cascade not null,
+  value smallint not null check (value in (-1, 1)),
+  created_at timestamptz default now(),
+  unique (post_id, user_id)
+);
+
+create table public.guild_post_comments (
+  id uuid default gen_random_uuid() primary key,
+  post_id uuid references public.guild_posts on delete cascade not null,
+  user_id uuid references auth.users on delete cascade not null,
+  body text not null,
+  created_at timestamptz default now()
+);
+
+create index guild_posts_guild_id_idx on public.guild_posts (guild_id, created_at desc);
+create index guild_post_votes_post_id_idx on public.guild_post_votes (post_id);
+create index guild_post_comments_post_id_idx on public.guild_post_comments (post_id, created_at asc);
+
+alter table public.guild_posts enable row level security;
+
+create policy "Guild members can view their guild's posts"
+  on public.guild_posts for select
+  using (public.is_guild_member(guild_id, auth.uid()));
+
+create policy "Guild members can post to their guild"
+  on public.guild_posts for insert
+  with check (auth.uid() = user_id and public.is_guild_member(guild_id, auth.uid()));
+
+create policy "Authors can delete their own posts"
+  on public.guild_posts for delete
+  using (auth.uid() = user_id);
+
+create or replace function public.is_guild_post_member(p_post_id uuid, p_user_id uuid)
+returns boolean as $$
+  select public.is_guild_member(guild_id, p_user_id) from public.guild_posts where id = p_post_id;
+$$ language sql security definer set search_path = public stable;
+
+alter table public.guild_post_votes enable row level security;
+
+create policy "Guild members can view votes"
+  on public.guild_post_votes for select
+  using (public.is_guild_post_member(post_id, auth.uid()));
+
+create policy "Guild members can vote"
+  on public.guild_post_votes for insert
+  with check (auth.uid() = user_id and public.is_guild_post_member(post_id, auth.uid()));
+
+create policy "Users can change their own vote"
+  on public.guild_post_votes for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "Users can remove their own vote"
+  on public.guild_post_votes for delete
+  using (auth.uid() = user_id);
+
+alter table public.guild_post_comments enable row level security;
+
+create policy "Guild members can view comments"
+  on public.guild_post_comments for select
+  using (public.is_guild_post_member(post_id, auth.uid()));
+
+create policy "Guild members can comment"
+  on public.guild_post_comments for insert
+  with check (auth.uid() = user_id and public.is_guild_post_member(post_id, auth.uid()));
+
+create policy "Authors can delete their own comments"
+  on public.guild_post_comments for delete
+  using (auth.uid() = user_id);
+
+-- Real upload pattern, identical to every other bucket in this file:
+-- public read, writes scoped to the uploader's own ${user_id}/ folder
+-- (a post image belongs to whoever posted it, not the guild itself,
+-- so this is simpler than guild-media's guild-id scoping).
+insert into storage.buckets (id, name, public)
+values ('guild-post-images', 'guild-post-images', true)
+on conflict (id) do nothing;
+
+create policy "Guild post images are publicly viewable"
+  on storage.objects for select
+  using (bucket_id = 'guild-post-images');
+
+create policy "Users can upload their own guild post images"
+  on storage.objects for insert
+  with check (bucket_id = 'guild-post-images' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Users can delete their own guild post images"
+  on storage.objects for delete
+  using (bucket_id = 'guild-post-images' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ---------- Official guilds: is_official flag + 5 seeded guilds ----------
+-- Purely a display flag ("Official Lykodex Guild" badge) - not a new
+-- security mechanism. created_by for the 5 seeded guilds below is set
+-- to the real Lykodex admin account, so every existing owner-only path
+-- (logo/banner/description editing, privacy toggle, approving join
+-- requests) already just works for them with zero new RLS. Regular
+-- users can never set is_official themselves since createGuild()'s
+-- insert never touches this column, so it always lands as the
+-- default false.
+alter table public.guilds add column if not exists is_official boolean not null default false;
+
+insert into public.guilds (name, created_by, is_private, is_official, description)
+select v.name, u.id, false, true, v.description
+from (values
+  ('Lykodex Gaming', 'The official Lykodex guild for everything Gaming.'),
+  ('Lykodex TCG', 'The official Lykodex guild for Magic and other TCGs.'),
+  ('Lykodex Entertainment', 'The official Lykodex guild for movies, TV, anime, and books.'),
+  ('Lykodex Collectibles', 'The official Lykodex guild for Pops, statues, LEGO, and more.'),
+  ('Lykodex Tabletop', 'The official Lykodex guild for RPGs and tabletop wargaming.')
+) as v(name, description)
+cross join (select id from auth.users where email = 'joshuakingsworth@gmail.com') as u
+where not exists (select 1 from public.guilds where name = v.name);
