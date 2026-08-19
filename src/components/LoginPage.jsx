@@ -45,7 +45,7 @@ export default function LoginPage({ onLoginSuccess, initialMode }) {
       console.error(`${label} sign-in failed:`, err);
       setOauthError(
         err.message?.toLowerCase().includes("provider is not enabled")
-          ? `${label} sign-in isn't turned on yet in Supabase — enable it under Authentication > Providers.`
+          ? `${label} sign-in isn't available yet.`
           : err.message || `Couldn't start ${label} sign-in.`
       );
       setOauthLoading(null);
@@ -57,7 +57,7 @@ export default function LoginPage({ onLoginSuccess, initialMode }) {
     setError("");
 
     if (!supabaseConfigured) {
-      setError("Accounts aren't set up yet — Supabase isn't configured on this deployment.");
+      setError("Accounts aren't set up yet.");
       return;
     }
 
@@ -87,8 +87,8 @@ export default function LoginPage({ onLoginSuccess, initialMode }) {
         setStatus("idle");
         setError(
           mode === "signup"
-            ? "Account created — but no session came back, which usually means email confirmation is still switched on in Supabase. Turn off \"Confirm email\" under Authentication > Providers > Email in your Supabase dashboard, then try signing up again."
-            : "Signed in, but no session came back — try refreshing, or check Supabase's dashboard for anything unusual on this account."
+            ? "Account created — check your email to confirm it, then sign in."
+            : "Signed in, but something went wrong — try refreshing."
         );
         return;
       }
@@ -116,7 +116,7 @@ export default function LoginPage({ onLoginSuccess, initialMode }) {
 
         {!supabaseConfigured && (
           <p className="panel__status panel__status--error">
-            Accounts aren't configured yet on this deployment (missing Supabase setup).
+            Accounts aren't set up yet on this deployment.
           </p>
         )}
 

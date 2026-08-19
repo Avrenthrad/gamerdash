@@ -80,10 +80,7 @@ export default function AchievementsPage({ onBack, userId, linkedSteamId }) {
         <button type="button" className="back-link" onClick={onBack}>← Back to Gaming</button>
         <h1 className="price-page__title">Achievements</h1>
         <p className="price-page__subtitle">
-          Steam's list is real and automatic — unlocked achievements, descriptions, and global
-          rarity straight from Steam's own API. Xbox and PlayStation have no public API for a
-          person's own achievements at all, so those two are a self-reported checklist you build
-          yourself as you play — clearly labeled, not pulled from a live source.
+          Steam syncs automatically. Xbox and PlayStation are tracked manually.
         </p>
       </div>
 

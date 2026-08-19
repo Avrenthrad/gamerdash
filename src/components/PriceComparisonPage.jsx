@@ -76,7 +76,7 @@ export default function PriceComparisonPage({
         if (!deal) {
           setErrorByTitle((prev) => ({
             ...prev,
-            [title]: "Not found on CheapShark",
+            [title]: "Not found",
           }));
           return;
         }

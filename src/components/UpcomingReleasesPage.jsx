@@ -180,7 +180,7 @@ export default function UpcomingReleasesPage({ onBack, isLoggedIn, userId, wishl
 
       {status === "loading" && <p className="panel__status">Loading…</p>}
       {status === "error" && <p className="panel__status panel__status--error">Couldn't load upcoming releases right now.</p>}
-      {status === "no_key" && <p className="panel__status">Upcoming Releases isn't configured yet — needs a free RAWG API key.</p>}
+      {status === "no_key" && <p className="panel__status">Upcoming Releases isn't available right now.</p>}
       {status === "ready" && releases.length === 0 && (
         <p className="panel__status">
           {mode === "mine" ? "No upcoming DLC found for your games right now." : "Nothing found for these filters."}

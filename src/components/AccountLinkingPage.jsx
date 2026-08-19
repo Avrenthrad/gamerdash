@@ -30,9 +30,9 @@ import { supabase } from "../lib/supabaseClient";
 import GameMasterySection from "./GameMasterySection";
 
 const HANDLE_PLATFORMS = [
-  { id: "xbox_gamertag", label: "Xbox", fieldLabel: "Gamertag", placeholder: "Your Xbox Gamertag", note: "The real Xbox Live API is gated behind Microsoft's ID@Xbox / Creators Program — for approved game developers, not companion apps like this one." },
-  { id: "playstation_online_id", label: "PlayStation", fieldLabel: "Online ID", placeholder: "Your PSN Online ID", note: "Sony has never published a public API for this, official or otherwise — nothing to apply for." },
-  { id: "nintendo_friend_code", label: "Nintendo", fieldLabel: "Friend Code", placeholder: "SW-0000-0000-0000", note: "Nintendo has never published a public API for this either." },
+  { id: "xbox_gamertag", label: "Xbox", fieldLabel: "Gamertag", placeholder: "Your Xbox Gamertag" },
+  { id: "playstation_online_id", label: "PlayStation", fieldLabel: "Online ID", placeholder: "Your PSN Online ID" },
+  { id: "nintendo_friend_code", label: "Nintendo", fieldLabel: "Friend Code", placeholder: "SW-0000-0000-0000" },
 ];
 
 function PlatformHandleCard({ platform, value: initialValue, onSaved, onRecomputeMastery }) {
@@ -70,7 +70,6 @@ function PlatformHandleCard({ platform, value: initialValue, onSaved, onRecomput
   return (
     <div className="steam-link-card">
       <h2 className="settings-card__title">{platform.label}</h2>
-      <p className="settings-card__note">{platform.note}</p>
       <form className="price-search" onSubmit={handleSave}>
         <input
           className="price-search__input"
@@ -87,7 +86,7 @@ function PlatformHandleCard({ platform, value: initialValue, onSaved, onRecomput
           className="linking-row__connect"
           onClick={handleRefresh}
           disabled={recomputing}
-          title="Recompute your Gaming Mastery from whatever Gamerscore/trophy numbers you've saved — there's no live sync to pull from for this platform, so this replays your own saved numbers, not a fresh scrape."
+          title="Recompute your Gaming Mastery"
         >
           {recomputing ? "Refreshing…" : "↻ Refresh"}
         </button>
@@ -97,7 +96,7 @@ function PlatformHandleCard({ platform, value: initialValue, onSaved, onRecomput
   );
 }
 
-function OAuthProviderCard({ label, provider, note, linkedProviders, onChanged }) {
+function OAuthProviderCard({ label, provider, linkedProviders, onChanged }) {
   const [status, setStatus] = useState("idle"); // idle | loading | error
   const [message, setMessage] = useState("");
   const connected = linkedProviders.includes(provider);
@@ -111,7 +110,7 @@ function OAuthProviderCard({ label, provider, note, linkedProviders, onChanged }
     } catch (err) {
       console.error(`${label} link failed:`, err);
       setStatus("error");
-      setMessage(err.message || `Couldn't connect ${label} — check it's enabled in Supabase's provider settings.`);
+      setMessage(err.message || `Couldn't connect ${label} — try again in a moment.`);
     }
   }
 
@@ -135,7 +134,6 @@ function OAuthProviderCard({ label, provider, note, linkedProviders, onChanged }
   return (
     <div className="steam-link-card">
       <h2 className="settings-card__title">{label}</h2>
-      <p className="settings-card__note">{note}</p>
       {connected ? (
         <button type="button" className="linking-row__connect" onClick={handleDisconnect} disabled={status === "loading"}>
           {status === "loading" ? "Disconnecting…" : `Disconnect ${label}`}
@@ -310,14 +308,12 @@ export default function AccountLinkingPage({
           <OAuthProviderCard
             label="Discord"
             provider="discord"
-            note="Real OAuth via Supabase — needs Discord enabled in Supabase's Authentication > Providers settings first."
             linkedProviders={linkedProviders}
             onChanged={refreshLinkedProviders}
           />
           <OAuthProviderCard
             label="Twitch"
             provider="twitch"
-            note="Real OAuth via Supabase — needs Twitch enabled in Supabase's Authentication > Providers settings first."
             linkedProviders={linkedProviders}
             onChanged={refreshLinkedProviders}
           />

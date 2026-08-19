@@ -115,7 +115,7 @@ export default function MarketPage({ onBack }) {
         <div className="ingame-store__banner ingame-store__banner--placeholder">
           <span className="ingame-store__banner-title">More games coming</span>
           <span className="ingame-store__banner-sub">
-            Marvel Rivals has a real store API too — needs a free key first, same as Xbox did.
+            Marvel Rivals support is coming soon.
           </span>
         </div>
       </div>

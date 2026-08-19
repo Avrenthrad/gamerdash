@@ -34,7 +34,7 @@ const SORT_OPTIONS = [
   { value: "rating", label: "Rating" },
   { value: "alphabetical", label: "Alphabetical" },
   { value: "releaseDate", label: "Release date" },
-  { value: "length", label: "Length (self-reported)" },
+  { value: "length", label: "Length" },
 ];
 
 const FILTER_OPTIONS = ["all", ...STATUSES];
@@ -229,8 +229,7 @@ export default function BacklogPage({ onBack, userId, linkedSteamId }) {
         <button type="button" className="back-link" onClick={onBack}>← Back to Collections</button>
         <h1 className="price-page__title">Backlog / To Be Played</h1>
         <p className="price-page__subtitle">
-          Real ratings, release dates, and achievement counts throughout. "Length" has no
-          legitimate public data source (see below) — self-reported only, clearly marked.
+          Ratings, release dates, and achievements — plus your own estimate for how long each game takes.
         </p>
       </div>
 

@@ -188,7 +188,7 @@ export default function EntertainmentHomePage({ onBack, isLoggedIn, userId, onSi
       </div>
 
       {searchStatus === "no_key" && (
-        <p className="panel__status">Entertainment isn't configured yet — needs a free TMDB API key.</p>
+        <p className="panel__status">Entertainment isn't available right now.</p>
       )}
       {searchStatus === "error" && <p className="panel__status panel__status--error">Couldn't search right now.</p>}
 

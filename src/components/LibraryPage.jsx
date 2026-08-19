@@ -231,8 +231,7 @@ export default function LibraryPage({
         <div className="library-most-played" style={{ marginTop: "24px" }}>
           <span className="feed-col__label">Xbox &amp; PlayStation</span>
           <p className="panel__status" style={{ fontSize: "11px", marginBottom: "10px" }}>
-            Real playtime the Discord bot has observed since you linked Discord — not a full
-            historical library, just what it's actually seen you play.
+            Tracked since you linked Discord — not your full historical library.
           </p>
           <ul className="backlog-list">
             {otherPlatformGames.map((g) => (

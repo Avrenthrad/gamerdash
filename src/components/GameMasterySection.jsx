@@ -124,10 +124,7 @@ export default function GameMasterySection({
     <div className="steam-link-card">
       <h2 className="settings-card__title">Gaming Mastery</h2>
       <p className="settings-card__note">
-        A cross-platform "Gamerscore equivalent." Steam's share is computed live from your real
-        unlocked achievements and Steam's own global rarity data. Xbox and PlayStation have no
-        public API for a person's own earned Gamerscore/trophies, so those two are real numbers
-        you enter yourself below — clearly self-reported, not verified against a live source.
+        Your cross-platform Gamerscore equivalent, combining Steam, Xbox, and PlayStation.
       </p>
 
       {hasAnyData ? (
@@ -189,7 +186,7 @@ export default function GameMasterySection({
       )}
 
       <details style={{ marginTop: "14px" }}>
-        <summary className="panel__status" style={{ cursor: "pointer" }}>Enter Xbox Gamerscore (self-reported)</summary>
+        <summary className="panel__status" style={{ cursor: "pointer" }}>Enter Xbox Gamerscore</summary>
         <form className="price-search" onSubmit={handleSaveXbox} style={{ marginTop: "8px" }}>
           <input
             className="price-search__input"
@@ -207,7 +204,7 @@ export default function GameMasterySection({
       </details>
 
       <details style={{ marginTop: "10px" }}>
-        <summary className="panel__status" style={{ cursor: "pointer" }}>Enter PlayStation trophies (self-reported)</summary>
+        <summary className="panel__status" style={{ cursor: "pointer" }}>Enter PlayStation trophies</summary>
         <p className="panel__status" style={{ fontSize: "11px" }}>
           Read these straight off your own PSN trophy case — it already breaks trophies down by tier and rarity this same way.
         </p>

@@ -41,8 +41,8 @@ export default function WishlistCard({
       <li className="wishlist-card wishlist-card--loading">
         {isRateLimit ? (
           <span className="panel__status panel__status--warning">
-            {entry.title}: CheapShark is temporarily rate-limiting requests. This clears up on
-            its own — avoid repeatedly retrying, as that can extend the wait.
+            {entry.title}: Pricing is temporarily rate-limited. This clears up on its own —
+            avoid repeatedly retrying, as that can extend the wait.
           </span>
         ) : (
           <span className="panel__status panel__status--error">

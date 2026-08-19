@@ -63,7 +63,7 @@ export default function TcgHomePage({ onNavigate, isLoggedIn, userId }) {
     <div className="price-page">
       <div className="price-page__head">
         <h1 className="price-page__title">TCG</h1>
-        <p className="price-page__subtitle">Magic the Gathering is fully real. Everything else here is honestly not built yet.</p>
+        <p className="price-page__subtitle">Magic: The Gathering is live — more TCGs coming soon.</p>
       </div>
 
       {isLoggedIn && status === "ready" && entries.length > 0 && (

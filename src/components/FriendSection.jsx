@@ -248,8 +248,7 @@ export default function FriendSection({ isLoggedIn, onSignIn, onCreateAccount, l
               </div>
               {totalPlaytime.xboxHours === 0 && totalPlaytime.playstationHours === 0 && (
                 <p className="total-playtime__note">
-                  Console hours only start counting from when Discord's linked and you're in the
-                  tracking server — there's no way to pull in time already played before that.
+                  Console hours start counting once your account is linked.
                 </p>
               )}
             </div>
