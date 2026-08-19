@@ -43,6 +43,7 @@ const GuildsPage = lazy(() => import("./components/GuildsPage"));
 const FriendsPage = lazy(() => import("./components/FriendsPage"));
 const OverviewPage = lazy(() => import("./components/OverviewPage"));
 const TcgHomePage = lazy(() => import("./components/TcgHomePage"));
+const TcgMarketplacePage = lazy(() => import("./components/TcgMarketplacePage"));
 const LibraryPage = lazy(() => import("./components/LibraryPage"));
 const EntertainmentHomePage = lazy(() => import("./components/EntertainmentHomePage"));
 const BooksPage = lazy(() => import("./components/BooksPage"));
@@ -511,6 +512,17 @@ export default function App() {
           )}
 
           {view === "tcg-home" && <TcgHomePage onNavigate={(id) => goTo(id)} isLoggedIn={isLoggedIn} userId={userId} />}
+
+          {view === "tcg-marketplace" && (
+            <TcgMarketplacePage
+              onBack={() => goTo("tcg-home")}
+              userId={userId}
+              isLoggedIn={isLoggedIn}
+              onSignIn={() => goTo("login", "login")}
+              onCreateAccount={() => goTo("login", "signup")}
+              currency={currency}
+            />
+          )}
 
           {view === "college-entertainment" && (
             <EntertainmentHomePage

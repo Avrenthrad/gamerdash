@@ -90,6 +90,7 @@ const KNOWN_VIEWS = [
   "overview",
   "library",
   "tcg-home",
+  "tcg-marketplace",
   "college-entertainment",
   "books",
   "comics",

@@ -2414,6 +2414,13 @@ button { font-family: inherit; }
   max-width: none;
 }
 
+.marketplace-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+  margin-top: 16px;
+}
+
 .wishlist-columns {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

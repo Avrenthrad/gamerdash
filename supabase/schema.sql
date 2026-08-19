@@ -1660,3 +1660,74 @@ alter table public.wishlist_items add constraint wishlist_items_user_title_uniqu
 -- added before this feature just don't have one, same honest-gap
 -- pattern as steam_appid/hours_estimate above.
 alter table public.backlog_items add column if not exists platform text;
+
+-- ---------- Marketplace: TCG + Collectibles (additive) ----------
+-- One real table shared by both Colleges (category column), not two
+-- duplicated schemas — each College's UI only ever queries its own
+-- category, so they stay honestly separate to the person using the
+-- app. No FK to mtg_collection/collectible_entries: a listing is
+-- freeform (title/description/price/condition/photo), not required
+-- to correspond to a tracked collection row — an optional "link to my
+-- collection" convenience is a natural later addition, not v1.
+-- condition is plain nullable text, not a check-constrained enum,
+-- since TCG and Collectibles use two different real condition scales
+-- (NM/LP/MP/HP/Damaged vs Mint/Near Mint/Good/Fair/Poor) and neither
+-- should be forced to fit the other's rigid list.
+--
+-- RLS here deliberately needs no cross-table check (auth.uid() =
+-- user_id is sufficient for all CRUD), so this doesn't risk the real
+-- Postgres 42P17 "infinite recursion detected in policy" bug this
+-- project hit before with guild_join_requests (a policy subquerying a
+-- table whose own policy subqueries back) — noted here so that trap
+-- isn't reintroduced if a "buyer can mark as sold" flow gets added
+-- later.
+create table public.marketplace_listings (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  category text not null check (category in ('tcg', 'collectibles')),
+  title text not null,
+  description text,
+  price numeric not null check (price >= 0),
+  currency text not null default 'USD',
+  condition text,
+  photo_url text,
+  status text not null default 'active' check (status in ('active', 'sold', 'removed')),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table public.marketplace_listings enable row level security;
+
+create policy "Anyone signed in can browse active listings"
+  on public.marketplace_listings for select
+  using (status = 'active' or auth.uid() = user_id);
+
+create policy "Sellers manage their own listings"
+  on public.marketplace_listings for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create index marketplace_listings_category_idx on public.marketplace_listings (category, status, created_at desc);
+
+-- Real upload pattern, identical to avatars/wallpapers/guild-media/
+-- collectible-covers above: public bucket, writes scoped to the
+-- uploader's own ${user_id}/ folder.
+insert into storage.buckets (id, name, public)
+values ('marketplace-photos', 'marketplace-photos', true)
+on conflict (id) do nothing;
+
+create policy "Marketplace photos are publicly viewable"
+  on storage.objects for select
+  using (bucket_id = 'marketplace-photos');
+
+create policy "Users can upload their own marketplace photos"
+  on storage.objects for insert
+  with check (bucket_id = 'marketplace-photos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Users can update their own marketplace photos"
+  on storage.objects for update
+  using (bucket_id = 'marketplace-photos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Users can delete their own marketplace photos"
+  on storage.objects for delete
+  using (bucket_id = 'marketplace-photos' and (storage.foldername(name))[1] = auth.uid()::text);

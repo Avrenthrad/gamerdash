@@ -18,6 +18,7 @@ export const NAV_INDEX = [
   { label: "MTG Deck Builder", view: "mtg-decks", keywords: "tcg magic decks" },
   { label: "MTG Card Scanner", view: "mtg-scan", keywords: "tcg magic ocr" },
   { label: "Import Collection", view: "mtg-import", keywords: "tcg magic csv manabox collectr import" },
+  { label: "TCG Marketplace", view: "tcg-marketplace", keywords: "tcg magic buy sell trade listings" },
   { label: "Entertainment", view: "college-entertainment", keywords: "movies tv anime books" },
   { label: "Books", view: "books", keywords: "entertainment tbr barcode isbn reading lists" },
   { label: "Comics", view: "comics", keywords: "entertainment issues pull list" },

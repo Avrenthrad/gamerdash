@@ -22,6 +22,7 @@ const MTG_FEATURES = [
   { id: "mtg-search", label: "Card Search", icon: "🔍", desc: "Full Scryfall search — real cards, real pricing." },
   { id: "mtg-collection", label: "My Collection", icon: "📚", desc: "Real owned cards, real live pricing." },
   { id: "mtg-decks", label: "Deck Builder", icon: "🛠️", desc: "Real format-legality checking against Scryfall's own data." },
+  { id: "tcg-marketplace", label: "Marketplace", icon: "💰", desc: "Buy and sell real cards with other Lykodex users." },
 ];
 
 const OTHER_GAMES = ["Pokémon", "One Piece", "Riftbound", "Yu-Gi-Oh!"];

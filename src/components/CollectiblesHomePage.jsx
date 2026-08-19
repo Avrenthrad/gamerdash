@@ -11,6 +11,7 @@ import { fetchCollectibles, addCollectible, updateCollectible, removeCollectible
 import { lookupProductByBarcode } from "../lib/upc";
 import { searchFunkoCatalog } from "../lib/funko";
 import ProductBarcodeScanner from "./ProductBarcodeScanner";
+import MarketplaceSection from "./MarketplaceSection";
 
 const TYPE_GROUPS = [
   { label: "Figures & Statues", types: ["figure", "statue", "funko_pop"] },
@@ -39,8 +40,8 @@ const PACKAGE_STATE_LABELS = {
 const CONDITIONS = ["mint", "near_mint", "good", "fair", "poor"];
 const CONDITION_LABELS = { mint: "Mint", near_mint: "Near Mint", good: "Good", fair: "Fair", poor: "Poor" };
 
-export default function CollectiblesHomePage({ onBack, isLoggedIn, userId, onSignIn, onCreateAccount }) {
-  const [section, setSection] = useState("shelf"); // shelf | add | hardware | wishlist | stats
+export default function CollectiblesHomePage({ onBack, isLoggedIn, userId, onSignIn, onCreateAccount, currency }) {
+  const [section, setSection] = useState("shelf"); // shelf | add | hardware | wishlist | stats | marketplace
   const [entries, setEntries] = useState([]);
   const [status, setStatus] = useState("idle");
 
@@ -118,6 +119,7 @@ export default function CollectiblesHomePage({ onBack, isLoggedIn, userId, onSig
         <button type="button" className={`quickdash-reset-btn ${section === "hardware" ? "quickdash-reset-btn--active" : ""}`} onClick={() => setSection("hardware")}>Hardware</button>
         <button type="button" className={`quickdash-reset-btn ${section === "wishlist" ? "quickdash-reset-btn--active" : ""}`} onClick={() => setSection("wishlist")}>Wishlist</button>
         <button type="button" className={`quickdash-reset-btn ${section === "stats" ? "quickdash-reset-btn--active" : ""}`} onClick={() => setSection("stats")}>Stats</button>
+        <button type="button" className={`quickdash-reset-btn ${section === "marketplace" ? "quickdash-reset-btn--active" : ""}`} onClick={() => setSection("marketplace")}>Marketplace</button>
       </div>
 
       {status === "loading" && <p className="panel__status">Loading your shelf…</p>}
@@ -155,6 +157,17 @@ export default function CollectiblesHomePage({ onBack, isLoggedIn, userId, onSig
       )}
 
       {status === "ready" && section === "stats" && <StatsView owned={owned} />}
+
+      {section === "marketplace" && (
+        <MarketplaceSection
+          category="collectibles"
+          userId={userId}
+          isLoggedIn={isLoggedIn}
+          onSignIn={onSignIn}
+          onCreateAccount={onCreateAccount}
+          currency={currency}
+        />
+      )}
     </div>
   );
 }
