@@ -62,6 +62,8 @@ export default function GamingDashboard({
 
       <CurrentRotation
         wishlist={wishlist}
+        linkedSteamId={linkedSteamId}
+        userId={userId}
         onOpenBacklog={() => goTo("backlog")}
         onOpenPrices={() => goTo("prices")}
       />

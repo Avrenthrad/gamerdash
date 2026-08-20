@@ -29,9 +29,40 @@ import { linkIdentity, unlinkProviderIdentity, getLinkedProviders, syncDiscordLi
 import { supabase } from "../lib/supabaseClient";
 import GameMasterySection from "./GameMasterySection";
 
+// accountUrl, where present, is a real, verified destination for
+// finding the actual Gamerscore/trophy numbers typed into
+// GameMasterySection below — confirmed live, not guessed:
+//   - Xbox: account.xbox.com/en-us/profile is Microsoft's own
+//     sign-in-gated "your profile" page; passing the saved Gamertag
+//     takes it straight there instead of a bare landing page.
+//   - PlayStation: my.playstation.com's old direct profile/trophy URLs
+//     are dead (redirect straight to the PlayStation homepage now,
+//     confirmed live) — library.playstation.com is Sony's real current
+//     sign-in-gated web app and the honest destination; no trophies
+//     sub-path could be verified working, so this links to the library
+//     root rather than guess one.
+//   - Nintendo has no equivalent self-service stats page at all, so no
+//     accountUrl here.
 const HANDLE_PLATFORMS = [
-  { id: "xbox_gamertag", label: "Xbox", fieldLabel: "Gamertag", placeholder: "Your Xbox Gamertag" },
-  { id: "playstation_online_id", label: "PlayStation", fieldLabel: "Online ID", placeholder: "Your PSN Online ID" },
+  {
+    id: "xbox_gamertag",
+    label: "Xbox",
+    fieldLabel: "Gamertag",
+    placeholder: "Your Xbox Gamertag",
+    accountUrl: (value) =>
+      value
+        ? `https://account.xbox.com/en-us/profile?gamertag=${encodeURIComponent(value)}`
+        : "https://account.xbox.com/en-us/profile",
+    accountLinkLabel: "Find your Gamerscore on Xbox →",
+  },
+  {
+    id: "playstation_online_id",
+    label: "PlayStation",
+    fieldLabel: "Online ID",
+    placeholder: "Your PSN Online ID",
+    accountUrl: () => "https://library.playstation.com",
+    accountLinkLabel: "Open your PlayStation Library →",
+  },
   { id: "nintendo_friend_code", label: "Nintendo", fieldLabel: "Friend Code", placeholder: "SW-0000-0000-0000" },
 ];
 
@@ -92,6 +123,16 @@ function PlatformHandleCard({ platform, value: initialValue, onSaved, onRecomput
         </button>
       </form>
       {status === "error" && <p className="panel__status panel__status--error">Couldn't save — try again.</p>}
+      {platform.accountUrl && (
+        <a
+          href={platform.accountUrl(value)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="ps-trophy-attribution"
+        >
+          {platform.accountLinkLabel}
+        </a>
+      )}
     </div>
   );
 }
