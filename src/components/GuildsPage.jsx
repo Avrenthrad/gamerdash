@@ -789,7 +789,7 @@ function PostsTab({ guildId, userId, isMember }) {
                 )}
               </div>
               {expandedPostId === post.id && (
-                <CommentsPanel postId={post.id} userId={userId} isMember={isMember} onCommentAdded={() => setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, commentCount: p.commentCount + 1 } : p)))} />
+                <CommentsPanel postId={post.id} guildId={guildId} userId={userId} isMember={isMember} onCommentAdded={() => setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, commentCount: p.commentCount + 1 } : p)))} />
               )}
             </li>
           ))}
@@ -799,11 +799,16 @@ function PostsTab({ guildId, userId, isMember }) {
   );
 }
 
-function CommentsPanel({ postId, userId, isMember, onCommentAdded }) {
+function CommentsPanel({ postId, guildId, userId, isMember, onCommentAdded }) {
   const [comments, setComments] = useState([]);
   const [status, setStatus] = useState("loading");
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
+  // Which top-level comment's inline reply form is open — a reply
+  // itself never gets its own reply form (one level of threading only).
+  const [replyingToId, setReplyingToId] = useState(null);
+  const [replyText, setReplyText] = useState("");
+  const [replySaving, setReplySaving] = useState(false);
 
   useEffect(() => {
     fetchPostComments(postId)
@@ -822,7 +827,7 @@ function CommentsPanel({ postId, userId, isMember, onCommentAdded }) {
     if (!text.trim()) return;
     setSaving(true);
     try {
-      await addPostComment(userId, postId, text.trim());
+      await addPostComment(userId, postId, guildId, text.trim());
       setText("");
       const rows = await fetchPostComments(postId);
       setComments(rows);
@@ -834,13 +839,74 @@ function CommentsPanel({ postId, userId, isMember, onCommentAdded }) {
     }
   }
 
+  async function handleReply(e, parentId) {
+    e.preventDefault();
+    if (!replyText.trim()) return;
+    setReplySaving(true);
+    try {
+      await addPostComment(userId, postId, guildId, replyText.trim(), parentId);
+      setReplyText("");
+      setReplyingToId(null);
+      const rows = await fetchPostComments(postId);
+      setComments(rows);
+      onCommentAdded();
+    } catch (err) {
+      console.error("Failed to add reply:", err);
+    } finally {
+      setReplySaving(false);
+    }
+  }
+
   async function handleDelete(commentId) {
     try {
       await deletePostComment(commentId);
-      setComments((prev) => prev.filter((c) => c.id !== commentId));
+      // Deleting a top-level comment cascades its replies at the DB
+      // level (on delete cascade) — reflect that in local state too,
+      // not just the one row, so the UI doesn't show orphaned replies.
+      setComments((prev) => prev.filter((c) => c.id !== commentId && c.parent_comment_id !== commentId));
     } catch (err) {
       console.error("Failed to delete comment:", err);
     }
+  }
+
+  const topLevel = comments.filter((c) => !c.parent_comment_id);
+  const repliesByParent = comments.reduce((acc, c) => {
+    if (c.parent_comment_id) (acc[c.parent_comment_id] ||= []).push(c);
+    return acc;
+  }, {});
+
+  function renderComment(c, isReply) {
+    return (
+      <div key={c.id} className="comments-panel__row" style={isReply ? { marginLeft: "28px" } : undefined}>
+        <span className="comments-panel__author">{displayName(c.author)}</span>
+        <span className="comments-panel__body">{c.body}</span>
+        <div className="settings-form-row" style={{ marginTop: "2px" }}>
+          {!isReply && isMember && (
+            <button type="button" className="store-row-toggle" onClick={() => setReplyingToId(replyingToId === c.id ? null : c.id)}>
+              Reply
+            </button>
+          )}
+          {c.user_id === userId && (
+            <button type="button" className="game-popup__close" onClick={() => handleDelete(c.id)} aria-label="Delete comment">✕</button>
+          )}
+        </div>
+        {!isReply && replyingToId === c.id && (
+          <form className="price-search" onSubmit={(e) => handleReply(e, c.id)} style={{ marginTop: "6px", marginLeft: "28px" }}>
+            <input
+              className="price-search__input"
+              type="text"
+              placeholder={`Reply to ${displayName(c.author)}…`}
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+            />
+            <button type="submit" className="price-search__button" disabled={replySaving}>
+              {replySaving ? "Posting…" : "Reply"}
+            </button>
+          </form>
+        )}
+        {!isReply && (repliesByParent[c.id] || []).map((reply) => renderComment(reply, true))}
+      </div>
+    );
   }
 
   return (
@@ -848,15 +914,7 @@ function CommentsPanel({ postId, userId, isMember, onCommentAdded }) {
       {status === "loading" && <p className="panel__status">Loading comments…</p>}
       {status === "error" && <p className="panel__status panel__status--error">Couldn't load comments.</p>}
       {status === "ready" && comments.length === 0 && <p className="panel__status">No comments yet.</p>}
-      {comments.map((c) => (
-        <div key={c.id} className="comments-panel__row">
-          <span className="comments-panel__author">{displayName(c.author)}</span>
-          <span className="comments-panel__body">{c.body}</span>
-          {c.user_id === userId && (
-            <button type="button" className="game-popup__close" onClick={() => handleDelete(c.id)} aria-label="Delete comment">✕</button>
-          )}
-        </div>
-      ))}
+      {topLevel.map((c) => renderComment(c, false))}
       {isMember && (
         <form className="price-search" onSubmit={handleAdd} style={{ marginTop: "8px" }}>
           <input

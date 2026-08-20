@@ -14,7 +14,7 @@ import { supabase } from "./supabaseClient";
 import { getPublicProfiles } from "./publicProfiles";
 import { sendFriendRequest } from "./friends";
 
-export async function fetchListings(category, { excludeUserId } = {}) {
+export async function fetchListings(category, { excludeUserId, game } = {}) {
   let query = supabase
     .from("marketplace_listings")
     .select("*")
@@ -23,6 +23,7 @@ export async function fetchListings(category, { excludeUserId } = {}) {
     .order("created_at", { ascending: false });
 
   if (excludeUserId) query = query.neq("user_id", excludeUserId);
+  if (game) query = query.eq("game", game);
 
   const { data, error } = await query;
   if (error) throw error;
@@ -34,13 +35,15 @@ export async function fetchListings(category, { excludeUserId } = {}) {
   return (data || []).map((l) => ({ ...l, seller: profileById[l.user_id] || null }));
 }
 
-export async function fetchMyListings(userId, category) {
-  const { data, error } = await supabase
+export async function fetchMyListings(userId, category, game) {
+  let query = supabase
     .from("marketplace_listings")
     .select("*")
     .eq("user_id", userId)
     .eq("category", category)
     .order("created_at", { ascending: false });
+  if (game) query = query.eq("game", game);
+  const { data, error } = await query;
   if (error) throw error;
   return data || [];
 }
@@ -49,6 +52,7 @@ export async function createListing(userId, listing) {
   const { error } = await supabase.from("marketplace_listings").insert({
     user_id: userId,
     category: listing.category,
+    game: listing.game || null,
     title: listing.title,
     description: listing.description || null,
     price: listing.price,
@@ -103,4 +107,122 @@ export async function contactSeller(buyerId, sellerId) {
     if (err.code === "23505") return "already_sent";
     throw err;
   }
+}
+
+// ---------- Offers — real, listing-scoped price negotiation ----------
+// One counter round only (buyer -> seller accept/decline/counter ->
+// buyer accept/decline the counter, no counter-of-a-counter). Accepting
+// never auto-marks the listing sold — that stays the seller's own
+// explicit action — but does trigger the same real contactSeller()
+// friend-request flow used elsewhere, reused as-is.
+
+export async function createOffer(listingId, buyerId, { amount, currency = "USD", message } = {}) {
+  const { error } = await supabase.from("marketplace_offers").insert({
+    listing_id: listingId,
+    buyer_id: buyerId,
+    amount,
+    currency,
+    message: message || null,
+  });
+  if (error) throw error;
+}
+
+export async function fetchOffersForListing(listingId) {
+  const { data, error } = await supabase
+    .from("marketplace_offers")
+    .select("*")
+    .eq("listing_id", listingId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+
+  const buyerIds = [...new Set((data || []).map((o) => o.buyer_id))];
+  const profiles = await getPublicProfiles(buyerIds);
+  const profileById = Object.fromEntries(profiles.map((p) => [p.id, p]));
+
+  return (data || []).map((o) => ({ ...o, buyer: profileById[o.buyer_id] || null }));
+}
+
+export async function fetchMyOffers(buyerId) {
+  const { data, error } = await supabase
+    .from("marketplace_offers")
+    .select("*")
+    .eq("buyer_id", buyerId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  if (!data || data.length === 0) return [];
+
+  const listingIds = [...new Set(data.map((o) => o.listing_id))];
+  const { data: listings, error: listingsError } = await supabase
+    .from("marketplace_listings")
+    .select("*")
+    .in("id", listingIds);
+  if (listingsError) throw listingsError;
+
+  const listingById = Object.fromEntries((listings || []).map((l) => [l.id, l]));
+  const sellerIds = [...new Set((listings || []).map((l) => l.user_id))];
+  const sellers = await getPublicProfiles(sellerIds);
+  const sellerById = Object.fromEntries(sellers.map((p) => [p.id, p]));
+
+  return data.map((o) => {
+    const listing = listingById[o.listing_id] || null;
+    return { ...o, listing, seller: listing ? sellerById[listing.user_id] || null : null };
+  });
+}
+
+// Seller action. status: 'accepted' | 'declined' | 'countered'.
+export async function respondToOffer(offerId, { status, counterAmount, counterMessage } = {}) {
+  const { data, error } = await supabase
+    .from("marketplace_offers")
+    .update({
+      status,
+      counter_amount: counterAmount ?? null,
+      counter_message: counterMessage ?? null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", offerId)
+    .select()
+    .single();
+  if (error) throw error;
+
+  if (status === "accepted") {
+    const { data: listing, error: listingError } = await supabase
+      .from("marketplace_listings")
+      .select("user_id")
+      .eq("id", data.listing_id)
+      .single();
+    if (listingError) throw listingError;
+    await contactSeller(data.buyer_id, listing.user_id);
+  }
+  return data;
+}
+
+// Buyer action on a 'countered' offer.
+export async function respondToCounter(offerId, accept) {
+  const { data, error } = await supabase
+    .from("marketplace_offers")
+    .update({ status: accept ? "accepted" : "declined", updated_at: new Date().toISOString() })
+    .eq("id", offerId)
+    .select()
+    .single();
+  if (error) throw error;
+
+  if (accept) {
+    const { data: listing, error: listingError } = await supabase
+      .from("marketplace_listings")
+      .select("user_id")
+      .eq("id", data.listing_id)
+      .single();
+    if (listingError) throw listingError;
+    await contactSeller(data.buyer_id, listing.user_id);
+  }
+  return data;
+}
+
+// Buyer action on their own 'pending' offer.
+export async function withdrawOffer(offerId) {
+  const { error } = await supabase
+    .from("marketplace_offers")
+    .update({ status: "withdrawn", updated_at: new Date().toISOString() })
+    .eq("id", offerId);
+  if (error) throw error;
 }

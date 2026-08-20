@@ -16,7 +16,10 @@ const EVENT_LABELS = {
   wishlist_added: "added to their wishlist:",
   mtg_card_added: "added a card to their MTG collection:",
   fab_card_added: "added a card to their Flesh and Blood collection:",
+  pokemon_card_added: "added a card to their Pokémon collection:",
   joined_guild: "joined the guild",
+  guild_post_commented: "commented on a post:",
+  guild_comment_replied: "replied to a comment:",
 };
 
 // Shared with the header notification bell so both surfaces describe
@@ -306,6 +309,26 @@ export async function logActivityForUser(userId, eventType, eventData) {
   }
 }
 
+// For events that already know exactly which one guild they belong to
+// (a post/comment in a specific guild) — inserts a single real row for
+// that guild only, rather than logActivityForUser's fan-out-to-every-
+// membership behavior, which would be wrong here: a person commenting
+// in one guild shouldn't show up as activity in every OTHER guild they
+// happen to also belong to.
+export async function logActivityForGuild(guildId, userId, eventType, eventData) {
+  try {
+    const { error } = await supabase.from("guild_activity").insert({
+      guild_id: guildId,
+      user_id: userId,
+      event_type: eventType,
+      event_data: eventData,
+    });
+    if (error) throw error;
+  } catch (err) {
+    console.error("Failed to log guild activity:", err);
+  }
+}
+
 // ---------- Posts (the real Reddit-like feed) ----------
 // Score is summed client-side from a single batched vote fetch rather
 // than a trigger/materialized column — guild feeds are small enough
@@ -402,9 +425,18 @@ export async function fetchPostComments(postId) {
   return (data || []).map((c) => ({ ...c, author: profileById[c.user_id] || null }));
 }
 
-export async function addPostComment(userId, postId, body) {
-  const { error } = await supabase.from("guild_post_comments").insert({ post_id: postId, user_id: userId, body });
+// One level of threading — a reply passes the top-level comment it's
+// replying to as parentCommentId; a reply itself can't be replied to
+// (enforced in the UI, not the DB, same as this app's other real-but-
+// bounded depth decisions). Logs to the post's own guild only, via
+// logActivityForGuild, not a fan-out to every guild the commenter
+// happens to belong to.
+export async function addPostComment(userId, postId, guildId, body, parentCommentId = null) {
+  const { error } = await supabase
+    .from("guild_post_comments")
+    .insert({ post_id: postId, user_id: userId, body, parent_comment_id: parentCommentId });
   if (error) throw error;
+  logActivityForGuild(guildId, userId, parentCommentId ? "guild_comment_replied" : "guild_post_commented", { title: body.slice(0, 80) });
 }
 
 export async function deletePostComment(commentId) {
