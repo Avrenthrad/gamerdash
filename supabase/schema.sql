@@ -1920,3 +1920,296 @@ alter table public.guild_activity add constraint guild_activity_event_type_check
     'achievement_unlocked', 'gd_score_milestone', 'backlog_status_change',
     'wishlist_added', 'mtg_card_added', 'fab_card_added', 'joined_guild'
   ));
+
+-- ---------- TCG: Flesh and Blood (Phase 3 — decks) ----------
+-- Every real FaB constructed format goagain exposes legality flags for
+-- (blitz/cc/commoner/ll/silver_age/upf) is built around exactly one
+-- Hero card — unlike MTG where only Commander/Brawl need one.
+-- hero_card_id/name are nullable at the DB level (a row can exist
+-- mid-creation) but the UI's create-deck flow requires picking one
+-- before the deck is usable. No is_sideboard column here — FaB
+-- constructed play has no confirmed equivalent to MTG's sideboarding.
+create table public.fab_decks (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  name text not null,
+  format text not null default 'blitz' check (format in ('blitz', 'cc', 'commoner', 'll', 'silver_age', 'upf')),
+  hero_card_id text,
+  hero_card_name text,
+  description text,
+  labels jsonb default '[]'::jsonb,
+  cover_image_url text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table public.fab_decks enable row level security;
+
+create policy "Users can manage their own FaB decks"
+  on public.fab_decks for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create table public.fab_deck_cards (
+  id uuid default gen_random_uuid() primary key,
+  deck_id uuid references public.fab_decks on delete cascade not null,
+  fab_card_id text not null,
+  card_name text not null,
+  quantity integer default 1
+);
+
+alter table public.fab_deck_cards enable row level security;
+
+create policy "Users can manage cards in their own FaB decks"
+  on public.fab_deck_cards for all
+  using (exists (select 1 from public.fab_decks where fab_decks.id = fab_deck_cards.deck_id and fab_decks.user_id = auth.uid()))
+  with check (exists (select 1 from public.fab_decks where fab_decks.id = fab_deck_cards.deck_id and fab_decks.user_id = auth.uid()));
+
+create index fab_deck_cards_deck_id_idx on public.fab_deck_cards (deck_id);
+
+-- ---------- TCG: Flesh and Blood (Phase 4 — binders) ----------
+-- Only the "binder" kind is used for now — kind is still a real
+-- column (matching mtg_binders' shape) so "set_list" can be enabled
+-- later without a schema change, but the UI doesn't offer it today:
+-- goagain.dev's `set` search filter was tested live and does NOT
+-- actually scope results (type=Hero correctly narrows 4897 cards to
+-- 150; set=WTR returns 862 with duplicate entries) — building a set
+-- checklist on a broken filter isn't honest, so it's on hold.
+create table public.fab_binders (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  name text not null,
+  labels jsonb default '[]'::jsonb,
+  cover_image_url text,
+  kind text not null default 'binder' check (kind in ('binder', 'set_list')),
+  fab_set_id text,
+  fab_set_name text,
+  fab_set_icon_url text,
+  notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table public.fab_binders enable row level security;
+
+create policy "Users can manage their own FaB binders"
+  on public.fab_binders for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create index fab_binders_user_id_idx on public.fab_binders (user_id);
+
+create table public.fab_binder_cards (
+  id uuid default gen_random_uuid() primary key,
+  binder_id uuid references public.fab_binders on delete cascade not null,
+  fab_card_id text not null,
+  card_name text not null,
+  set_id text,
+  edition text,
+  foiling text,
+  quantity integer not null default 1,
+  condition text default 'Near Mint',
+  source text default 'manual',
+  added_at timestamptz default now(),
+  printing_unique_id text,
+  unique (binder_id, fab_card_id, printing_unique_id)
+);
+
+alter table public.fab_binder_cards enable row level security;
+
+create policy "Users can manage cards in their own FaB binders"
+  on public.fab_binder_cards for all
+  using (exists (select 1 from public.fab_binders where fab_binders.id = fab_binder_cards.binder_id and fab_binders.user_id = auth.uid()))
+  with check (exists (select 1 from public.fab_binders where fab_binders.id = fab_binder_cards.binder_id and fab_binders.user_id = auth.uid()));
+
+create index fab_binder_cards_binder_id_idx on public.fab_binder_cards (binder_id);
+
+insert into storage.buckets (id, name, public) values ('fab-covers', 'fab-covers', true) on conflict (id) do nothing;
+
+create policy "FaB cover images are publicly viewable" on storage.objects for select using (bucket_id = 'fab-covers');
+create policy "Users can upload their own FaB cover images" on storage.objects for insert with check (bucket_id = 'fab-covers' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "Users can update their own FaB cover images" on storage.objects for update using (bucket_id = 'fab-covers' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "Users can delete their own FaB cover images" on storage.objects for delete using (bucket_id = 'fab-covers' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ---------- Marketplace: FaB alongside MTG (additive) ----------
+-- game is nullable and only meaningful when category = 'tcg' — a
+-- Collectibles listing has no game. Existing tcg listings all predate
+-- this feature and are genuinely all MTG, so they're backfilled
+-- rather than left honestly-but-uselessly blank.
+alter table public.marketplace_listings add column if not exists game text check (game is null or game in ('mtg', 'fab'));
+update public.marketplace_listings set game = 'mtg' where category = 'tcg' and game is null;
+create index if not exists marketplace_listings_category_game_idx on public.marketplace_listings (category, game, status, created_at desc);
+
+-- ---------- TCG: Pokémon (additive) ----------
+-- Real card data via pokemontcg.io's live, keyless (or optionally
+-- keyed for a higher quota) API — see lib/pokemon.js. card.id (e.g.
+-- "sv1-8") already identifies one specific real printing directly,
+-- unlike Flesh and Blood's card-vs-printing split. finish is a real
+-- variant key taken from that card's own tcgplayer.prices (e.g.
+-- "reverseHolofoil"), not a fabricated fixed enum.
+create table public.pokemon_collection (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  pokemon_card_id text not null,
+  card_name text not null,
+  set_id text,
+  finish text,
+  quantity integer default 1,
+  condition text default 'Near Mint',
+  source text default 'manual',
+  added_at timestamptz default now()
+);
+alter table public.pokemon_collection enable row level security;
+create policy "Users can view their own Pokémon collection" on public.pokemon_collection for select using (auth.uid() = user_id);
+create policy "Users can add to their own Pokémon collection" on public.pokemon_collection for insert with check (auth.uid() = user_id);
+create policy "Users can update their own Pokémon collection" on public.pokemon_collection for update using (auth.uid() = user_id);
+create policy "Users can remove from their own Pokémon collection" on public.pokemon_collection for delete using (auth.uid() = user_id);
+create index pokemon_collection_user_id_idx on public.pokemon_collection (user_id);
+
+-- Real format legalities confirmed live: {standard, expanded, unlimited},
+-- values capitalized "Legal" (not Scryfall's lowercase "legal") — see
+-- lib/pokemonCollection.js's checkPokemonDeckLegality. No Hero-anchor
+-- concept (unlike Flesh and Blood) and no sideboard.
+create table public.pokemon_decks (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  name text not null,
+  format text not null default 'standard' check (format in ('standard', 'expanded', 'unlimited')),
+  description text,
+  labels jsonb default '[]'::jsonb,
+  cover_image_url text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table public.pokemon_decks enable row level security;
+create policy "Users can manage their own Pokémon decks" on public.pokemon_decks for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create table public.pokemon_deck_cards (
+  id uuid default gen_random_uuid() primary key,
+  deck_id uuid references public.pokemon_decks on delete cascade not null,
+  pokemon_card_id text not null,
+  card_name text not null,
+  quantity integer default 1
+);
+alter table public.pokemon_deck_cards enable row level security;
+create policy "Users can manage cards in their own Pokémon decks" on public.pokemon_deck_cards for all
+  using (exists (select 1 from public.pokemon_decks where pokemon_decks.id = pokemon_deck_cards.deck_id and pokemon_decks.user_id = auth.uid()))
+  with check (exists (select 1 from public.pokemon_decks where pokemon_decks.id = pokemon_deck_cards.deck_id and pokemon_decks.user_id = auth.uid()));
+create index pokemon_deck_cards_deck_id_idx on public.pokemon_deck_cards (deck_id);
+
+-- Set Lists ARE built for Pokémon (unlike Flesh and Blood) — confirmed
+-- live that pokemontcg.io's set.id filter genuinely scopes correctly
+-- (matched a set's own real total card count).
+create table public.pokemon_binders (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  name text not null,
+  labels jsonb default '[]'::jsonb,
+  cover_image_url text,
+  kind text not null default 'binder' check (kind in ('binder', 'set_list')),
+  pokemon_set_id text,
+  pokemon_set_name text,
+  pokemon_set_icon_url text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table public.pokemon_binders enable row level security;
+create policy "Users can manage their own Pokémon binders" on public.pokemon_binders for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create index pokemon_binders_user_id_idx on public.pokemon_binders (user_id);
+
+create table public.pokemon_binder_cards (
+  id uuid default gen_random_uuid() primary key,
+  binder_id uuid references public.pokemon_binders on delete cascade not null,
+  pokemon_card_id text not null,
+  card_name text not null,
+  set_id text,
+  finish text,
+  quantity integer not null default 1,
+  condition text default 'Near Mint',
+  source text default 'manual',
+  added_at timestamptz default now(),
+  unique (binder_id, pokemon_card_id, finish)
+);
+alter table public.pokemon_binder_cards enable row level security;
+create policy "Users can manage cards in their own Pokémon binders" on public.pokemon_binder_cards for all
+  using (exists (select 1 from public.pokemon_binders where pokemon_binders.id = pokemon_binder_cards.binder_id and pokemon_binders.user_id = auth.uid()))
+  with check (exists (select 1 from public.pokemon_binders where pokemon_binders.id = pokemon_binder_cards.binder_id and pokemon_binders.user_id = auth.uid()));
+create index pokemon_binder_cards_binder_id_idx on public.pokemon_binder_cards (binder_id);
+
+insert into storage.buckets (id, name, public) values ('pokemon-covers', 'pokemon-covers', true) on conflict (id) do nothing;
+create policy "Pokémon cover images are publicly viewable" on storage.objects for select using (bucket_id = 'pokemon-covers');
+create policy "Users can upload their own Pokémon cover images" on storage.objects for insert with check (bucket_id = 'pokemon-covers' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "Users can update their own Pokémon cover images" on storage.objects for update using (bucket_id = 'pokemon-covers' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "Users can delete their own Pokémon cover images" on storage.objects for delete using (bucket_id = 'pokemon-covers' and (storage.foldername(name))[1] = auth.uid()::text);
+
+alter table public.guild_activity drop constraint if exists guild_activity_event_type_check;
+alter table public.guild_activity add constraint guild_activity_event_type_check
+  check (event_type in (
+    'achievement_unlocked', 'gd_score_milestone', 'backlog_status_change',
+    'wishlist_added', 'mtg_card_added', 'fab_card_added', 'pokemon_card_added', 'joined_guild'
+  ));
+
+-- Marketplace: widen the game check from the FaB migration to also allow 'pokemon'.
+alter table public.marketplace_listings drop constraint if exists marketplace_listings_game_check;
+alter table public.marketplace_listings add constraint marketplace_listings_game_check check (game is null or game in ('mtg', 'fab', 'pokemon'));
+
+-- ---------- Marketplace: real price offers (additive) ----------
+-- One counter round only (buyer -> seller accept/decline/counter ->
+-- buyer accept/decline the counter) — enforced in lib/marketplace.js,
+-- not a DB-level state machine, same as marketplace_listings.status
+-- itself already has no transition enforcement beyond the CHECK.
+-- Accepting never auto-marks the listing sold (a real, separate
+-- action) but does trigger the same real contactSeller() friend-
+-- request flow "Contact Seller" already uses.
+create table public.marketplace_offers (
+  id uuid default gen_random_uuid() primary key,
+  listing_id uuid references public.marketplace_listings on delete cascade not null,
+  buyer_id uuid references auth.users on delete cascade not null,
+  amount numeric not null,
+  currency text not null default 'USD',
+  message text,
+  status text not null default 'pending' check (status in ('pending', 'accepted', 'declined', 'countered', 'withdrawn')),
+  counter_amount numeric,
+  counter_message text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table public.marketplace_offers enable row level security;
+
+-- Buyer sees their own offers; seller sees offers on listings they own.
+create policy "Buyers and sellers can view relevant offers"
+  on public.marketplace_offers for select
+  using (
+    auth.uid() = buyer_id
+    or auth.uid() = (select user_id from public.marketplace_listings where id = listing_id)
+  );
+
+create policy "Buyers can create offers"
+  on public.marketplace_offers for insert
+  with check (auth.uid() = buyer_id);
+
+create policy "Buyers and sellers can update relevant offers"
+  on public.marketplace_offers for update
+  using (
+    auth.uid() = buyer_id
+    or auth.uid() = (select user_id from public.marketplace_listings where id = listing_id)
+  );
+
+create index marketplace_offers_listing_id_idx on public.marketplace_offers (listing_id);
+create index marketplace_offers_buyer_id_idx on public.marketplace_offers (buyer_id);
+
+-- ---------- Guild posts: threaded comments (additive) ----------
+-- One level of threading only — a reply's own parent_comment_id must
+-- point at a top-level comment (null parent), enforced in the UI, not
+-- the DB. is_guild_post_member already covers RLS for this table via
+-- post_id, so replies inherit the exact same real membership check
+-- top-level comments already use — no new RLS needed.
+alter table public.guild_post_comments add column if not exists parent_comment_id uuid references public.guild_post_comments on delete cascade;
+create index if not exists guild_post_comments_parent_id_idx on public.guild_post_comments (parent_comment_id);
+
+alter table public.guild_activity drop constraint if exists guild_activity_event_type_check;
+alter table public.guild_activity add constraint guild_activity_event_type_check
+  check (event_type in (
+    'achievement_unlocked', 'gd_score_milestone', 'backlog_status_change',
+    'wishlist_added', 'mtg_card_added', 'fab_card_added', 'pokemon_card_added',
+    'joined_guild', 'guild_post_commented', 'guild_comment_replied'
+  ));
