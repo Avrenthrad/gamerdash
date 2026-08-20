@@ -65,7 +65,7 @@ export default async function handler(req, res) {
     if (mode === "search") {
       const q = searchParams.get("q");
       if (!q) return res.status(400).json({ error: "Missing q query parameter" });
-      const rawgRes = await fetch(`${BASE_URL}/games?key=${apiKey}&search=${encodeURIComponent(q)}&page_size=8`);
+      const rawgRes = await fetch(`${BASE_URL}/games?key=${apiKey}&search=${encodeURIComponent(q)}&page_size=20`);
       const data = await rawgRes.json();
       return res.status(200).json(data);
     }

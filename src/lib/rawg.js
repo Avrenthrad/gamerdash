@@ -74,7 +74,7 @@ export async function searchRawgGame(title) {
   return data.results?.[0] || null; // best match, or null
 }
 
-// Up to 8 matches, each with its real list of platforms (from RAWG's
+// Up to 20 matches, each with its real list of platforms (from RAWG's
 // own catalog, not guessed) — powers Backlog's "add from any
 // platform" search, since Steam's own search only ever finds Steam
 // titles and misses anything console-exclusive.
