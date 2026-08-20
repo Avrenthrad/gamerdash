@@ -94,11 +94,13 @@ repo, one manual setting is required:
   on a Discord field their own docs admit can be unreliable — falls
   back to "unknown" rather than guessing when it's not confident.
 
-## Daily Gaming Mastery refresh
+## Daily Gaming + Overall Mastery refresh
 
 Runs once on startup and then every 24 hours (see `masteryRefresh.js`,
-scheduled from the bottom of `index.js`). For every profile with a
-linked Steam account and/or a self-reported Xbox/PlayStation input:
+scheduled from the bottom of `index.js`).
+
+**Gaming Mastery** — for every profile with a linked Steam account
+and/or a self-reported Xbox/PlayStation input:
 
 - **Steam**: a genuine live re-scan via the real Steam Web API (through
   the main site's own `/api/steam` proxy), so this portion of the score
@@ -110,7 +112,18 @@ linked Steam account and/or a self-reported Xbox/PlayStation input:
   the fresh Steam score. Xbox/PS values only change when the person
   updates them manually.
 
+**Overall Mastery** — recomputed for *every* profile, combining that
+day's fresh Gaming Mastery score with whatever's already stored for
+the other 4 Colleges (TCG, Entertainment, Collectibles, Tabletop),
+mirroring `src/lib/overallMasteryData.js`. TCG's contribution is a
+live Scryfall price re-scan of the person's MTG collection specifically
+(through the main site's own `/api/scryfall` proxy) — same MTG-only
+scope the browser's own Overall Mastery currently has; it doesn't yet
+factor in Flesh and Blood or Pokémon collections. A College with
+nothing added simply isn't counted, same "missing ≠ zero" rule used
+everywhere else in this project.
+
 This lives on the bot rather than a Vercel Cron Job because scanning
-many people's Steam libraries in one run can take longer than the ~10s
-execution limit on Vercel's Hobby plan — this process just stays up
-and runs it in the background instead.
+many people's Steam libraries (or MTG collections) in one run can take
+longer than the ~10s execution limit on Vercel's Hobby plan — this
+process just stays up and runs it in the background instead.
