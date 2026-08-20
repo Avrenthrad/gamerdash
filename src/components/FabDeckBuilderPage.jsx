@@ -1,26 +1,45 @@
-// Magic: The Gathering — Deck Builder. Real format-legality checking
-// using Scryfall's own per-card legalities data — not a guess.
+// Flesh and Blood — Deck Builder. Real per-format legality checking
+// using goagain.dev's own per-card format flags (see lib/fab.js /
+// lib/fabCollection.js's checkFabDeckLegality — NOT a straight port of
+// MTG's version, since FaB's data shape is genuinely different).
+//
+// Every FaB constructed format is built around exactly one Hero card,
+// unlike MTG where only Commander/Brawl need one — so creating a deck
+// here is name -> search & pick a real Hero -> format, not a single
+// name+format form like MtgDeckBuilderPage.
 
 import { useEffect, useState } from "react";
-import { searchCards } from "../lib/scryfall";
+import { searchFabCards } from "../lib/fab";
 import {
   fetchDecks, createDeck, deleteDeck, updateDeck,
   fetchDeckCards, addCardToDeck, updateDeckCardQuantity, removeCardFromDeck,
-  checkDeckLegality, uploadCoverImage,
-} from "../lib/mtg";
+  checkFabDeckLegality, uploadCoverImage,
+} from "../lib/fabCollection";
 
-const FORMATS = ["standard", "pioneer", "modern", "legacy", "vintage", "pauper", "commander", "brawl", "alchemy"];
+const FAB_FORMATS = [
+  { id: "blitz", label: "Blitz" },
+  { id: "cc", label: "Classic Constructed" },
+  { id: "commoner", label: "Commoner" },
+  { id: "ll", label: "Living Legend" },
+  { id: "silver_age", label: "Silver Age" },
+  { id: "upf", label: "Ultimate Pit Fight" },
+];
 
-export default function MtgDeckBuilderPage({ onBack, userId }) {
+export default function FabDeckBuilderPage({ onBack, userId }) {
   const [decks, setDecks] = useState([]);
   const [status, setStatus] = useState("loading");
   const [activeDeckId, setActiveDeckId] = useState(null);
 
+  // ---- Create-deck flow: name -> pick a Hero -> format ----
   const [newDeckName, setNewDeckName] = useState("");
-  const [newDeckFormat, setNewDeckFormat] = useState("commander");
+  const [newDeckFormat, setNewDeckFormat] = useState("blitz");
+  const [heroQuery, setHeroQuery] = useState("");
+  const [heroResults, setHeroResults] = useState([]);
+  const [selectedHero, setSelectedHero] = useState(null);
 
   const [deckCards, setDeckCards] = useState([]);
   const [illegalCards, setIllegalCards] = useState([]);
+  const [warningCards, setWarningCards] = useState([]);
   const [deckCardsStatus, setDeckCardsStatus] = useState("idle");
 
   const [addQuery, setAddQuery] = useState("");
@@ -47,12 +66,26 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
     }
   }
 
+  async function handleHeroSearch(e) {
+    e.preventDefault();
+    if (!heroQuery.trim()) return;
+    try {
+      const { cards } = await searchFabCards({ name: heroQuery.trim(), type: "Hero" });
+      setHeroResults(cards.filter((c) => c.isHero).slice(0, 8));
+    } catch (err) {
+      console.error("Hero search failed:", err);
+    }
+  }
+
   async function handleCreateDeck(e) {
     e.preventDefault();
-    if (!newDeckName.trim()) return;
+    if (!newDeckName.trim() || !selectedHero) return;
     try {
-      const deck = await createDeck(userId, newDeckName.trim(), newDeckFormat);
+      const deck = await createDeck(userId, newDeckName.trim(), newDeckFormat, selectedHero);
       setNewDeckName("");
+      setSelectedHero(null);
+      setHeroResults([]);
+      setHeroQuery("");
       setDecks((prev) => [deck, ...prev]);
       // Pass the freshly-created deck directly rather than relying on
       // openDeck's usual decks-array lookup — setDecks above hasn't
@@ -83,8 +116,9 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
     try {
       const cards = await fetchDeckCards(deckId);
       setDeckCards(cards);
-      const { illegal } = await checkDeckLegality(cards, deck?.format || "commander");
+      const { illegal, warnings } = await checkFabDeckLegality(cards, deck?.format || "blitz");
       setIllegalCards(illegal.map((i) => i.card_name));
+      setWarningCards(warnings.map((i) => i.card_name));
       setDeckCardsStatus("ready");
     } catch (err) {
       console.error("Failed to load deck cards:", err);
@@ -119,7 +153,7 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
     e.preventDefault();
     if (!addQuery.trim()) return;
     try {
-      const { cards } = await searchCards(addQuery.trim());
+      const { cards } = await searchFabCards({ name: addQuery.trim() });
       setAddResults(cards.slice(0, 8));
     } catch (err) {
       console.error("Deck card search failed:", err);
@@ -158,6 +192,7 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
 
   const activeDeck = decks.find((d) => d.id === activeDeckId);
   const totalCards = deckCards.reduce((sum, c) => sum + c.quantity, 0);
+  const formatLabel = FAB_FORMATS.find((f) => f.id === activeDeck?.format)?.label || activeDeck?.format;
 
   if (activeDeckId && activeDeck) {
     return (
@@ -174,7 +209,9 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
             </div>
             <div className="binder-detail__info">
               <h1 className="price-page__title">{activeDeck.name}</h1>
-              <p className="price-page__subtitle" style={{ textTransform: "capitalize" }}>{activeDeck.format} — {totalCards} cards</p>
+              <p className="price-page__subtitle">
+                {formatLabel} — Hero: {activeDeck.hero_card_name || "not set"} — {totalCards} cards
+              </p>
               <label className="settings-avatar__upload">
                 {coverStatus === "uploading" ? "Uploading…" : "Change cover photo"}
                 <input type="file" accept="image/*" onChange={handleCoverUpload} hidden />
@@ -194,7 +231,12 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
 
         {illegalCards.length > 0 && (
           <p className="panel__status panel__status--error">
-            Not legal in {activeDeck.format}: {illegalCards.join(", ")}
+            Not legal in {formatLabel}: {illegalCards.join(", ")}
+          </p>
+        )}
+        {warningCards.length > 0 && (
+          <p className="panel__status">
+            Suspended/restricted in {formatLabel} (still technically legal, worth double-checking): {warningCards.join(", ")}
           </p>
         )}
 
@@ -213,7 +255,7 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
           <ul className="backlog-search-results">
             {addResults.map((card) => (
               <li key={card.id} className="backlog-search-results__row">
-                <span>{card.name} ({card.setName})</span>
+                <span>{card.name} ({card.typeText})</span>
                 <button type="button" className="linking-row__connect" onClick={() => handleAddCard(card)}>Add</button>
               </li>
             ))}
@@ -232,6 +274,7 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
                   <span className="backlog-card__title">
                     {c.card_name}
                     {illegalCards.includes(c.card_name) && <span className="score-badge score-badge--low"> Not legal</span>}
+                    {warningCards.includes(c.card_name) && <span className="score-badge score-badge--preorder"> Suspended/Restricted</span>}
                   </span>
                 </div>
                 <input
@@ -247,8 +290,8 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
           </ul>
         )}
 
-        <a href="https://scryfall.com" target="_blank" rel="noopener noreferrer" className="ps-trophy-attribution">
-          Card data and legality checks powered by Scryfall
+        <a href="https://fabtcg.com" target="_blank" rel="noopener noreferrer" className="ps-trophy-attribution">
+          Card data and legality checks via goagain.dev
         </a>
       </div>
     );
@@ -259,10 +302,12 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
       <div className="price-page__head">
         <button type="button" className="back-link" onClick={onBack}>← Back</button>
         <h1 className="price-page__title">Deck Builder</h1>
-        <p className="price-page__subtitle">Real format-legality checking, powered by Scryfall.</p>
+        <p className="price-page__subtitle">
+          Every real Flesh and Blood constructed format is built around one Hero — pick yours below.
+        </p>
       </div>
 
-      <form className="price-search" onSubmit={handleCreateDeck}>
+      <form className="price-search" onSubmit={handleCreateDeck} style={{ flexWrap: "wrap" }}>
         <input
           className="price-search__input"
           type="text"
@@ -271,16 +316,50 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
           onChange={(e) => setNewDeckName(e.target.value)}
         />
         <select value={newDeckFormat} onChange={(e) => setNewDeckFormat(e.target.value)}>
-          {FORMATS.map((f) => (
-            <option key={f} value={f} style={{ textTransform: "capitalize" }}>{f}</option>
+          {FAB_FORMATS.map((f) => (
+            <option key={f.id} value={f.id}>{f.label}</option>
           ))}
         </select>
-        <button type="submit" className="price-search__button">Create deck</button>
+        <button type="submit" className="price-search__button" disabled={!newDeckName.trim() || !selectedHero}>
+          Create deck
+        </button>
       </form>
+
+      {selectedHero ? (
+        <p className="panel__status">
+          Hero: <strong>{selectedHero.name}</strong>{" "}
+          <button type="button" className="linking-row__connect" onClick={() => setSelectedHero(null)}>Change</button>
+        </p>
+      ) : (
+        <>
+          <form className="price-search" onSubmit={handleHeroSearch}>
+            <input
+              className="price-search__input"
+              type="text"
+              placeholder="Search for your Hero…"
+              value={heroQuery}
+              onChange={(e) => setHeroQuery(e.target.value)}
+            />
+            <button type="submit" className="price-search__button">Search</button>
+          </form>
+          {heroResults.length > 0 && (
+            <ul className="backlog-search-results">
+              {heroResults.map((card) => (
+                <li key={card.id} className="backlog-search-results__row">
+                  <span>{card.name} ({card.typeText})</span>
+                  <button type="button" className="linking-row__connect" onClick={() => { setSelectedHero(card); setHeroResults([]); setHeroQuery(""); }}>
+                    Choose
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
 
       {status === "loading" && <p className="panel__status">Loading your decks…</p>}
       {status === "error" && <p className="panel__status panel__status--error">Couldn't load your decks right now.</p>}
-      {status === "ready" && decks.length === 0 && <p className="panel__status">No decks yet — create one above.</p>}
+      {status === "ready" && decks.length === 0 && <p className="panel__status">No decks yet — pick a Hero and create one above.</p>}
 
       {status === "ready" && decks.length > 0 && (
         <ul className="backlog-list">
@@ -288,7 +367,10 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
             <li key={deck.id} className="backlog-card">
               <div className="backlog-card__info">
                 <span className="backlog-card__title">{deck.name}</span>
-                <span className="backlog-card__meta" style={{ textTransform: "capitalize" }}>{deck.format}</span>
+                <span className="backlog-card__meta">
+                  {FAB_FORMATS.find((f) => f.id === deck.format)?.label || deck.format}
+                  {deck.hero_card_name ? ` · ${deck.hero_card_name}` : ""}
+                </span>
                 {deck.labels?.length > 0 && (
                   <div className="label-chip-row">
                     {deck.labels.map((l) => (

@@ -70,7 +70,17 @@ export default async function handler(req, res) {
     if (mode === "search") {
       const params = new URLSearchParams();
       for (const key of ["name", "type", "class", "set", "pitch", "cost", "power", "defense", "rarity", "keyword"]) {
-        const value = searchParams.get(key);
+        // Confirmed live: `vercel dev`'s local runtime re-encodes a
+        // real space's "+" form (from the browser's own
+        // URLSearchParams.toString()) into a literal "%2B" before this
+        // handler ever sees req.url — so searchParams.get(key) here
+        // decodes it back to a literal "+" CHARACTER, not a space (a
+        // plain Node process, and real production Vercel, don't do
+        // this — isolated and reproduced specifically to `vercel dev`).
+        // A literal "+" is not a real character in any Flesh and Blood
+        // card name, so treating it as a mangled space here is a safe
+        // defensive normalization, not a semantic risk.
+        const value = searchParams.get(key)?.replace(/\+/g, " ");
         if (value) params.set(key, value);
       }
       // Confirmed live: goagain paginates with limit/offset, NOT page

@@ -40,6 +40,10 @@ const MtgDeckBuilderPage = lazy(() => import("./components/MtgDeckBuilderPage"))
 const MtgPriceWatchPage = lazy(() => import("./components/MtgPriceWatchPage"));
 const FabSearchPage = lazy(() => import("./components/FabSearchPage"));
 const FabCollectionPage = lazy(() => import("./components/FabCollectionPage"));
+const FabDeckBuilderPage = lazy(() => import("./components/FabDeckBuilderPage"));
+const PokemonSearchPage = lazy(() => import("./components/PokemonSearchPage"));
+const PokemonCollectionPage = lazy(() => import("./components/PokemonCollectionPage"));
+const PokemonDeckBuilderPage = lazy(() => import("./components/PokemonDeckBuilderPage"));
 const MtgScanPage = lazy(() => import("./components/MtgScanPage"));
 const CsvImportPage = lazy(() => import("./components/CsvImportPage"));
 const GuildsPage = lazy(() => import("./components/GuildsPage"));
@@ -453,10 +457,66 @@ export default function App() {
 
           {view === "fab-collection" && (
             isLoggedIn ? (
-              <FabCollectionPage onBack={() => goTo("tcg-home")} userId={userId} onGoToSearch={() => goTo("fab-search")} />
+              <FabCollectionPage
+                onBack={() => goTo("tcg-home")}
+                userId={userId}
+                onGoToSearch={() => goTo("fab-search")}
+                onGoToDecks={() => goTo("fab-decks")}
+              />
             ) : (
               <AccountGatePage
                 title="My Collection"
+                onSignIn={() => goTo("login", "login")}
+                onCreateAccount={() => goTo("login", "signup")}
+              />
+            )
+          )}
+
+          {view === "fab-decks" && (
+            isLoggedIn ? (
+              <FabDeckBuilderPage onBack={() => goTo("tcg-home")} userId={userId} />
+            ) : (
+              <AccountGatePage
+                title="Deck Builder"
+                onSignIn={() => goTo("login", "login")}
+                onCreateAccount={() => goTo("login", "signup")}
+              />
+            )
+          )}
+
+          {view === "pokemon-search" && (
+            <PokemonSearchPage
+              onBack={() => goTo("tcg-home")}
+              userId={userId}
+              isLoggedIn={isLoggedIn}
+              onSignIn={() => goTo("login", "login")}
+              onCreateAccount={() => goTo("login", "signup")}
+            />
+          )}
+
+          {view === "pokemon-collection" && (
+            isLoggedIn ? (
+              <PokemonCollectionPage
+                onBack={() => goTo("tcg-home")}
+                userId={userId}
+                onGoToSearch={() => goTo("pokemon-search")}
+                onGoToDecks={() => goTo("pokemon-decks")}
+              />
+            ) : (
+              <AccountGatePage
+                title="My Collection"
+                onSignIn={() => goTo("login", "login")}
+                onCreateAccount={() => goTo("login", "signup")}
+              />
+            )
+          )}
+
+          {view === "pokemon-decks" && (
+            isLoggedIn ? (
+              <PokemonDeckBuilderPage onBack={() => goTo("tcg-home")} userId={userId} />
+            ) : (
+              <AccountGatePage
+                title="Deck Builder"
                 onSignIn={() => goTo("login", "login")}
                 onCreateAccount={() => goTo("login", "signup")}
               />

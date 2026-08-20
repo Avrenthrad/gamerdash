@@ -1,23 +1,30 @@
-// Magic: The Gathering — Deck Builder. Real format-legality checking
-// using Scryfall's own per-card legalities data — not a guess.
+// Pokémon TCG — Deck Builder. Real format-legality checking using
+// pokemontcg.io's own per-card legalities data. Structurally a
+// straight mirror of MtgDeckBuilderPage.jsx — Pokémon has no
+// Hero-anchored deck concept the way Flesh and Blood does, and no
+// sideboard, so this is name+format like MTG's, not a picker flow.
 
 import { useEffect, useState } from "react";
-import { searchCards } from "../lib/scryfall";
+import { searchPokemonCards, nameQuery } from "../lib/pokemon";
 import {
   fetchDecks, createDeck, deleteDeck, updateDeck,
   fetchDeckCards, addCardToDeck, updateDeckCardQuantity, removeCardFromDeck,
-  checkDeckLegality, uploadCoverImage,
-} from "../lib/mtg";
+  checkPokemonDeckLegality, uploadCoverImage,
+} from "../lib/pokemonCollection";
 
-const FORMATS = ["standard", "pioneer", "modern", "legacy", "vintage", "pauper", "commander", "brawl", "alchemy"];
+const FORMATS = [
+  { id: "standard", label: "Standard" },
+  { id: "expanded", label: "Expanded" },
+  { id: "unlimited", label: "Unlimited" },
+];
 
-export default function MtgDeckBuilderPage({ onBack, userId }) {
+export default function PokemonDeckBuilderPage({ onBack, userId }) {
   const [decks, setDecks] = useState([]);
   const [status, setStatus] = useState("loading");
   const [activeDeckId, setActiveDeckId] = useState(null);
 
   const [newDeckName, setNewDeckName] = useState("");
-  const [newDeckFormat, setNewDeckFormat] = useState("commander");
+  const [newDeckFormat, setNewDeckFormat] = useState("standard");
 
   const [deckCards, setDeckCards] = useState([]);
   const [illegalCards, setIllegalCards] = useState([]);
@@ -54,11 +61,10 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
       const deck = await createDeck(userId, newDeckName.trim(), newDeckFormat);
       setNewDeckName("");
       setDecks((prev) => [deck, ...prev]);
-      // Pass the freshly-created deck directly rather than relying on
-      // openDeck's usual decks-array lookup — setDecks above hasn't
-      // committed yet at this point in the same tick, so that lookup
-      // would find nothing and fall back to the wrong format for the
-      // legality check on a deck's very first open.
+      // Pass the freshly-created deck directly — decks state above
+      // hasn't committed yet in this same tick, so openDeck's usual
+      // array lookup would find nothing (same fix already applied to
+      // MtgDeckBuilderPage/FabDeckBuilderPage after hitting this live).
       openDeck(deck.id, deck);
     } catch (err) {
       console.error("Failed to create deck:", err);
@@ -83,7 +89,7 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
     try {
       const cards = await fetchDeckCards(deckId);
       setDeckCards(cards);
-      const { illegal } = await checkDeckLegality(cards, deck?.format || "commander");
+      const { illegal } = await checkPokemonDeckLegality(cards, deck?.format || "standard");
       setIllegalCards(illegal.map((i) => i.card_name));
       setDeckCardsStatus("ready");
     } catch (err) {
@@ -119,7 +125,7 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
     e.preventDefault();
     if (!addQuery.trim()) return;
     try {
-      const { cards } = await searchCards(addQuery.trim());
+      const { cards } = await searchPokemonCards(nameQuery(addQuery.trim()));
       setAddResults(cards.slice(0, 8));
     } catch (err) {
       console.error("Deck card search failed:", err);
@@ -129,7 +135,7 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
   async function handleAddCard(card) {
     try {
       await addCardToDeck(activeDeckId, card);
-      openDeck(activeDeckId); // refresh + re-check legality
+      openDeck(activeDeckId);
       setAddResults([]);
       setAddQuery("");
     } catch (err) {
@@ -158,6 +164,7 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
 
   const activeDeck = decks.find((d) => d.id === activeDeckId);
   const totalCards = deckCards.reduce((sum, c) => sum + c.quantity, 0);
+  const formatLabel = FORMATS.find((f) => f.id === activeDeck?.format)?.label || activeDeck?.format;
 
   if (activeDeckId && activeDeck) {
     return (
@@ -174,7 +181,7 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
             </div>
             <div className="binder-detail__info">
               <h1 className="price-page__title">{activeDeck.name}</h1>
-              <p className="price-page__subtitle" style={{ textTransform: "capitalize" }}>{activeDeck.format} — {totalCards} cards</p>
+              <p className="price-page__subtitle">{formatLabel} — {totalCards} cards</p>
               <label className="settings-avatar__upload">
                 {coverStatus === "uploading" ? "Uploading…" : "Change cover photo"}
                 <input type="file" accept="image/*" onChange={handleCoverUpload} hidden />
@@ -194,7 +201,7 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
 
         {illegalCards.length > 0 && (
           <p className="panel__status panel__status--error">
-            Not legal in {activeDeck.format}: {illegalCards.join(", ")}
+            Not legal in {formatLabel}: {illegalCards.join(", ")}
           </p>
         )}
 
@@ -247,8 +254,8 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
           </ul>
         )}
 
-        <a href="https://scryfall.com" target="_blank" rel="noopener noreferrer" className="ps-trophy-attribution">
-          Card data and legality checks powered by Scryfall
+        <a href="https://pokemontcg.io" target="_blank" rel="noopener noreferrer" className="ps-trophy-attribution">
+          Card data and legality checks via pokemontcg.io
         </a>
       </div>
     );
@@ -259,7 +266,7 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
       <div className="price-page__head">
         <button type="button" className="back-link" onClick={onBack}>← Back</button>
         <h1 className="price-page__title">Deck Builder</h1>
-        <p className="price-page__subtitle">Real format-legality checking, powered by Scryfall.</p>
+        <p className="price-page__subtitle">Real format-legality checking, powered by pokemontcg.io.</p>
       </div>
 
       <form className="price-search" onSubmit={handleCreateDeck}>
@@ -272,7 +279,7 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
         />
         <select value={newDeckFormat} onChange={(e) => setNewDeckFormat(e.target.value)}>
           {FORMATS.map((f) => (
-            <option key={f} value={f} style={{ textTransform: "capitalize" }}>{f}</option>
+            <option key={f.id} value={f.id}>{f.label}</option>
           ))}
         </select>
         <button type="submit" className="price-search__button">Create deck</button>
@@ -288,7 +295,7 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
             <li key={deck.id} className="backlog-card">
               <div className="backlog-card__info">
                 <span className="backlog-card__title">{deck.name}</span>
-                <span className="backlog-card__meta" style={{ textTransform: "capitalize" }}>{deck.format}</span>
+                <span className="backlog-card__meta">{FORMATS.find((f) => f.id === deck.format)?.label || deck.format}</span>
                 {deck.labels?.length > 0 && (
                   <div className="label-chip-row">
                     {deck.labels.map((l) => (

@@ -18,12 +18,18 @@
 // not a separate route/picker layer, since two games doesn't warrant
 // an extra click.
 //
-// Other TCGs (Pokémon, One Piece, Riftbound, Yu-Gi-Oh) aren't built
-// yet, shown honestly as such rather than omitted or faked.
+// Pokémon has real pricing built into pokemontcg.io (unlike Flesh and
+// Blood, which has none confirmed yet), so its summary shows a real
+// value like MTG's rather than counts-only.
+//
+// Other TCGs (One Piece, Riftbound, Yu-Gi-Oh) aren't built yet, shown
+// honestly as such rather than omitted or faked.
 
 import { useEffect, useState } from "react";
 import { fetchCollection, enrichCollectionEntry } from "../lib/mtg";
 import { fetchCollection as fetchFabCollection, enrichCollectionEntry as enrichFabCollectionEntry } from "../lib/fabCollection";
+import { fetchCollection as fetchPokemonCollection, enrichCollectionEntry as enrichPokemonCollectionEntry } from "../lib/pokemonCollection";
+import { currentPokemonPrice } from "../lib/pokemon";
 
 const MTG_FEATURES = [
   { id: "mtg-scan", label: "Scan Cards", icon: "📷", desc: "Free on-device text recognition, matched against real Scryfall data.", emphasized: true },
@@ -37,10 +43,18 @@ const MTG_FEATURES = [
 const FAB_FEATURES = [
   { id: "fab-search", label: "Card Search", icon: "🔍", desc: "Real card data via goagain.dev's live Flesh and Blood API.", emphasized: true },
   { id: "fab-collection", label: "My Collection", icon: "📚", desc: "Real owned cards — no pricing shown yet." },
+  { id: "fab-decks", label: "Deck Builder", icon: "🛠️", desc: "Real per-format legality checks, built around your chosen Hero." },
   { id: "tcg-marketplace", label: "Marketplace", icon: "💰", desc: "Buy and sell real cards with other Lykodex users." },
 ];
 
-const OTHER_GAMES = ["Pokémon", "One Piece", "Riftbound", "Yu-Gi-Oh!"];
+const POKEMON_FEATURES = [
+  { id: "pokemon-search", label: "Card Search", icon: "🔍", desc: "Real card data and pricing via pokemontcg.io.", emphasized: true },
+  { id: "pokemon-collection", label: "My Collection", icon: "📚", desc: "Real owned cards, real live pricing." },
+  { id: "pokemon-decks", label: "Deck Builder", icon: "🛠️", desc: "Real format-legality checking against pokemontcg.io's own data." },
+  { id: "tcg-marketplace", label: "Marketplace", icon: "💰", desc: "Buy and sell real cards with other Lykodex users." },
+];
+
+const OTHER_GAMES = ["One Piece", "Riftbound", "Yu-Gi-Oh!"];
 
 const RARITY_ORDER = ["mythic", "rare", "uncommon", "common"];
 const RARITY_LABELS = { mythic: "Mythic", rare: "Rare", uncommon: "Uncommon", common: "Common" };
@@ -144,27 +158,86 @@ function FabSummary({ isLoggedIn, userId }) {
   );
 }
 
+function PokemonSummary({ isLoggedIn, userId }) {
+  const [entries, setEntries] = useState([]);
+  const [status, setStatus] = useState("idle");
+
+  useEffect(() => {
+    if (!isLoggedIn || !userId) return;
+    setStatus("loading");
+    fetchPokemonCollection(userId)
+      .then((rows) => Promise.all(rows.map(enrichPokemonCollectionEntry)))
+      .then((enriched) => {
+        setEntries(enriched);
+        setStatus("ready");
+      })
+      .catch((err) => {
+        console.error("Pokémon collection summary fetch failed:", err);
+        setStatus("error");
+      });
+  }, [isLoggedIn, userId]);
+
+  const totalCards = entries.reduce((sum, e) => sum + e.quantity, 0);
+  const totalValue = entries.reduce((sum, e) => {
+    const price = e.card ? currentPokemonPrice(e.card)?.price || 0 : 0;
+    return sum + price * e.quantity;
+  }, 0);
+  const rarityCounts = entries.reduce((acc, e) => {
+    const rarity = e.card?.rarity;
+    if (rarity) acc[rarity] = (acc[rarity] || 0) + e.quantity;
+    return acc;
+  }, {});
+  const topRarities = Object.entries(rarityCounts).sort((a, b) => b[1] - a[1]).slice(0, 4);
+
+  if (!isLoggedIn || status !== "ready") return null;
+  if (entries.length === 0) {
+    return <p className="panel__status">No cards in your collection yet — start with Search below.</p>;
+  }
+
+  return (
+    <div className="backlog-summary">
+      <div className="panel__stat">
+        <span className="panel__stat-value">{entries.length}</span>
+        <span className="panel__stat-label">Unique cards</span>
+      </div>
+      <div className="panel__stat">
+        <span className="panel__stat-value">{totalCards}</span>
+        <span className="panel__stat-label">Total cards</span>
+      </div>
+      <div className="panel__stat">
+        <span className="panel__stat-value">${totalValue.toFixed(2)}</span>
+        <span className="panel__stat-label">Est. value (USD)</span>
+      </div>
+      {topRarities.map(([rarity, count]) => (
+        <div className="panel__stat" key={rarity}>
+          <span className="panel__stat-value">{count}</span>
+          <span className="panel__stat-label">{rarity}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function TcgHomePage({ onNavigate, isLoggedIn, userId }) {
-  const [game, setGame] = useState("mtg"); // mtg | fab
-  const features = game === "mtg" ? MTG_FEATURES : FAB_FEATURES;
+  const [game, setGame] = useState("mtg"); // mtg | fab | pokemon
+  const features = game === "mtg" ? MTG_FEATURES : game === "fab" ? FAB_FEATURES : POKEMON_FEATURES;
 
   return (
     <div className="price-page">
       <div className="price-page__head">
         <h1 className="price-page__title">TCG</h1>
-        <p className="price-page__subtitle">Magic: The Gathering and Flesh and Blood are live — more TCGs coming soon.</p>
+        <p className="price-page__subtitle">Magic: The Gathering, Flesh and Blood, and Pokémon are live — more TCGs coming soon.</p>
       </div>
 
       <div className="backlog-status-tabs">
         <button type="button" className={`quickdash-reset-btn ${game === "mtg" ? "quickdash-reset-btn--active" : ""}`} onClick={() => setGame("mtg")}>Magic: The Gathering</button>
         <button type="button" className={`quickdash-reset-btn ${game === "fab" ? "quickdash-reset-btn--active" : ""}`} onClick={() => setGame("fab")}>Flesh and Blood</button>
+        <button type="button" className={`quickdash-reset-btn ${game === "pokemon" ? "quickdash-reset-btn--active" : ""}`} onClick={() => setGame("pokemon")}>Pokémon</button>
       </div>
 
-      {game === "mtg" ? (
-        <MtgSummary isLoggedIn={isLoggedIn} userId={userId} />
-      ) : (
-        <FabSummary isLoggedIn={isLoggedIn} userId={userId} />
-      )}
+      {game === "mtg" && <MtgSummary isLoggedIn={isLoggedIn} userId={userId} />}
+      {game === "fab" && <FabSummary isLoggedIn={isLoggedIn} userId={userId} />}
+      {game === "pokemon" && <PokemonSummary isLoggedIn={isLoggedIn} userId={userId} />}
 
       <div className="overview-grid">
         {features.map((f) => (

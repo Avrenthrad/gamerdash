@@ -1,38 +1,42 @@
-// Flesh and Blood — My Collection. Cards + Decks tabs (Binders/Set
-// lists land with their own phase — see the FaB feature plan's
-// staging). No price/value shown — pricing is deferred for FaB.
+// Pokémon TCG — My Collection hub. Four real, distinct ways to
+// organize owned cards, mirrors MtgCollectionPage.jsx's shape exactly:
+//   Cards      — flat owned-card list (pokemon_collection), live pricing.
+//   Decks      — real decks, full editor lives at Deck Builder.
+//   Binders    — user-named card groups with labels + a cover photo.
+//   Set lists  — binders pinned to one real set, doubling as that
+//                set's owned-quantity checklist.
 
 import { useEffect, useState } from "react";
-import { fetchCollection, enrichCollectionEntry, updateCollectionEntry, removeFromCollection, fetchDecks } from "../lib/fabCollection";
-import FabBindersPage from "./FabBindersPage";
+import { fetchCollection, enrichCollectionEntry, updateCollectionEntry, removeFromCollection, fetchDecks } from "../lib/pokemonCollection";
+import { currentPokemonPrice } from "../lib/pokemon";
+import PokemonBindersPage from "./PokemonBindersPage";
 
 const TABS = [
   { id: "cards", label: "Cards" },
   { id: "decks", label: "Decks" },
   { id: "binders", label: "Binders" },
+  { id: "set-lists", label: "Set lists" },
 ];
 
 const SORT_OPTIONS = [
   { value: "recent", label: "Recently added" },
   { value: "name", label: "Name" },
+  { value: "price", label: "Price" },
 ];
 
-function firstPrintingImage(card) {
-  return card?.printings?.find((p) => p.imageUrl)?.imageUrl || null;
+function cardPrice(entry) {
+  return entry.card ? currentPokemonPrice(entry.card)?.price || 0 : 0;
 }
 
-// onGoToImport is optional — CSV import for FaB doesn't exist yet
-// (a later phase), so the button only renders once a real handler is
-// passed in, rather than linking to a route that doesn't exist.
-export default function FabCollectionPage({ onBack, userId, onGoToSearch, onGoToImport, onGoToDecks }) {
+export default function PokemonCollectionPage({ onBack, userId, onGoToSearch, onGoToDecks }) {
   const [tab, setTab] = useState("cards");
 
   return (
     <div className="price-page">
       <div className="price-page__head">
         <button type="button" className="back-link" onClick={onBack}>← Back</button>
-        <h1 className="price-page__title">Flesh and Blood — My Collection</h1>
-        <p className="price-page__subtitle">Real owned cards and decks, via goagain.dev's live Flesh and Blood API.</p>
+        <h1 className="price-page__title">My Collection</h1>
+        <p className="price-page__subtitle">Real owned cards, decks, binders, and set checklists — via pokemontcg.io.</p>
       </div>
 
       <div className="backlog-status-tabs">
@@ -49,15 +53,16 @@ export default function FabCollectionPage({ onBack, userId, onGoToSearch, onGoTo
       </div>
 
       {tab === "cards" && (
-        <CardsTab userId={userId} onGoToSearch={onGoToSearch} onGoToImport={onGoToImport} />
+        <CardsTab userId={userId} onGoToSearch={onGoToSearch} />
       )}
       {tab === "decks" && <DecksTab userId={userId} onGoToDecks={onGoToDecks} />}
-      {tab === "binders" && <FabBindersPage userId={userId} />}
+      {tab === "binders" && <PokemonBindersPage userId={userId} kind="binder" />}
+      {tab === "set-lists" && <PokemonBindersPage userId={userId} kind="set_list" />}
     </div>
   );
 }
 
-function CardsTab({ userId, onGoToSearch, onGoToImport }) {
+function CardsTab({ userId, onGoToSearch }) {
   const [entries, setEntries] = useState([]);
   const [status, setStatus] = useState("loading");
   const [sortBy, setSortBy] = useState("recent");
@@ -76,7 +81,7 @@ function CardsTab({ userId, onGoToSearch, onGoToImport }) {
       setEntries(enriched);
       setStatus("ready");
     } catch (err) {
-      console.error("Failed to load Flesh and Blood collection:", err);
+      console.error("Failed to load Pokémon collection:", err);
       setStatus("error");
     }
   }
@@ -105,9 +110,17 @@ function CardsTab({ userId, onGoToSearch, onGoToImport }) {
   }
 
   const totalCards = entries.reduce((sum, e) => sum + e.quantity, 0);
+  const totalValue = entries.reduce((sum, e) => sum + cardPrice(e) * e.quantity, 0);
+  const rarityCounts = entries.reduce((counts, e) => {
+    const rarity = e.card?.rarity;
+    if (rarity) counts[rarity] = (counts[rarity] || 0) + e.quantity;
+    return counts;
+  }, {});
+  const topRarities = Object.entries(rarityCounts).sort((a, b) => b[1] - a[1]).slice(0, 4);
 
   const sortedEntries = [...entries].sort((a, b) => {
     if (sortBy === "name") return a.card_name.localeCompare(b.card_name);
+    if (sortBy === "price") return cardPrice(b) - cardPrice(a);
     return new Date(b.added_at) - new Date(a.added_at);
   });
 
@@ -123,80 +136,87 @@ function CardsTab({ userId, onGoToSearch, onGoToImport }) {
             <span className="panel__stat-value">{totalCards}</span>
             <span className="panel__stat-label">Total cards</span>
           </div>
+          <div className="panel__stat">
+            <span className="panel__stat-value">${totalValue.toFixed(2)}</span>
+            <span className="panel__stat-label">Est. collection value (USD)</span>
+          </div>
+          {topRarities.map(([rarity, count]) => (
+            <div className="panel__stat" key={rarity}>
+              <span className="panel__stat-value">{count}</span>
+              <span className="panel__stat-label">{rarity}</span>
+            </div>
+          ))}
         </div>
       )}
 
       <div className="backlog-add">
-        <button type="button" className="quickdash-reset-btn" onClick={onGoToSearch}>+ Search &amp; add</button>
-        {onGoToImport && (
-          <button type="button" className="quickdash-reset-btn" onClick={onGoToImport}>⬆️ Import CSV</button>
-        )}
+        <button type="button" className="quickdash-reset-btn" onClick={onGoToSearch}>
+          + Search &amp; add
+        </button>
       </div>
+
+      {status === "ready" && entries.length > 0 && (
+        <div className="backlog-add">
+          <label className="currency-picker">
+            <span>Sort by</span>
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+              {SORT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
 
       {status === "loading" && <p className="panel__status">Loading your collection…</p>}
       {status === "error" && <p className="panel__status panel__status--error">Couldn't load your collection right now.</p>}
       {status === "ready" && entries.length === 0 && (
-        <p className="panel__status">No cards in your collection yet — search and add some above.</p>
+        <p className="panel__status">No cards in your collection yet — start with Search above.</p>
       )}
 
       {status === "ready" && entries.length > 0 && (
-        <>
-          <div className="backlog-add">
-            <label className="currency-picker">
-              <span>Sort by</span>
-              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-                {SORT_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <ul className="backlog-list">
-            {sortedEntries.map((entry) => {
-              const image = firstPrintingImage(entry.card);
-              return (
-                <li key={entry.id} className="backlog-card">
-                  {image ? (
-                    <img src={image} alt="" className="backlog-card__thumb" style={{ width: "56px", height: "78px" }} />
-                  ) : (
-                    <div className="backlog-card__thumb backlog-card__thumb--placeholder" style={{ width: "56px", height: "78px" }} />
-                  )}
-                  <div className="backlog-card__info">
-                    <span className="backlog-card__title">{entry.card_name}</span>
-                    <div className="backlog-card__meta">
-                      {entry.set_id && <span>{entry.set_id}</span>}
-                      {entry.foiling && <span>{entry.foiling}</span>}
-                      {entry.condition && <span>{entry.condition}</span>}
-                    </div>
+        <ul className="backlog-list">
+          {sortedEntries.map((entry) => {
+            const price = cardPrice(entry);
+            return (
+              <li key={entry.id} className="backlog-card">
+                {entry.card?.imageSmall ? (
+                  <img src={entry.card.imageSmall} alt="" className="backlog-card__thumb" style={{ width: "56px", height: "78px" }} />
+                ) : (
+                  <div className="backlog-card__thumb backlog-card__thumb--placeholder" style={{ width: "56px", height: "78px" }} />
+                )}
+                <div className="backlog-card__info">
+                  <span className="backlog-card__title">{entry.card_name}</span>
+                  <div className="backlog-card__meta">
+                    {entry.set_id && <span>{entry.set_id}</span>}
+                    {entry.finish && <span>{entry.finish}</span>}
+                    {entry.condition && <span>{entry.condition}</span>}
+                    {price > 0 && <span className="score-badge">${price.toFixed(2)}</span>}
                   </div>
-                  <input
-                    type="number"
-                    min="0"
-                    className="backlog-card__status-select"
-                    style={{ width: "64px" }}
-                    value={entry.quantity}
-                    onChange={(e) => handleQuantityChange(entry, e.target.value)}
-                  />
-                  <button type="button" className="game-popup__close" onClick={() => handleRemove(entry.id)} aria-label="Remove">✕</button>
-                </li>
-              );
-            })}
-          </ul>
-        </>
+                </div>
+                <input
+                  type="number"
+                  min="0"
+                  className="backlog-card__status-select"
+                  style={{ width: "64px" }}
+                  value={entry.quantity}
+                  onChange={(e) => handleQuantityChange(entry, e.target.value)}
+                />
+                <button type="button" className="game-popup__close" onClick={() => handleRemove(entry.id)} aria-label="Remove">✕</button>
+              </li>
+            );
+          })}
+        </ul>
       )}
 
-      <a href="https://fabtcg.com" target="_blank" rel="noopener noreferrer" className="ps-trophy-attribution">
-        Card data via goagain.dev · Flesh and Blood is a trademark of Legend Story Studios
+      <a href="https://pokemontcg.io" target="_blank" rel="noopener noreferrer" className="ps-trophy-attribution">
+        Card data and pricing via pokemontcg.io
       </a>
     </>
   );
 }
 
-// Compact deck list — the full editor (Hero picker, add/remove cards,
-// legality checks) lives in FabDeckBuilderPage; this tab is a real,
-// live-loaded summary with covers/labels, same pattern MtgCollectionPage
-// uses for its own Decks tab.
+// Compact deck list — the full editor lives in PokemonDeckBuilderPage.
 function DecksTab({ userId, onGoToDecks }) {
   const [decks, setDecks] = useState([]);
   const [status, setStatus] = useState("loading");
@@ -228,7 +248,7 @@ function DecksTab({ userId, onGoToDecks }) {
       {status === "ready" && decks.length === 0 && (
         <div className="empty-state">
           <span className="empty-state__icon" aria-hidden="true">🛠️</span>
-          <p className="empty-state__body">No decks yet — open the Deck Builder to pick a Hero and create one.</p>
+          <p className="empty-state__body">No decks yet — open the Deck Builder to create one.</p>
         </div>
       )}
 
@@ -244,7 +264,7 @@ function DecksTab({ userId, onGoToDecks }) {
                 )}
               </span>
               <span className="binder-card__name">{deck.name}</span>
-              <span className="binder-card__meta">{deck.format}{deck.hero_card_name ? ` · ${deck.hero_card_name}` : ""}</span>
+              <span className="binder-card__meta">{deck.format}</span>
               {deck.labels?.length > 0 && (
                 <div className="label-chip-row">
                   {deck.labels.map((l) => (

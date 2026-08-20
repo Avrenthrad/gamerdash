@@ -56,7 +56,7 @@ export const GAMING_VIEWS = [
   "backlog", "achievements", "upcoming-releases", "linking", "settings", "dashfeed",
 ];
 
-export const TCG_VIEWS = ["tcg-home", "mtg-search", "mtg-collection", "mtg-decks", "mtg-price-watch", "mtg-scan", "mtg-import", "tcg-marketplace", "fab-search", "fab-collection"];
+export const TCG_VIEWS = ["tcg-home", "mtg-search", "mtg-collection", "mtg-decks", "mtg-price-watch", "mtg-scan", "mtg-import", "tcg-marketplace", "fab-search", "fab-collection", "fab-decks", "pokemon-search", "pokemon-collection", "pokemon-decks"];
 
 function DefaultAvatarIcon() {
   return (
