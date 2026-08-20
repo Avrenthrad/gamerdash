@@ -18,6 +18,7 @@ import LykodexLogo from "./LykodexLogo";
 import CollegeIcon from "./CollegeIcon";
 import { fetchRecentActivityForUser, describeActivity } from "../lib/guilds";
 import { relativeTime } from "./price/priceUtils";
+import MiniAvatar from "./MiniAvatar";
 
 // Top-level College tabs. Order matters — this is the fixed display
 // order regardless of which ones a person actually selected during
@@ -282,7 +283,8 @@ export default function Header({
                   ) : activity.length > 0 ? (
                     activity.map((entry) => (
                       <div key={entry.id} className="dash-header__notification-row">
-                        <span className="dash-header__notification-text">
+                        <span className="dash-header__notification-text" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <MiniAvatar profile={entry.profile} />
                           {describeActivity(entry)}
                         </span>
                         <span className="dash-header__notification-meta">

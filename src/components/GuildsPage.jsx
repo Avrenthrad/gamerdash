@@ -20,6 +20,7 @@ import {
 } from "../lib/guilds";
 import { findUserByFriendCode } from "../lib/friends";
 import { supabase } from "../lib/supabaseClient";
+import MiniAvatar from "./MiniAvatar";
 
 function displayName(profile) {
   if (!profile) return "Someone";
@@ -577,6 +578,7 @@ function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, o
               <ul className="backlog-list">
                 {joinRequests.map((req) => (
                   <li key={req.id} className="backlog-card">
+                    <MiniAvatar profile={req.profile} />
                     <div className="backlog-card__info">
                       <span className="backlog-card__title">{displayName(req.profile)}</span>
                     </div>
@@ -600,6 +602,7 @@ function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, o
             <ul className="backlog-list">
               {members.map((m) => (
                 <li key={m.id} className="backlog-card">
+                  <MiniAvatar profile={m.profile} />
                   <div className="backlog-card__info">
                     <span className="backlog-card__title">{displayName(m.profile)}</span>
                     {m.user_id === guild.created_by && <span className="backlog-card__meta">Owner</span>}
@@ -624,7 +627,10 @@ function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, o
                 <li key={entry.id} className="calendar-row">
                   <span className="calendar-row__date">{new Date(entry.created_at).toLocaleDateString()}</span>
                   <div className="calendar-row__body">
-                    <span className="calendar-row__event">{describeActivity(entry)}</span>
+                    <span className="calendar-row__event" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <MiniAvatar profile={entry.profile} />
+                      {describeActivity(entry)}
+                    </span>
                   </div>
                 </li>
               ))}
@@ -771,7 +777,8 @@ function PostsTab({ guildId, userId, isMember }) {
                 </div>
                 <div className="backlog-card__info">
                   <span className="backlog-card__title">{post.title}</span>
-                  <span className="backlog-card__meta">
+                  <span className="backlog-card__meta" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <MiniAvatar profile={post.author} />
                     {displayName(post.author)} · {new Date(post.created_at).toLocaleDateString()}
                   </span>
                   {post.body && <p className="settings-card__note" style={{ margin: "6px 0" }}>{post.body}</p>}
@@ -878,7 +885,10 @@ function CommentsPanel({ postId, guildId, userId, isMember, onCommentAdded }) {
   function renderComment(c, isReply) {
     return (
       <div key={c.id} className="comments-panel__row" style={isReply ? { marginLeft: "28px" } : undefined}>
-        <span className="comments-panel__author">{displayName(c.author)}</span>
+        <span className="comments-panel__author" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          <MiniAvatar profile={c.author} />
+          {displayName(c.author)}
+        </span>
         <span className="comments-panel__body">{c.body}</span>
         <div className="settings-form-row" style={{ marginTop: "2px" }}>
           {!isReply && isMember && (

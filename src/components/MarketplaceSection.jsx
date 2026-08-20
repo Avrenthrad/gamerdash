@@ -13,6 +13,7 @@ import {
 } from "../lib/marketplace";
 import { getExchangeRates, formatPrice, SUPPORTED_CURRENCIES } from "../lib/currency";
 import { AccountGatePanel } from "./AccountGate";
+import MiniAvatar from "./MiniAvatar";
 
 const CONDITION_OPTIONS = {
   tcg: ["Near Mint", "Lightly Played", "Moderately Played", "Heavily Played", "Damaged"],
@@ -161,7 +162,10 @@ function BrowseTab({ category, game, userId, isLoggedIn, rates, currency }) {
           </div>
           <div className="wishlist-card__body">
             <span className="wishlist-card__title">{listing.title}</span>
-            <span className="wishlist-card__meta">{displaySellerName(listing.seller)}</span>
+            <span className="wishlist-card__meta" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <MiniAvatar profile={listing.seller} />
+              {displaySellerName(listing.seller)}
+            </span>
             {listing.condition && <span className="tag tag--muted">{listing.condition}</span>}
             {listing.description && <span className="wishlist-card__lowest">{listing.description}</span>}
             <div className="wishlist-card__cheapest">
@@ -482,6 +486,7 @@ function ListingOffersPanel({ listing, rates, currency }) {
     <ul className="backlog-list" style={{ marginTop: "12px" }}>
       {offers.map((offer) => (
         <li key={offer.id} className="backlog-card">
+          <MiniAvatar profile={offer.buyer} />
           <div className="backlog-card__info">
             <span className="backlog-card__title">
               {displaySellerName(offer.buyer)} offered {rates ? formatPrice(offer.amount, offer.currency, rates, currency || offer.currency) : `${offer.currency} ${offer.amount}`}

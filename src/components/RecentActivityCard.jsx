@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import { fetchRecentActivityForUser, describeActivity } from "../lib/guilds";
 import { relativeTime } from "./price/priceUtils";
+import MiniAvatar from "./MiniAvatar";
 
 export default function RecentActivityCard({ userId, onOpenGuilds }) {
   const [activity, setActivity] = useState([]);
@@ -45,7 +46,10 @@ export default function RecentActivityCard({ userId, onOpenGuilds }) {
         <ul className="activity-feed-list">
           {activity.map((entry) => (
             <li key={entry.id} className="activity-feed-row">
-              <span className="activity-feed-row__text">{describeActivity(entry)}</span>
+              <span className="activity-feed-row__text" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <MiniAvatar profile={entry.profile} />
+                {describeActivity(entry)}
+              </span>
               <span className="activity-feed-row__meta">
                 {entry.guilds?.name ? `${entry.guilds.name} · ` : ""}
                 {relativeTime(entry.created_at)}

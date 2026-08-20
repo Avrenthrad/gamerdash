@@ -230,7 +230,17 @@ export async function fetchGuildActivity(guildId, limit = 30) {
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return data || [];
+  return attachProfiles(data || []);
+}
+
+// Batch-enriches activity rows with the real profile (avatar, name)
+// of whoever did the thing — same getPublicProfiles pattern used
+// everywhere else a list of user_ids needs real names/avatars.
+async function attachProfiles(rows) {
+  if (rows.length === 0) return rows;
+  const profiles = await getPublicProfiles([...new Set(rows.map((r) => r.user_id))]);
+  const profileById = Object.fromEntries(profiles.map((p) => [p.id, p]));
+  return rows.map((r) => ({ ...r, profile: profileById[r.user_id] || null }));
 }
 
 // Powers the header notification bell — real activity across every
@@ -255,7 +265,7 @@ export async function fetchRecentActivityForUser(userId, limit = 10) {
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return data || [];
+  return attachProfiles(data || []);
 }
 
 // The one function the rest of the app actually calls when something

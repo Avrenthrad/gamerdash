@@ -10,6 +10,7 @@ import {
   findUserByFriendCode, sendFriendRequest,
   fetchFriendRequests, acceptFriendRequest, declineFriendRequest, withdrawFriendRequest,
 } from "../lib/friends";
+import MiniAvatar from "./MiniAvatar";
 
 function displayName(profile) {
   if (!profile) return "Someone";
@@ -178,6 +179,7 @@ export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCr
           <ul className="backlog-list">
             {incoming.map((r) => (
               <li key={r.id} className="backlog-card">
+                <MiniAvatar profile={r.senderProfile} />
                 <div className="backlog-card__info">
                   <span className="backlog-card__title">{displayName(r.senderProfile)}</span>
                 </div>
@@ -195,6 +197,7 @@ export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCr
           <ul className="backlog-list">
             {outgoing.map((r) => (
               <li key={r.id} className="backlog-card">
+                <MiniAvatar profile={r.receiverProfile} />
                 <div className="backlog-card__info">
                   <span className="backlog-card__title">{displayName(r.receiverProfile)}</span>
                   <span className="backlog-card__meta">Pending</span>
@@ -217,6 +220,7 @@ export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCr
         <ul className="backlog-list">
           {friends.map((f) => (
             <li key={f.id} className="backlog-card">
+              <MiniAvatar profile={f.profile} />
               <div className="backlog-card__info">
                 <span className="backlog-card__title">{displayName(f.profile)}</span>
                 {f.profile?.username && <span className="backlog-card__meta">@{f.profile.username}</span>}

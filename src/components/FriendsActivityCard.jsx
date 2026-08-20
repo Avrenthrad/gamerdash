@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { fetchFriends } from "../lib/friends";
 import { fetchRecentActivityForUser, describeActivity } from "../lib/guilds";
 import { relativeTime } from "./price/priceUtils";
+import MiniAvatar from "./MiniAvatar";
 
 function displayName(profile) {
   if (!profile) return "Someone";
@@ -80,7 +81,10 @@ export default function FriendsActivityCard({ userId, onGoToFriends }) {
         <ul className="friends-activity-card__list">
           {activity.map((entry) => (
             <li key={entry.id}>
-              <span className="friends-activity-card__entry">{describeActivity(entry)}</span>
+              <span className="friends-activity-card__entry" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <MiniAvatar profile={entry.profile} />
+                {describeActivity(entry)}
+              </span>
               <span className="presence-card__meta">
                 {entry.guilds?.name ? `${entry.guilds.name} · ` : ""}
                 {relativeTime(entry.created_at)}
