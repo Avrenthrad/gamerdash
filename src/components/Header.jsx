@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import LykodexLogo from "./LykodexLogo";
 import CollegeIcon from "./CollegeIcon";
 import { fetchRecentActivityForUser, describeActivity } from "../lib/guilds";
+import { fetchUnreadCount } from "../lib/messages";
 import { relativeTime } from "./price/priceUtils";
 import MiniAvatar from "./MiniAvatar";
 
@@ -94,6 +95,15 @@ function BellIcon() {
   );
 }
 
+function InboxIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
+      <path d="M3 6l9 7 9-7" />
+    </svg>
+  );
+}
+
 export default function Header({
   onNavigateView,
   onNavigateHome,
@@ -157,6 +167,35 @@ export default function Header({
       cancelled = true;
     };
   }, [isLoggedIn, userId, notificationsOpen]);
+
+  // ----- Inbox unread count — the one interval-polled query in this
+  // app. Everything else here is poll-on-mount/on-demand, but DM
+  // staleness is directly user-visible (a friend can message you while
+  // you're elsewhere in the app with no natural "next visit" moment to
+  // refetch on), so a light, cheap count-only poll is worth the
+  // exception. Thread contents and the Inbox list itself stay
+  // poll-on-mount only — see InboxPage.jsx.
+  const [unreadDmCount, setUnreadDmCount] = useState(0);
+  useEffect(() => {
+    if (!isLoggedIn || !userId) {
+      setUnreadDmCount(0);
+      return;
+    }
+    let cancelled = false;
+    function loadUnread() {
+      fetchUnreadCount(userId)
+        .then((count) => {
+          if (!cancelled) setUnreadDmCount(count);
+        })
+        .catch((err) => console.error("Failed to load Inbox unread count:", err));
+    }
+    loadUnread();
+    const interval = setInterval(loadUnread, 45000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [isLoggedIn, userId]);
 
   const hasUnseenActivity =
     activity.length > 0 &&
@@ -261,6 +300,19 @@ export default function Header({
           >
             <SearchIcon />
           </button>
+
+          {isLoggedIn && (
+            <button
+              type="button"
+              className="dash-header__icon-btn"
+              onClick={() => handleAccountClick("inbox")}
+              aria-label="Inbox"
+              title="Inbox"
+            >
+              <InboxIcon />
+              {unreadDmCount > 0 && <span className="dash-header__icon-dot" aria-hidden="true" />}
+            </button>
+          )}
 
           {isLoggedIn && (
             <div className="dash-header__menu-wrap">

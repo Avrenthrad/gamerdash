@@ -33,6 +33,7 @@ export const NAV_INDEX = [
   { label: "Tabletop", view: "college-tabletop", keywords: "rpg dnd wargames dice" },
   { label: "Guilds", view: "guilds", keywords: "social friends activity crew" },
   { label: "Friends", view: "friends", keywords: "social guilds add friend code" },
+  { label: "Inbox", view: "inbox", keywords: "messages dm direct message chat friends" },
   { label: "Account Settings", view: "settings", keywords: "profile avatar theme" },
   { label: "Account Linking", view: "linking", keywords: "steam link connect" },
   { label: "Dashfeed Settings", view: "dashfeed", keywords: "toggles layout" },

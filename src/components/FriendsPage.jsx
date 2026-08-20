@@ -18,7 +18,7 @@ function displayName(profile) {
   return full || profile.username || "Someone";
 }
 
-export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCreateAccount }) {
+export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCreateAccount, onGoToInbox }) {
   const [myCode, setMyCode] = useState("");
   const [friends, setFriends] = useState([]);
   const [requests, setRequests] = useState([]);
@@ -225,6 +225,9 @@ export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCr
                 <span className="backlog-card__title">{displayName(f.profile)}</span>
                 {f.profile?.username && <span className="backlog-card__meta">@{f.profile.username}</span>}
               </div>
+              {onGoToInbox && (
+                <button type="button" className="linking-row__connect" onClick={onGoToInbox}>Message</button>
+              )}
               <button type="button" className="game-popup__close" onClick={() => handleRemove(f.friend_id)} aria-label="Remove friend">✕</button>
             </li>
           ))}

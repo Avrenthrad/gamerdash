@@ -48,6 +48,7 @@ const MtgScanPage = lazy(() => import("./components/MtgScanPage"));
 const CsvImportPage = lazy(() => import("./components/CsvImportPage"));
 const GuildsPage = lazy(() => import("./components/GuildsPage"));
 const FriendsPage = lazy(() => import("./components/FriendsPage"));
+const InboxPage = lazy(() => import("./components/InboxPage"));
 const OverviewPage = lazy(() => import("./components/OverviewPage"));
 const TcgHomePage = lazy(() => import("./components/TcgHomePage"));
 const TcgMarketplacePage = lazy(() => import("./components/TcgMarketplacePage"));
@@ -557,6 +558,17 @@ export default function App() {
 
           {view === "friends" && (
             <FriendsPage
+              onBack={() => goTo("overview")}
+              userId={userId}
+              isLoggedIn={isLoggedIn}
+              onSignIn={() => goTo("login", "login")}
+              onCreateAccount={() => goTo("login", "signup")}
+              onGoToInbox={() => goTo("inbox")}
+            />
+          )}
+
+          {view === "inbox" && (
+            <InboxPage
               onBack={() => goTo("overview")}
               userId={userId}
               isLoggedIn={isLoggedIn}

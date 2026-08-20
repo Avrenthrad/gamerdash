@@ -88,6 +88,7 @@ const KNOWN_VIEWS = [
   "mtg-import",
   "guilds",
   "friends",
+  "inbox",
   "overview",
   "library",
   "tcg-home",

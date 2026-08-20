@@ -2213,3 +2213,47 @@ alter table public.guild_activity add constraint guild_activity_event_type_check
     'wishlist_added', 'mtg_card_added', 'fab_card_added', 'pokemon_card_added',
     'joined_guild', 'guild_post_commented', 'guild_comment_replied'
   ));
+
+-- ---------- Direct Messages: real 1:1 messaging between friends (additive) ----------
+-- One flat table, no separate "conversations" table — a conversation is
+-- just every row where {sender_id, receiver_id} matches that pair,
+-- computed client-side (see lib/messages.js), same as this app avoids a
+-- separate "offer thread" table for marketplace_offers. Deliberately
+-- NOT wired into logActivityForUser/logActivityForGuild — a private
+-- message must never be broadcast into any Guild feed or the
+-- notifications bell.
+create table public.direct_messages (
+  id uuid default gen_random_uuid() primary key,
+  sender_id uuid references auth.users on delete cascade not null,
+  receiver_id uuid references auth.users on delete cascade not null,
+  body text not null,
+  created_at timestamptz default now(),
+  read_at timestamptz,
+  check (sender_id <> receiver_id)
+);
+
+alter table public.direct_messages enable row level security;
+
+create policy "Sender and receiver can view a DM"
+  on public.direct_messages for select
+  using (auth.uid() = sender_id or auth.uid() = receiver_id);
+
+-- Friends-only. friends rows are symmetric (both directions written by
+-- accept_friend_request), so checking one direction is sufficient —
+-- same one-hop-subquery pattern marketplace_offers already uses, no
+-- SECURITY DEFINER needed.
+create policy "Friends can send a DM"
+  on public.direct_messages for insert
+  with check (
+    auth.uid() = sender_id
+    and exists (select 1 from public.friends where user_id = auth.uid() and friend_id = receiver_id)
+  );
+
+-- No column-level restriction (same trust-the-app-layer precedent as
+-- marketplace_offers' own update policy) — the app only ever sets read_at.
+create policy "Receiver can mark a DM read"
+  on public.direct_messages for update
+  using (auth.uid() = receiver_id);
+
+create index direct_messages_sender_id_idx on public.direct_messages (sender_id, created_at desc);
+create index direct_messages_receiver_id_idx on public.direct_messages (receiver_id, created_at desc);

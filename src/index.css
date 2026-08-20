@@ -6265,6 +6265,55 @@ html[data-mode="light"] .current-rotation {
   object-fit: cover;
 }
 
+.dm-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.dm-bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  max-width: 70%;
+  padding: 10px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+}
+
+.dm-bubble--mine {
+  align-self: flex-end;
+  align-items: flex-end;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.dm-bubble__body {
+  font-size: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.dm-bubble__meta {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.dm-bubble--mine .dm-bubble__meta {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.dm-compose {
+  position: sticky;
+  bottom: 0;
+  background: var(--bg);
+  padding-top: 10px;
+}
+
 .friends-activity-card__avatar {
   width: 32px;
   height: 32px;
