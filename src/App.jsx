@@ -37,6 +37,9 @@ const UpcomingReleasesPage = lazy(() => import("./components/UpcomingReleasesPag
 const MtgSearchPage = lazy(() => import("./components/MtgSearchPage"));
 const MtgCollectionPage = lazy(() => import("./components/MtgCollectionPage"));
 const MtgDeckBuilderPage = lazy(() => import("./components/MtgDeckBuilderPage"));
+const MtgPriceWatchPage = lazy(() => import("./components/MtgPriceWatchPage"));
+const FabSearchPage = lazy(() => import("./components/FabSearchPage"));
+const FabCollectionPage = lazy(() => import("./components/FabCollectionPage"));
 const MtgScanPage = lazy(() => import("./components/MtgScanPage"));
 const CsvImportPage = lazy(() => import("./components/CsvImportPage"));
 const GuildsPage = lazy(() => import("./components/GuildsPage"));
@@ -438,6 +441,28 @@ export default function App() {
             />
           )}
 
+          {view === "fab-search" && (
+            <FabSearchPage
+              onBack={() => goTo("tcg-home")}
+              userId={userId}
+              isLoggedIn={isLoggedIn}
+              onSignIn={() => goTo("login", "login")}
+              onCreateAccount={() => goTo("login", "signup")}
+            />
+          )}
+
+          {view === "fab-collection" && (
+            isLoggedIn ? (
+              <FabCollectionPage onBack={() => goTo("tcg-home")} userId={userId} onGoToSearch={() => goTo("fab-search")} />
+            ) : (
+              <AccountGatePage
+                title="My Collection"
+                onSignIn={() => goTo("login", "login")}
+                onCreateAccount={() => goTo("login", "signup")}
+              />
+            )
+          )}
+
           {view === "mtg-scan" && (
             <MtgScanPage
               onBack={() => goTo("tcg-home")}
@@ -601,6 +626,22 @@ export default function App() {
             ) : (
               <AccountGatePage
                 title="Deck Builder"
+                onSignIn={() => goTo("login", "login")}
+                onCreateAccount={() => goTo("login", "signup")}
+              />
+            )
+          )}
+
+          {view === "mtg-price-watch" && (
+            isLoggedIn ? (
+              <MtgPriceWatchPage
+                onBack={() => goTo("tcg-home")}
+                userId={userId}
+                onGoToSearch={() => goTo("mtg-search")}
+              />
+            ) : (
+              <AccountGatePage
+                title="Price Watch"
                 onSignIn={() => goTo("login", "login")}
                 onCreateAccount={() => goTo("login", "signup")}
               />

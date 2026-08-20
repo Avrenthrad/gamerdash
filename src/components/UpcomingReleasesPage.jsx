@@ -45,8 +45,15 @@ export default function UpcomingReleasesPage({ onBack, isLoggedIn, userId, wishl
   const [status, setStatus] = useState("idle"); // idle | loading | ready | error | no_key
 
   useEffect(() => {
-    fetchRawgPlatforms().then((list) => list !== "no_key" && setPlatforms(list));
-    fetchRawgGenres().then((list) => list !== "no_key" && setGenres(list));
+    // Best-effort — the platform/genre filters just stay empty (no
+    // crash) if this fails, since loadEverything/loadMine below still
+    // work fine without them and already own the page's real error UI.
+    fetchRawgPlatforms()
+      .then((list) => list !== "no_key" && setPlatforms(list))
+      .catch((err) => console.error("Failed to load RAWG platforms:", err));
+    fetchRawgGenres()
+      .then((list) => list !== "no_key" && setGenres(list))
+      .catch((err) => console.error("Failed to load RAWG genres:", err));
   }, []);
 
   useEffect(() => {

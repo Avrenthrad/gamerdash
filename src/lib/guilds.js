@@ -15,6 +15,7 @@ const EVENT_LABELS = {
   backlog_status_change: "updated their backlog:",
   wishlist_added: "added to their wishlist:",
   mtg_card_added: "added a card to their MTG collection:",
+  fab_card_added: "added a card to their Flesh and Blood collection:",
   joined_guild: "joined the guild",
 };
 

@@ -31,6 +31,7 @@
 import "dotenv/config";
 import { Client, GatewayIntentBits, Partials } from "discord.js";
 import { createClient } from "@supabase/supabase-js";
+import { runDailyMasteryRefresh } from "./masteryRefresh.js";
 
 const { DISCORD_BOT_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
 
@@ -204,3 +205,25 @@ process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
 client.login(DISCORD_BOT_TOKEN);
+
+// Daily Gaming Mastery refresh — independent of the Discord gateway
+// connection above, so it still runs even if presence tracking is
+// having a bad day. Runs once on startup (so a redeploy also counts
+// as that day's run) and then every 24h. No cron dependency needed:
+// this process is meant to stay up continuously on Railway, so a
+// plain setInterval is enough — the worst case on an occasional
+// restart is one extra early run, which is harmless.
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+async function runMasteryRefresh() {
+  console.log("Running daily Gaming Mastery refresh…");
+  try {
+    const { total, succeeded, failed } = await runDailyMasteryRefresh(supabase);
+    console.log(`Mastery refresh done: ${succeeded}/${total} profiles updated${failed ? `, ${failed} failed` : ""}.`);
+  } catch (err) {
+    console.error("Mastery refresh run failed:", err);
+  }
+}
+
+runMasteryRefresh();
+setInterval(runMasteryRefresh, ONE_DAY_MS);

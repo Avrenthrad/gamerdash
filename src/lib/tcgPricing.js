@@ -77,3 +77,27 @@ export async function fetchPriceHistory(scryfallId, days = 90) {
   if (error) throw error;
   return data || [];
 }
+
+// One query for many cards at once (MtgPriceWatchPage), instead of one
+// query per card — real Postgres `in (...)` filter, grouped client-side
+// per scryfall_id. Returns { [scryfallId]: snapshot[] }, ascending by
+// time within each card, same shape fetchPriceHistory already returns
+// per card.
+export async function fetchPriceHistoryForCards(scryfallIds, days = 90) {
+  if (!scryfallIds || scryfallIds.length === 0) return {};
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from("tcg_price_snapshots")
+    .select("*")
+    .in("scryfall_id", scryfallIds)
+    .gte("captured_at", since)
+    .order("captured_at", { ascending: true });
+  if (error) throw error;
+
+  const byCard = {};
+  for (const row of data || []) {
+    if (!byCard[row.scryfall_id]) byCard[row.scryfall_id] = [];
+    byCard[row.scryfall_id].push(row);
+  }
+  return byCard;
+}

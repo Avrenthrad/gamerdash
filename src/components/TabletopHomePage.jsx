@@ -283,7 +283,7 @@ function CampaignDetail({ userId, campaign, onBack }) {
                 <span className="backlog-card__title">{c.name}</span>
                 {c.class_or_playbook && <span className="backlog-card__meta">{c.class_or_playbook}</span>}
               </div>
-              <button type="button" className="game-popup__close" onClick={() => deleteCharacter(c.id).then(loadAll)} aria-label="Remove">✕</button>
+              <button type="button" className="game-popup__close" onClick={() => deleteCharacter(c.id).then(loadAll).catch((err) => console.error("Failed to delete character:", err))} aria-label="Remove">✕</button>
             </li>
           ))}
         </ul>
@@ -412,7 +412,7 @@ function WargamesSection({ userId }) {
                     </div>
                   </div>
                   <button type="button" className="linking-row__connect" onClick={() => setActiveArmy(a)}>Open</button>
-                  <button type="button" className="game-popup__close" onClick={() => deleteArmy(a.id).then(loadAll)} aria-label="Delete">✕</button>
+                  <button type="button" className="game-popup__close" onClick={() => deleteArmy(a.id).then(loadAll).catch((err) => console.error("Failed to delete army:", err))} aria-label="Delete">✕</button>
                 </li>
               ))}
             </ul>
@@ -458,7 +458,7 @@ function WargamesSection({ userId }) {
                       {g.result}{g.opponent_name ? ` vs ${g.opponent_name}` : ""}
                     </span>
                   </div>
-                  <button type="button" className="game-popup__close" onClick={() => deleteGame(g.id).then(loadAll)} aria-label="Delete">✕</button>
+                  <button type="button" className="game-popup__close" onClick={() => deleteGame(g.id).then(loadAll).catch((err) => console.error("Failed to delete game:", err))} aria-label="Delete">✕</button>
                 </li>
               ))}
             </ul>
@@ -535,11 +535,11 @@ function ArmyDetail({ userId, army, onBack }) {
               <select
                 className="backlog-card__status-select"
                 value={u.painted_status}
-                onChange={(e) => updateUnitStatus(u.id, e.target.value).then(loadUnits)}
+                onChange={(e) => updateUnitStatus(u.id, e.target.value).then(loadUnits).catch((err) => console.error("Failed to update unit status:", err))}
               >
                 {PAINTED_STATUSES.map((s) => <option key={s} value={s}>{PAINTED_LABELS[s]}</option>)}
               </select>
-              <button type="button" className="game-popup__close" onClick={() => removeUnit(u.id).then(loadUnits)} aria-label="Remove">✕</button>
+              <button type="button" className="game-popup__close" onClick={() => removeUnit(u.id).then(loadUnits).catch((err) => console.error("Failed to remove unit:", err))} aria-label="Remove">✕</button>
             </li>
           ))}
         </ul>

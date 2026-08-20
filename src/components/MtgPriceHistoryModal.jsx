@@ -16,6 +16,26 @@ const RANGES = [
   { id: 90, label: "90d" },
 ];
 
+// Real % change over whatever real history exists in the current
+// range — never shown for <2 points, since there's nothing real to
+// compare. Exported so MtgPriceWatchPage's per-row summary uses the
+// exact same math instead of a second, possibly-drifting copy.
+export function PriceChangeBadge({ history }) {
+  const first = Number(history[0]?.price);
+  const last = Number(history[history.length - 1]?.price);
+  if (!first || !last) return null;
+  const pct = ((last - first) / first) * 100;
+  const up = pct >= 0;
+  return (
+    <span
+      className="price-badge__value"
+      style={{ color: up ? "#22c55e" : "#E8283D", marginLeft: "auto" }}
+    >
+      {up ? "▲" : "▼"} {Math.abs(pct).toFixed(1)}%
+    </span>
+  );
+}
+
 export default function MtgPriceHistoryModal({ card, onClose }) {
   const [prices, setPrices] = useState([]);
   const [status, setStatus] = useState("loading");
@@ -113,6 +133,9 @@ export default function MtgPriceHistoryModal({ card, onClose }) {
               {r.label}
             </button>
           ))}
+          {historyStatus === "ready" && history.length >= 2 && (
+            <PriceChangeBadge history={history} />
+          )}
         </div>
 
         {historyStatus === "loading" && <p className="panel__status">Loading history…</p>}

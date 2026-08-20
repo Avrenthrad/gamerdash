@@ -1,7 +1,7 @@
 // Magic: The Gathering — card search/catalog. Real data throughout
 // via Scryfall's genuine free public API.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { searchCards, getCardAutocomplete } from "../lib/scryfall";
 import { addToCollection } from "../lib/mtg";
 
@@ -11,6 +11,15 @@ export default function MtgSearchPage({ onBack, userId, isLoggedIn, onSignIn, on
   const [results, setResults] = useState([]);
   const [status, setStatus] = useState("idle"); // idle | loading | ready | error
   const [addedIds, setAddedIds] = useState(new Set());
+  // Guards a real bug: the debounced autocomplete fetch below can
+  // still be in flight when the user submits a real search (e.g.
+  // click Search right after typing, before the 250ms debounce
+  // fires). Without this, that stale fetch can resolve AFTER
+  // handleSearch clears suggestions and re-populate the dropdown on
+  // top of the real results. Each autocomplete request checks it's
+  // still the latest before applying its result; handleSearch bumps
+  // it to invalidate any request already in flight.
+  const suggestionRequestId = useRef(0);
 
   useEffect(() => {
     if (query.length < 2) {
@@ -18,7 +27,12 @@ export default function MtgSearchPage({ onBack, userId, isLoggedIn, onSignIn, on
       return;
     }
     const timer = setTimeout(() => {
-      getCardAutocomplete(query).then(setSuggestions);
+      const requestId = ++suggestionRequestId.current;
+      getCardAutocomplete(query)
+        .then((names) => {
+          if (requestId === suggestionRequestId.current) setSuggestions(names);
+        })
+        .catch((err) => console.error("Autocomplete failed:", err));
     }, 250);
     return () => clearTimeout(timer);
   }, [query]);
@@ -26,6 +40,7 @@ export default function MtgSearchPage({ onBack, userId, isLoggedIn, onSignIn, on
   async function handleSearch(e) {
     e?.preventDefault();
     if (!query.trim()) return;
+    suggestionRequestId.current += 1; // invalidate any in-flight autocomplete
     setSuggestions([]);
     setStatus("loading");
     try {

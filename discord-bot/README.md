@@ -2,7 +2,9 @@
 
 Tracks cross-platform "currently playing" status and Xbox/PlayStation
 playtime for linked Lykodex accounts, using Discord's own official
-Xbox/PlayStation/Steam presence integrations as the data source.
+Xbox/PlayStation/Steam presence integrations as the data source. It
+also runs a daily Gaming Mastery refresh (see below) — same always-on
+process, two independent jobs.
 
 **This is a genuinely separate project from the main Lykodex app.**
 It needs a persistent, always-on connection to Discord (the Gateway),
@@ -71,6 +73,8 @@ repo, one manual setting is required:
    (and the main app's `package.json`) instead of just the bot.
 3. **Variables** tab → add `DISCORD_BOT_TOKEN`, `SUPABASE_URL`,
    `SUPABASE_SERVICE_ROLE_KEY` (same values as your local `.env`).
+   `SITE_BASE_URL` is optional — only needed if the production site
+   ever moves off `gamerdash.vercel.app`.
 4. Deploy. Railway runs `npm start` automatically and restarts the
    process if it crashes (`railway.json`'s restart policy) — no
    further config needed for an always-on worker like this.
@@ -89,3 +93,24 @@ repo, one manual setting is required:
 - Platform attribution (is this really Xbox vs PlayStation vs PC) relies
   on a Discord field their own docs admit can be unreliable — falls
   back to "unknown" rather than guessing when it's not confident.
+
+## Daily Gaming Mastery refresh
+
+Runs once on startup and then every 24 hours (see `masteryRefresh.js`,
+scheduled from the bottom of `index.js`). For every profile with a
+linked Steam account and/or a self-reported Xbox/PlayStation input:
+
+- **Steam**: a genuine live re-scan via the real Steam Web API (through
+  the main site's own `/api/steam` proxy), so this portion of the score
+  is honestly fresh every day.
+- **Xbox / PlayStation**: no public API exists for a person's own
+  Gamerscore or trophy case (see `mastery_inputs` in `schema.sql`), so
+  this does **not** pull anything new for them — it re-applies whatever
+  numbers the person last typed in on Account Linking, recombined with
+  the fresh Steam score. Xbox/PS values only change when the person
+  updates them manually.
+
+This lives on the bot rather than a Vercel Cron Job because scanning
+many people's Steam libraries in one run can take longer than the ~10s
+execution limit on Vercel's Hobby plan — this process just stays up
+and runs it in the background instead.

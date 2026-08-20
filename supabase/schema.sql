@@ -1869,3 +1869,54 @@ from (values
 ) as v(name, description)
 cross join (select id from auth.users where email = 'joshuakingsworth@gmail.com') as u
 where not exists (select 1 from public.guilds where name = v.name);
+
+-- ---------- TCG: Flesh and Blood (Phase 1 — collection only) ----------
+-- Real card data via goagain.dev's live, keyless FaB API (see
+-- lib/fab.js). Small third-party maintainer, no documented uptime or
+-- rate-limit SLA — accepted risk, mitigated by client-side caching and
+-- a defensive upstream timeout in api/fab.js.
+--
+-- fab_card_id stores goagain's Card.unique_id (one name+pitch variant).
+-- printing_unique_id stores the PRINTING's own unique_id (confirmed
+-- live via curl to be distinct from the card's id) — the real "which
+-- exact printing is owned" identifier. foiling stores goagain's real
+-- per-printing finish code ("S"/"R"/"C" confirmed live = Standard/
+-- Rainbow Foil/Cold Foil) — genuine API data, not self-reported the
+-- way mtg_collection.foil effectively is.
+create table public.fab_collection (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  fab_card_id text not null,
+  card_name text not null,
+  printing_unique_id text,
+  set_id text,
+  edition text,
+  foiling text,
+  quantity integer default 1,
+  condition text default 'Near Mint',
+  source text default 'manual',
+  added_at timestamptz default now()
+);
+
+alter table public.fab_collection enable row level security;
+
+create policy "Users can view their own FaB collection"
+  on public.fab_collection for select using (auth.uid() = user_id);
+create policy "Users can add to their own FaB collection"
+  on public.fab_collection for insert with check (auth.uid() = user_id);
+create policy "Users can update their own FaB collection"
+  on public.fab_collection for update using (auth.uid() = user_id);
+create policy "Users can remove from their own FaB collection"
+  on public.fab_collection for delete using (auth.uid() = user_id);
+
+create index fab_collection_user_id_idx on public.fab_collection (user_id);
+
+-- guild_activity CHECK constraints can't add a value in place — drop/recreate.
+-- Current (verified live): 'achievement_unlocked', 'gd_score_milestone',
+-- 'backlog_status_change', 'wishlist_added', 'mtg_card_added', 'joined_guild'.
+alter table public.guild_activity drop constraint if exists guild_activity_event_type_check;
+alter table public.guild_activity add constraint guild_activity_event_type_check
+  check (event_type in (
+    'achievement_unlocked', 'gd_score_milestone', 'backlog_status_change',
+    'wishlist_added', 'mtg_card_added', 'fab_card_added', 'joined_guild'
+  ));
