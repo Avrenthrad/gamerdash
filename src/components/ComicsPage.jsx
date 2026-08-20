@@ -1,11 +1,14 @@
 // Comics — real, user-owned issue library: title, issue #, publisher,
 // condition, status (owned / on your pull list / wishlist), and an
-// optional real cover photo you upload yourself. Manual entry only —
-// see lib/comics.js for why no external comics database is wired in
-// yet (honest, not a placeholder).
+// optional real cover photo you upload yourself. Also supports a real
+// lookup against Comic Vine's general comics database (all publishers,
+// see lib/comicvine.js) — needs a real COMIC_VINE_KEY set server-side,
+// degrades to an honest "not set up yet" state until then, same
+// pattern as this app's other optional-key integrations.
 
 import { useState, useEffect } from "react";
 import { fetchComicIssues, addComicIssue, updateComicIssue, removeComicIssue, uploadEntertainmentCover } from "../lib/comics";
+import { searchComicVineIssues } from "../lib/comicvine";
 
 const STATUS_LABELS = { owned: "Owned", pull_list: "Pull list", wishlist: "Wishlist" };
 const CONDITIONS = ["Near Mint", "Very Fine", "Fine", "Good", "Fair", "Poor"];
@@ -31,6 +34,15 @@ export default function ComicsPage({ onBack, userId, isLoggedIn, onSignIn, onCre
   const [coverFile, setCoverFile] = useState(null);
   const [saving, setSaving] = useState(false);
 
+  // Set by a real Comic Vine match — a real hosted image URL, used
+  // as-is rather than re-uploaded to our own Storage bucket. Cleared
+  // if the person picks a different cover photo manually instead.
+  const [catalogCoverUrl, setCatalogCoverUrl] = useState(null);
+  const [showComicVineSearch, setShowComicVineSearch] = useState(false);
+  const [comicVineQuery, setComicVineQuery] = useState("");
+  const [comicVineResults, setComicVineResults] = useState([]);
+  const [comicVineStatus, setComicVineStatus] = useState("idle"); // idle | loading | ready | error | no_key
+
   useEffect(() => {
     if (!isLoggedIn) return;
     load();
@@ -54,7 +66,10 @@ export default function ComicsPage({ onBack, userId, isLoggedIn, onSignIn, onCre
     if (!title.trim()) return;
     setSaving(true);
     try {
-      let coverUrl = null;
+      // A real Comic Vine cover URL is used as-is; a manually chosen
+      // file is uploaded to our own Storage — a catalog match takes
+      // priority only if the person didn't then also pick a file.
+      let coverUrl = catalogCoverUrl;
       if (coverFile) coverUrl = await uploadEntertainmentCover(userId, coverFile);
 
       const issue = await addComicIssue(userId, {
@@ -70,10 +85,44 @@ export default function ComicsPage({ onBack, userId, isLoggedIn, onSignIn, onCre
       setIssueNumber("");
       setPublisher("");
       setCoverFile(null);
+      setCatalogCoverUrl(null);
     } catch (err) {
       console.error("Failed to add comic issue:", err);
     }
     setSaving(false);
+  }
+
+  async function handleComicVineSearch(e) {
+    e.preventDefault();
+    if (!comicVineQuery.trim()) return;
+    setComicVineStatus("loading");
+    try {
+      const results = await searchComicVineIssues(comicVineQuery.trim());
+      if (results === "no_key") {
+        setComicVineStatus("no_key");
+        return;
+      }
+      setComicVineResults(results);
+      setComicVineStatus("ready");
+    } catch (err) {
+      console.error("Comic Vine search failed:", err);
+      setComicVineStatus("error");
+    }
+  }
+
+  // Publisher is deliberately left for the person to fill in — Comic
+  // Vine's real issue-search results don't include it (only the
+  // volume/series resource does, a separate lookup this doesn't make),
+  // so auto-filling it here would mean guessing rather than using real
+  // matched data.
+  function handlePickComicVineIssue(issue) {
+    setTitle(issue.volumeName || issue.name);
+    setIssueNumber(issue.issueNumber ? `#${issue.issueNumber}` : "");
+    setCatalogCoverUrl(issue.imageUrl);
+    setCoverFile(null);
+    setShowComicVineSearch(false);
+    setComicVineResults([]);
+    setComicVineQuery("");
   }
 
   async function handleStatusChange(issue, newStatus) {
@@ -122,6 +171,50 @@ export default function ComicsPage({ onBack, userId, isLoggedIn, onSignIn, onCre
 
       <form className="settings-card" onSubmit={handleAdd}>
         <h2 className="settings-card__title">Add an issue</h2>
+
+        <div className="settings-form-row">
+          <button type="button" className="quickdash-reset-btn" onClick={() => setShowComicVineSearch((v) => !v)}>
+            {showComicVineSearch ? "Cancel search" : "🔍 Search real Comic Vine catalog"}
+          </button>
+        </div>
+
+        {showComicVineSearch && (
+          <div className="backlog-add">
+            <form className="price-search" onSubmit={handleComicVineSearch}>
+              <input
+                className="price-search__input"
+                type="text"
+                placeholder="Search real comic issues…"
+                value={comicVineQuery}
+                onChange={(e) => setComicVineQuery(e.target.value)}
+              />
+              <button type="submit" className="price-search__button" disabled={comicVineStatus === "loading"}>
+                {comicVineStatus === "loading" ? "Searching…" : "Search"}
+              </button>
+            </form>
+            {comicVineStatus === "no_key" && <p className="panel__status">Comic catalog search isn't set up yet — fill in the details manually below.</p>}
+            {comicVineStatus === "error" && <p className="panel__status panel__status--error">Couldn't load the comics catalog right now.</p>}
+            {comicVineStatus === "ready" && comicVineResults.length === 0 && <p className="panel__status">No matches — try a different search.</p>}
+            {comicVineResults.length > 0 && (
+              <ul className="backlog-search-results">
+                {comicVineResults.map((issue) => (
+                  <li key={issue.id} className="backlog-search-results__row">
+                    {issue.imageUrl && <img src={issue.imageUrl} alt="" />}
+                    <span>{issue.volumeName || issue.name}{issue.issueNumber ? ` #${issue.issueNumber}` : ""}</span>
+                    <button type="button" className="linking-row__connect" onClick={() => handlePickComicVineIssue(issue)}>
+                      Use this
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {catalogCoverUrl && !coverFile && (
+          <img src={catalogCoverUrl} alt="" className="backlog-card__thumb" style={{ alignSelf: "flex-start" }} />
+        )}
+
         <div className="settings-form-row">
           <label className="auth-form__field">
             <span>Title</span>
@@ -156,7 +249,7 @@ export default function ComicsPage({ onBack, userId, isLoggedIn, onSignIn, onCre
         </div>
         <label className="settings-avatar__upload">
           {coverFile ? coverFile.name : "Upload a cover photo (optional)"}
-          <input type="file" accept="image/*" onChange={(e) => setCoverFile(e.target.files?.[0] || null)} hidden />
+          <input type="file" accept="image/*" onChange={(e) => { setCoverFile(e.target.files?.[0] || null); setCatalogCoverUrl(null); }} hidden />
         </label>
         <button type="submit" className="price-search__button" disabled={saving || !title.trim()} style={{ marginTop: "10px" }}>
           {saving ? "Adding…" : "Add issue"}

@@ -1,10 +1,12 @@
 // Vercel serverless function — merges several pricing-related proxies
 // (xbxprices.js, platprices.js, cheapshark.js, currency.js, plus MTG
-// pricing: cardkingdom, tcgaggregator) into one file, purely to stay
-// under Vercel's Hobby plan's 12-serverless-function limit. No
-// behavior changed for the original four — each keeps its own exact
-// logic, just dispatched by ?service= instead of being separate
-// files. Same consolidation reasoning as the bungie.js merge.
+// pricing: cardkingdom, tcgaggregator, and Rebrickable for LEGO) into
+// one file, purely to stay under Vercel's Hobby plan's 12-serverless-
+// function limit — /api was already at exactly 12 files when
+// Rebrickable was added, so it landed here rather than as its own
+// file. No behavior changed for the original services — each keeps
+// its own exact logic, just dispatched by ?service= instead of being
+// separate files. Same consolidation reasoning as the bungie.js merge.
 //
 // Usage from the frontend:
 //   fetch("/api/pricing?service=xbxprices&endpoint=search&q=...&region=au")
@@ -14,6 +16,9 @@
 //   fetch("/api/pricing?service=currency")
 //   fetch("/api/pricing?service=cardkingdom&scryfallIds=id1,id2,...")
 //   fetch("/api/pricing?service=tcgaggregator&...")
+//   fetch("/api/pricing?service=rebrickable&mode=search&q=...")
+//   fetch("/api/pricing?service=rebrickable&mode=set&setNum=...")
+//   fetch("/api/pricing?service=comicvine&q=...")
 
 const XBXPRICES_BASE = "https://xbxprices.com/api/v2";
 const CHEAPSHARK_ALLOWED_ENDPOINTS = ["games", "deals", "stores"];
@@ -186,6 +191,123 @@ async function handleTcgAggregator(res) {
   });
 }
 
+// ---------- JustTCG (real FaB pricing — deferred at launch, same "don't guess" rule as handleTcgAggregator) ----------
+// Confirmed real and covering Flesh and Blood (their own homepage FAQ
+// names it explicitly among 18 supported games) — genuinely requires
+// a key (confirmed live: unauthenticated /v1/cards returns a real 401
+// {"error":"API key is required","code":"MISSING_API_KEY"}), sent via
+// an `x-api-key` header (confirmed from their own quickstart example),
+// not a query param.
+//
+// Confirmed real response shape from their schema docs: Card has
+// {uuid, id, name, game, set, set_name, number, tcgplayerId,
+// mtgjsonId, scryfallId, rarity, details, variants[]}, each Variant
+// has {uuid, id, printing, condition, price, lastUpdated} — a single
+// real `price` number per variant, not a low/mid/high spread like
+// Pokémon TCG's TCGplayer data.
+//
+// NOT wired to a real search call: the exact query parameter names
+// for searching cards by name/game (as opposed to looking one up by
+// a known id) are not confirmed anywhere accessible without a real
+// key — their docs page describes "9 search params" without naming
+// them. This project has a real, hard-learned rule against guessing
+// an API's endpoint/param shape (a past Fortnite pricing bug came
+// from doing exactly that) — same as handleTcgAggregator above, this
+// stays an honest "not_configured" once a key is set, until the real
+// param names are confirmed against a live authenticated response.
+async function handleJustTcg(res) {
+  const apiKey = process.env.JUSTTCG_API_KEY;
+  if (!apiKey) return res.status(200).json({ error: "no_key" });
+  return res.status(200).json({
+    error: "not_configured",
+    message: "JUSTTCG_API_KEY is set, but the real search parameter names haven't been confirmed against a live response yet — see handleJustTcg in api/pricing.js.",
+  });
+}
+
+// ---------- Rebrickable (real LEGO set database) ----------
+// Confirmed live that Rebrickable genuinely requires authentication —
+// a real keyless request to /lego/sets/ returns a real 401 "Authentication
+// credentials were not provided." Field names (set_num, name, year,
+// theme_id, num_parts, set_img_url) and endpoint shapes
+// (/lego/sets/?search=..., /lego/sets/{set_num}/) are confirmed against
+// Rebrickable's own real API docs and a community client library's
+// README, NOT guessed — but not spot-checked against a real
+// authenticated response (no key held while building this), so treat
+// the exact field list as the best real information available rather
+// than 100% verified, and double check once REBRICKABLE_KEY is set.
+const REBRICKABLE_BASE = "https://rebrickable.com/api/v3/lego";
+
+async function handleRebrickable(searchParams, res) {
+  const apiKey = process.env.REBRICKABLE_KEY;
+  if (!apiKey) return res.status(200).json({ error: "no_key" });
+
+  const mode = searchParams.get("mode");
+  const headers = { Authorization: `key ${apiKey}` };
+
+  try {
+    if (mode === "search") {
+      const q = searchParams.get("q");
+      if (!q) return res.status(400).json({ error: "Missing q query parameter" });
+      const url = `${REBRICKABLE_BASE}/sets/?search=${encodeURIComponent(q)}&page_size=20&ordering=-year`;
+      const rbRes = await fetch(url, { headers });
+      if (!rbRes.ok) return res.status(rbRes.status).json({ error: "Rebrickable search failed" });
+      const data = await rbRes.json();
+      return res.status(200).json(data);
+    }
+
+    if (mode === "set") {
+      const setNum = searchParams.get("setNum");
+      if (!setNum) return res.status(400).json({ error: "Missing setNum query parameter" });
+      const url = `${REBRICKABLE_BASE}/sets/${encodeURIComponent(setNum)}/`;
+      const rbRes = await fetch(url, { headers });
+      if (rbRes.status === 404) return res.status(404).json({ error: "Set not found" });
+      if (!rbRes.ok) return res.status(rbRes.status).json({ error: "Rebrickable lookup failed" });
+      const data = await rbRes.json();
+      return res.status(200).json(data);
+    }
+
+    return res.status(400).json({ error: "Missing or invalid mode parameter" });
+  } catch (err) {
+    console.error("pricing (rebrickable): fetch threw", err);
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+// ---------- Comic Vine (real, general comics database — all publishers) ----------
+// Confirmed live that Comic Vine genuinely requires a key (a real
+// unauthenticated request returns a real 401 with a clean
+// {"error":"Invalid API Key",...} body) and confirmed via their real
+// API documentation (not guessed) that /search issue fields include:
+// aliases, api_detail_url, cover_date, date_added, date_last_updated,
+// deck, description, has_staff_review, id, image, issue_number, name,
+// site_detail_url, store_date, volume. The docs page didn't spell out
+// image's own sub-fields, so multiple real candidate keys
+// (medium_url/small_url/thumb_url) are tried with fallbacks client-side
+// rather than assuming one. Confirmed live: Comic Vine sends no CORS
+// headers, so this must be proxied (unlike Discogs) — it's here rather
+// than its own file because /api was already at Vercel's 12-function
+// cap when this was added.
+const COMIC_VINE_BASE = "https://comicvine.gamespot.com/api";
+
+async function handleComicVine(searchParams, res) {
+  const apiKey = process.env.COMIC_VINE_KEY;
+  if (!apiKey) return res.status(200).json({ error: "no_key" });
+
+  const q = searchParams.get("q");
+  if (!q) return res.status(400).json({ error: "Missing q query parameter" });
+
+  try {
+    const url = `${COMIC_VINE_BASE}/search/?api_key=${apiKey}&format=json&query=${encodeURIComponent(q)}&resources=issue&limit=10`;
+    const cvRes = await fetch(url, { headers: { "User-Agent": "Lykodex/1.0 (+https://gamerdash.vercel.app)" } });
+    if (!cvRes.ok) return res.status(cvRes.status).json({ error: "Comic Vine request failed" });
+    const data = await cvRes.json();
+    return res.status(200).json(data);
+  } catch (err) {
+    console.error("pricing (comicvine): fetch threw", err);
+    return res.status(500).json({ error: err.message });
+  }
+}
+
 async function handleCurrency(res) {
   try {
     const url = "https://api.frankfurter.app/latest?from=USD&to=AUD,CAD,NZD,GBP,EUR";
@@ -213,6 +335,9 @@ export default async function handler(req, res) {
   if (service === "currency") return handleCurrency(res);
   if (service === "cardkingdom") return handleCardKingdom(searchParams, res);
   if (service === "tcgaggregator") return handleTcgAggregator(res);
+  if (service === "rebrickable") return handleRebrickable(searchParams, res);
+  if (service === "comicvine") return handleComicVine(searchParams, res);
+  if (service === "justtcg") return handleJustTcg(res);
 
   return res.status(400).json({ error: "Missing or invalid service parameter" });
 }

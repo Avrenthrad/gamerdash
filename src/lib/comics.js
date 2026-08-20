@@ -1,8 +1,8 @@
-// Real user-owned comic issue library. No external comics catalogue
-// API is wired yet — Comic Vine's real response shape couldn't be
-// verified live (see schema.sql's comic_issues comment) — so this is
-// honestly manual-entry-only for now, same as Collectibles' Phase 1
-// before Rebrickable/Discogs/IGDB got added.
+// Real user-owned comic issue library — CRUD only. Real catalog
+// lookup (Comic Vine, all publishers) lives in lib/comicvine.js and
+// is wired into ComicsPage.jsx's add form; needs a real COMIC_VINE_KEY
+// set server-side, same optional-key pattern as this app's other
+// catalog integrations.
 
 import { supabase } from "./supabaseClient";
 

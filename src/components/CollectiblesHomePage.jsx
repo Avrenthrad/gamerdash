@@ -1,15 +1,23 @@
 // Collectibles College — real personal inventory, with real section
 // navigation (My Shelf / Add Item / Hardware / Wishlist / Stats).
-// Add Item supports two real lookups: a camera barcode scan against a
+// Add Item supports real lookups: a camera barcode scan against a
 // generic public UPC database (lib/upc.js — covers any retail
 // product, since no general catalogue exists for most collectible
-// types), and a search against the real open Funko Pop catalog
-// (lib/funko.js). Everything else stays honest manual entry.
+// types), a search against the real open Funko Pop catalog
+// (lib/funko.js), the real Rebrickable LEGO set database (lib/rebrickable.js
+// — needs a real REBRICKABLE_KEY set server-side, degrades to an
+// honest "not set up yet" state until then, same pattern as this
+// app's other optional-key integrations), and the real Discogs vinyl
+// database (lib/discogs.js — genuinely keyless, called directly from
+// the browser, no server-side setup needed at all). Everything else
+// stays honest manual entry.
 
 import { useEffect, useState } from "react";
 import { fetchCollectibles, addCollectible, updateCollectible, removeCollectible } from "../lib/collectibles";
 import { lookupProductByBarcode } from "../lib/upc";
 import { searchFunkoCatalog } from "../lib/funko";
+import { searchRebrickableSets } from "../lib/rebrickable";
+import { searchDiscogsVinyl } from "../lib/discogs";
 import ProductBarcodeScanner from "./ProductBarcodeScanner";
 import MarketplaceSection from "./MarketplaceSection";
 
@@ -107,9 +115,8 @@ export default function CollectiblesHomePage({ onBack, isLoggedIn, userId, onSig
         <button type="button" className="back-link" onClick={onBack}>← Back to Overview</button>
         <h1 className="price-page__title">Collectibles</h1>
         <p className="price-page__subtitle">
-          Scan a barcode or search the real Funko Pop catalog to add items fast — everything else
-          stays honest manual entry. Real lookups for LEGO (Rebrickable) and vinyl (Discogs) are a
-          planned next step.
+          Scan a barcode, or search the real Funko Pop, LEGO (Rebrickable), or vinyl (Discogs)
+          catalogs to add items fast — everything else stays honest manual entry.
         </p>
       </div>
 
@@ -232,6 +239,16 @@ function AddItemForm({ userId, onAdded }) {
   const [funkoResults, setFunkoResults] = useState([]);
   const [funkoStatus, setFunkoStatus] = useState("idle"); // idle | loading | ready | error
 
+  const [showLegoSearch, setShowLegoSearch] = useState(false);
+  const [legoQuery, setLegoQuery] = useState("");
+  const [legoResults, setLegoResults] = useState([]);
+  const [legoStatus, setLegoStatus] = useState("idle"); // idle | loading | ready | error | no_key
+
+  const [showVinylSearch, setShowVinylSearch] = useState(false);
+  const [vinylQuery, setVinylQuery] = useState("");
+  const [vinylResults, setVinylResults] = useState([]);
+  const [vinylStatus, setVinylStatus] = useState("idle"); // idle | loading | ready | error
+
   async function handleBarcodeDetected(barcode) {
     setShowScanner(false);
     setScanStatus("loading");
@@ -277,6 +294,58 @@ function AddItemForm({ userId, onAdded }) {
     setFunkoQuery("");
   }
 
+  async function handleLegoSearch(e) {
+    e.preventDefault();
+    if (!legoQuery.trim()) return;
+    setLegoStatus("loading");
+    try {
+      const results = await searchRebrickableSets(legoQuery.trim());
+      if (results === "no_key") {
+        setLegoStatus("no_key");
+        return;
+      }
+      setLegoResults(results);
+      setLegoStatus("ready");
+    } catch (err) {
+      console.error("Rebrickable search failed:", err);
+      setLegoStatus("error");
+    }
+  }
+
+  function handlePickLego(set) {
+    setTitle(set.year ? `${set.name} (${set.year})` : set.name);
+    setCoverImageUrl(set.imageUrl);
+    setIdentifier(set.setNum);
+    setSource("rebrickable");
+    setShowLegoSearch(false);
+    setLegoResults([]);
+    setLegoQuery("");
+  }
+
+  async function handleVinylSearch(e) {
+    e.preventDefault();
+    if (!vinylQuery.trim()) return;
+    setVinylStatus("loading");
+    try {
+      const results = await searchDiscogsVinyl(vinylQuery.trim());
+      setVinylResults(results);
+      setVinylStatus("ready");
+    } catch (err) {
+      console.error("Discogs search failed:", err);
+      setVinylStatus("error");
+    }
+  }
+
+  function handlePickVinyl(release) {
+    setTitle(release.year ? `${release.title} (${release.year})` : release.title);
+    setCoverImageUrl(release.imageUrl);
+    setIdentifier(String(release.id));
+    setSource("discogs");
+    setShowVinylSearch(false);
+    setVinylResults([]);
+    setVinylQuery("");
+  }
+
   async function handleAdd(e) {
     e.preventDefault();
     if (!title.trim()) return;
@@ -302,6 +371,16 @@ function AddItemForm({ userId, onAdded }) {
         {type === "funko_pop" && (
           <button type="button" className="quickdash-reset-btn" onClick={() => setShowFunkoSearch((v) => !v)}>
             {showFunkoSearch ? "Cancel search" : "🔍 Search real Funko catalog"}
+          </button>
+        )}
+        {type === "lego_set" && (
+          <button type="button" className="quickdash-reset-btn" onClick={() => setShowLegoSearch((v) => !v)}>
+            {showLegoSearch ? "Cancel search" : "🔍 Search real LEGO catalog"}
+          </button>
+        )}
+        {type === "vinyl_music" && (
+          <button type="button" className="quickdash-reset-btn" onClick={() => setShowVinylSearch((v) => !v)}>
+            {showVinylSearch ? "Cancel search" : "🔍 Search real vinyl catalog"}
           </button>
         )}
       </div>
@@ -335,6 +414,71 @@ function AddItemForm({ userId, onAdded }) {
                   {pop.imageUrl && <img src={pop.imageUrl} alt="" />}
                   <span>{pop.title}{pop.series ? ` — ${pop.series}` : ""}</span>
                   <button type="button" className="linking-row__connect" onClick={() => handlePickFunko(pop)}>
+                    Use this
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {showLegoSearch && (
+        <div className="backlog-add">
+          <form className="price-search" onSubmit={handleLegoSearch}>
+            <input
+              className="price-search__input"
+              type="text"
+              placeholder="Search the real LEGO set catalog…"
+              value={legoQuery}
+              onChange={(e) => setLegoQuery(e.target.value)}
+            />
+            <button type="submit" className="price-search__button" disabled={legoStatus === "loading"}>
+              {legoStatus === "loading" ? "Searching…" : "Search"}
+            </button>
+          </form>
+          {legoStatus === "no_key" && <p className="panel__status">LEGO catalog search isn't set up yet — fill in the details manually below.</p>}
+          {legoStatus === "error" && <p className="panel__status panel__status--error">Couldn't load the LEGO catalog right now.</p>}
+          {legoStatus === "ready" && legoResults.length === 0 && <p className="panel__status">No matches — try a different search.</p>}
+          {legoResults.length > 0 && (
+            <ul className="backlog-search-results">
+              {legoResults.map((set) => (
+                <li key={set.setNum} className="backlog-search-results__row">
+                  {set.imageUrl && <img src={set.imageUrl} alt="" />}
+                  <span>{set.name}{set.year ? ` (${set.year})` : ""} — #{set.setNum}</span>
+                  <button type="button" className="linking-row__connect" onClick={() => handlePickLego(set)}>
+                    Use this
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {showVinylSearch && (
+        <div className="backlog-add">
+          <form className="price-search" onSubmit={handleVinylSearch}>
+            <input
+              className="price-search__input"
+              type="text"
+              placeholder="Search the real Discogs vinyl catalog…"
+              value={vinylQuery}
+              onChange={(e) => setVinylQuery(e.target.value)}
+            />
+            <button type="submit" className="price-search__button" disabled={vinylStatus === "loading"}>
+              {vinylStatus === "loading" ? "Searching…" : "Search"}
+            </button>
+          </form>
+          {vinylStatus === "error" && <p className="panel__status panel__status--error">Couldn't load the vinyl catalog right now.</p>}
+          {vinylStatus === "ready" && vinylResults.length === 0 && <p className="panel__status">No matches — try a different search.</p>}
+          {vinylResults.length > 0 && (
+            <ul className="backlog-search-results">
+              {vinylResults.map((release) => (
+                <li key={release.id} className="backlog-search-results__row">
+                  {release.imageUrl && <img src={release.imageUrl} alt="" />}
+                  <span>{release.title}{release.year ? ` (${release.year})` : ""}{release.format ? ` — ${release.format}` : ""}</span>
+                  <button type="button" className="linking-row__connect" onClick={() => handlePickVinyl(release)}>
                     Use this
                   </button>
                 </li>
