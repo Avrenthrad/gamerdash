@@ -30,6 +30,7 @@ export default async function handler(req, res) {
         `${BASE_URL}/search.json?q=${encodeURIComponent(q)}&fields=${fields}&limit=12`,
         { headers: { "User-Agent": USER_AGENT } }
       );
+      if (!olRes.ok) return res.status(502).json({ error: "Open Library search failed." });
       const data = await olRes.json();
       return res.status(200).json({ results: data.docs || [] });
     }
@@ -48,6 +49,7 @@ export default async function handler(req, res) {
         `${BASE_URL}/api/books?bibkeys=${encodeURIComponent(bibkey)}&format=json&jscmd=data`,
         { headers: { "User-Agent": USER_AGENT } }
       );
+      if (!olRes.ok) return res.status(502).json({ error: "Open Library ISBN lookup failed." });
       const data = await olRes.json();
       const book = data[bibkey];
       if (!book) return res.status(200).json({ book: null });

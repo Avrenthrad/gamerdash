@@ -21,6 +21,7 @@ export default function MtgScanPage({ onBack, userId, isLoggedIn, onSignIn, onCr
   const [candidates, setCandidates] = useState([]);
   const [selectedCard, setSelectedCard] = useState(null);
   const [added, setAdded] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   async function handlePhoto(e) {
     const file = e.target.files?.[0];
@@ -34,6 +35,7 @@ export default function MtgScanPage({ onBack, userId, isLoggedIn, onSignIn, onCr
     setPhoto(dataUrl);
     setSelectedCard(null);
     setAdded(false);
+    setAdding(false);
     setStatus("reading");
 
     try {
@@ -74,12 +76,15 @@ export default function MtgScanPage({ onBack, userId, isLoggedIn, onSignIn, onCr
   }
 
   async function handleAdd() {
-    if (!selectedCard) return;
+    if (!selectedCard || adding || added) return;
+    setAdding(true);
     try {
       await addToCollection(userId, selectedCard);
       setAdded(true);
     } catch (err) {
       console.error("Failed to add scanned card:", err);
+    } finally {
+      setAdding(false);
     }
   }
 
@@ -88,6 +93,7 @@ export default function MtgScanPage({ onBack, userId, isLoggedIn, onSignIn, onCr
     setCandidates([]);
     setSelectedCard(null);
     setAdded(false);
+    setAdding(false);
     setStatus("idle");
   }
 
@@ -154,8 +160,8 @@ export default function MtgScanPage({ onBack, userId, isLoggedIn, onSignIn, onCr
               {added ? (
                 <span className="score-badge">Added</span>
               ) : (
-                <button type="button" className="linking-row__connect" onClick={handleAdd}>
-                  Add to Collection
+                <button type="button" className="linking-row__connect" onClick={handleAdd} disabled={adding}>
+                  {adding ? "Adding…" : "Add to Collection"}
                 </button>
               )}
               <button type="button" className="quickdash-reset-btn" onClick={handleScanAnother}>

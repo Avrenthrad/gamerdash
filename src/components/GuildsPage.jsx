@@ -36,6 +36,7 @@ export default function GuildsPage({ onBack, userId, isLoggedIn, onSignIn, onCre
 
   const [newGuildName, setNewGuildName] = useState("");
   const [newGuildPrivate, setNewGuildPrivate] = useState(false);
+  const [creatingGuild, setCreatingGuild] = useState(false);
   const [codeInput, setCodeInput] = useState("");
   const [codeStatus, setCodeStatus] = useState("idle");
   const [codeMessage, setCodeMessage] = useState("");
@@ -71,14 +72,17 @@ export default function GuildsPage({ onBack, userId, isLoggedIn, onSignIn, onCre
 
   async function handleCreate(e) {
     e.preventDefault();
-    if (!newGuildName.trim()) return;
+    if (!newGuildName.trim() || creatingGuild) return;
+    setCreatingGuild(true);
     try {
       await createGuild(userId, newGuildName.trim(), newGuildPrivate);
       setNewGuildName("");
       setNewGuildPrivate(false);
-      loadGuilds();
+      await loadGuilds();
     } catch (err) {
       console.error("Failed to create guild:", err);
+    } finally {
+      setCreatingGuild(false);
     }
   }
 
@@ -226,7 +230,9 @@ export default function GuildsPage({ onBack, userId, isLoggedIn, onSignIn, onCre
           <input type="checkbox" checked={newGuildPrivate} onChange={(e) => setNewGuildPrivate(e.target.checked)} />
           <span>Private</span>
         </label>
-        <button type="submit" className="price-search__button">Create guild</button>
+        <button type="submit" className="price-search__button" disabled={creatingGuild}>
+          {creatingGuild ? "Creating…" : "Create guild"}
+        </button>
       </form>
 
       {status === "loading" && <p className="panel__status">Loading guilds…</p>}

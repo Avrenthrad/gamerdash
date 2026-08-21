@@ -21,6 +21,7 @@ export default async function handler(req, res) {
       if (!q) return res.status(400).json({ error: "Missing q query parameter" });
       const endpoint = mode === "search-spells" ? "spells" : "monsters";
       const olRes = await fetch(`${BASE_URL}/${endpoint}/?search=${encodeURIComponent(q)}&limit=10`);
+      if (!olRes.ok) return res.status(502).json({ error: "Open5e search failed." });
       const data = await olRes.json();
       return res.status(200).json({ results: data.results || [] });
     }

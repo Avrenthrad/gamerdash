@@ -25,6 +25,7 @@ export default async function handler(req, res) {
       if (!q) return res.status(400).json({ error: "Missing q query parameter" });
       const endpoint = mode === "search-movie" ? "search/movie" : "search/tv";
       const tmdbRes = await fetch(`${BASE_URL}/${endpoint}?api_key=${apiKey}&query=${encodeURIComponent(q)}`);
+      if (!tmdbRes.ok) return res.status(502).json({ error: "TMDB search failed." });
       const data = await tmdbRes.json();
       return res.status(200).json(data);
     }
@@ -33,7 +34,8 @@ export default async function handler(req, res) {
       const id = searchParams.get("id");
       if (!id) return res.status(400).json({ error: "Missing id query parameter" });
       const endpoint = mode === "movie-details" ? "movie" : "tv";
-      const tmdbRes = await fetch(`${BASE_URL}/${endpoint}/${id}?api_key=${apiKey}`);
+      const tmdbRes = await fetch(`${BASE_URL}/${endpoint}/${encodeURIComponent(id)}?api_key=${apiKey}`);
+      if (!tmdbRes.ok) return res.status(502).json({ error: "Failed to load TMDB details." });
       const data = await tmdbRes.json();
       return res.status(200).json(data);
     }

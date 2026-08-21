@@ -254,12 +254,19 @@ export async function fetchBinderCards(binderId) {
 // unique (binder_id, fab_card_id, printing_unique_id) constraint).
 export async function setBinderCardQuantity(binderId, card, quantity, { printingUniqueId = null, foiling = null, setId = null, edition = null, condition = "Near Mint", source } = {}) {
   if (quantity <= 0) {
-    const { error } = await supabase
+    let deleteQuery = supabase
       .from("fab_binder_cards")
       .delete()
       .eq("binder_id", binderId)
-      .eq("fab_card_id", card.id)
-      .eq("printing_unique_id", printingUniqueId);
+      .eq("fab_card_id", card.id);
+    // Supabase's .eq() never matches NULL rows (SQL `= NULL` is never
+    // true) — printingUniqueId is null whenever no specific printing was
+    // picked, so that case needs .is() instead or the delete matches
+    // nothing.
+    deleteQuery = printingUniqueId === null
+      ? deleteQuery.is("printing_unique_id", null)
+      : deleteQuery.eq("printing_unique_id", printingUniqueId);
+    const { error } = await deleteQuery;
     if (error) throw error;
     return null;
   }

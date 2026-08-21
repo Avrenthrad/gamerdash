@@ -32,7 +32,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing appid query parameter" });
     }
     try {
-      const url = `https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?appid=${appid}`;
+      const url = `https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?appid=${encodeURIComponent(appid)}`;
       const steamRes = await fetch(url);
       if (!steamRes.ok) {
         return res.status(steamRes.status).json({ error: "Steam API request failed" });
@@ -69,7 +69,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing appid query parameter" });
     }
     try {
-      const url = `https://store.steampowered.com/api/appdetails?appids=${appid}&cc=au`;
+      const url = `https://store.steampowered.com/api/appdetails?appids=${encodeURIComponent(appid)}&cc=au`;
       const steamRes = await fetch(url);
       if (!steamRes.ok) {
         return res.status(steamRes.status).json({ error: "Steam appdetails request failed" });
@@ -117,7 +117,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing appid query parameter" });
     }
     try {
-      const url = `https://store.steampowered.com/appreviews/${appid}?json=1&language=all&purchase_type=all`;
+      const url = `https://store.steampowered.com/appreviews/${encodeURIComponent(appid)}?json=1&language=all&purchase_type=all`;
       const steamRes = await fetch(url);
       if (!steamRes.ok) {
         return res.status(steamRes.status).json({ error: "Steam reviews request failed" });
@@ -169,7 +169,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing steamid query parameter" });
     }
     try {
-      const url = `https://api.steampowered.com/IWishlistService/GetWishlist/v1/?steamid=${steamid}`;
+      const url = `https://api.steampowered.com/IWishlistService/GetWishlist/v1/?steamid=${encodeURIComponent(steamid)}`;
       const steamRes = await fetch(url);
       if (!steamRes.ok) {
         return res.status(steamRes.status).json({ error: "Steam wishlist request failed — is it set to public?" });
@@ -213,7 +213,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "STEAM_API_KEY not set on the server" });
     }
     try {
-      const url = `https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?appid=${appid}&key=${apiKey}`;
+      const url = `https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?appid=${encodeURIComponent(appid)}&key=${apiKey}`;
       const steamRes = await fetch(url);
       if (!steamRes.ok) {
         return res.status(steamRes.status).json({ error: "Steam schema request failed" });
@@ -232,7 +232,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing appid query parameter" });
     }
     try {
-      const url = `https://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/?gameid=${appid}`;
+      const url = `https://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/?gameid=${encodeURIComponent(appid)}`;
       const steamRes = await fetch(url);
       if (!steamRes.ok) {
         return res.status(steamRes.status).json({ error: "Steam global achievement percentages request failed" });
@@ -254,7 +254,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "STEAM_API_KEY not set on the server" });
     }
     try {
-      const url = `https://api.steampowered.com/ISteamUser/GetFriendList/v0001/?key=${apiKey}&steamid=${steamid}&relationship=friend`;
+      const url = `https://api.steampowered.com/ISteamUser/GetFriendList/v0001/?key=${apiKey}&steamid=${encodeURIComponent(steamid)}&relationship=friend`;
       const steamRes = await fetch(url);
       if (!steamRes.ok) {
         // Steam returns a non-200 here when the friends list is
@@ -280,7 +280,7 @@ export default async function handler(req, res) {
     }
     try {
       const count = req.query.count || "5";
-      const url = `https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=${appid}&count=${count}&maxlength=300&format=json`;
+      const url = `https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=${encodeURIComponent(appid)}&count=${encodeURIComponent(count)}&maxlength=300&format=json`;
       const steamRes = await fetch(url);
       if (!steamRes.ok) {
         return res.status(steamRes.status).json({ error: "Steam news request failed" });
@@ -304,7 +304,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "STEAM_API_KEY not set on the server" });
     }
     try {
-      const url = `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${apiKey}&steamids=${steamids}`;
+      const url = `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${apiKey}&steamids=${encodeURIComponent(steamids)}`;
       const steamRes = await fetch(url);
       if (!steamRes.ok) {
         return res.status(steamRes.status).json({ error: "Steam player summaries request failed" });
@@ -325,8 +325,8 @@ export default async function handler(req, res) {
 
   try {
     const url = appid
-      ? `https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${appid}&key=${apiKey}&steamid=${steamid}`
-      : `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key=${apiKey}&steamid=${steamid}&format=json&include_appinfo=1`;
+      ? `https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${encodeURIComponent(appid)}&key=${apiKey}&steamid=${encodeURIComponent(steamid)}`
+      : `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key=${apiKey}&steamid=${encodeURIComponent(steamid)}&format=json&include_appinfo=1`;
 
     const steamRes = await fetch(url);
     if (!steamRes.ok) {

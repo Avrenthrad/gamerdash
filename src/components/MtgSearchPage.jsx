@@ -11,6 +11,7 @@ export default function MtgSearchPage({ onBack, userId, isLoggedIn, onSignIn, on
   const [results, setResults] = useState([]);
   const [status, setStatus] = useState("idle"); // idle | loading | ready | error
   const [addedIds, setAddedIds] = useState(new Set());
+  const [addingIds, setAddingIds] = useState(new Set());
   // Guards a real bug: the debounced autocomplete fetch below can
   // still be in flight when the user submits a real search (e.g.
   // click Search right after typing, before the 250ms debounce
@@ -37,14 +38,15 @@ export default function MtgSearchPage({ onBack, userId, isLoggedIn, onSignIn, on
     return () => clearTimeout(timer);
   }, [query]);
 
-  async function handleSearch(e) {
+  async function handleSearch(e, overrideQuery) {
     e?.preventDefault();
-    if (!query.trim()) return;
+    const q = overrideQuery ?? query;
+    if (!q.trim()) return;
     suggestionRequestId.current += 1; // invalidate any in-flight autocomplete
     setSuggestions([]);
     setStatus("loading");
     try {
-      const { cards } = await searchCards(query.trim());
+      const { cards } = await searchCards(q.trim());
       setResults(cards);
       setStatus("ready");
     } catch (err) {
@@ -54,11 +56,19 @@ export default function MtgSearchPage({ onBack, userId, isLoggedIn, onSignIn, on
   }
 
   async function handleAdd(card) {
+    if (addingIds.has(card.id) || addedIds.has(card.id)) return;
+    setAddingIds((prev) => new Set(prev).add(card.id));
     try {
       await addToCollection(userId, card);
       setAddedIds((prev) => new Set(prev).add(card.id));
     } catch (err) {
       console.error("Failed to add card to collection:", err);
+    } finally {
+      setAddingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(card.id);
+        return next;
+      });
     }
   }
 
@@ -89,7 +99,7 @@ export default function MtgSearchPage({ onBack, userId, isLoggedIn, onSignIn, on
                 <button
                   type="button"
                   className="linking-row__connect"
-                  onClick={() => { setQuery(name); setSuggestions([]); handleSearch(); }}
+                  onClick={() => { setQuery(name); setSuggestions([]); handleSearch(undefined, name); }}
                   style={{ width: "100%", textAlign: "left" }}
                 >
                   {name}
@@ -127,9 +137,9 @@ export default function MtgSearchPage({ onBack, userId, isLoggedIn, onSignIn, on
                   type="button"
                   className="linking-row__connect"
                   onClick={() => handleAdd(card)}
-                  disabled={addedIds.has(card.id)}
+                  disabled={addedIds.has(card.id) || addingIds.has(card.id)}
                 >
-                  {addedIds.has(card.id) ? "Added" : "Add to Collection"}
+                  {addedIds.has(card.id) ? "Added" : addingIds.has(card.id) ? "Adding…" : "Add to Collection"}
                 </button>
               ) : (
                 <div className="backlog-card__actions">

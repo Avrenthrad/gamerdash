@@ -17,6 +17,14 @@ export default function BookBarcodeScanner({ onDetected, onManualEntry }) {
   const [supported] = useState(typeof window !== "undefined" && "BarcodeDetector" in window);
   const [status, setStatus] = useState("idle"); // idle | starting | scanning | error
   const [manualValue, setManualValue] = useState("");
+  // Holds the latest onDetected without it being a dependency of the
+  // camera-setup effect below — the parent passes a new function
+  // identity on every render, and re-running that effect on every
+  // render would tear down and restart the live camera stream.
+  const onDetectedRef = useRef(onDetected);
+  useEffect(() => {
+    onDetectedRef.current = onDetected;
+  }, [onDetected]);
 
   useEffect(() => {
     if (!supported) return;
@@ -54,7 +62,7 @@ export default function BookBarcodeScanner({ onDetected, onManualEntry }) {
         // out any other EAN-13 product barcode that isn't a book.
         const isbnMatch = barcodes.find((b) => /^97[89]\d{10}$/.test(b.rawValue));
         if (isbnMatch) {
-          onDetected(isbnMatch.rawValue);
+          onDetectedRef.current(isbnMatch.rawValue);
           return;
         }
       } catch {
@@ -69,7 +77,7 @@ export default function BookBarcodeScanner({ onDetected, onManualEntry }) {
       if (rafId) cancelAnimationFrame(rafId);
       stream?.getTracks().forEach((t) => t.stop());
     };
-  }, [supported, onDetected]);
+  }, [supported]);
 
   function handleManualSubmit(e) {
     e.preventDefault();

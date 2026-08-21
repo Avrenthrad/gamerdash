@@ -30,12 +30,14 @@ export default async function handler(req, res) {
   try {
     if (mode === "platforms") {
       const rawgRes = await fetch(`${BASE_URL}/platforms?key=${apiKey}&page_size=50`);
+      if (!rawgRes.ok) return res.status(502).json({ error: "Failed to load platforms." });
       const data = await rawgRes.json();
       return res.status(200).json(data);
     }
 
     if (mode === "genres") {
       const rawgRes = await fetch(`${BASE_URL}/genres?key=${apiKey}&page_size=50`);
+      if (!rawgRes.ok) return res.status(502).json({ error: "Failed to load genres." });
       const data = await rawgRes.json();
       return res.status(200).json(data);
     }
@@ -46,6 +48,9 @@ export default async function handler(req, res) {
       const platforms = searchParams.get("platforms"); // comma-separated RAWG platform IDs
       const genres = searchParams.get("genres"); // comma-separated RAWG genre IDs
       const excludeAdditions = searchParams.get("excludeAdditions");
+      if (!dateFrom || !dateTo) {
+        return res.status(400).json({ error: "Missing dateFrom or dateTo query parameter" });
+      }
 
       const params = new URLSearchParams({
         key: apiKey,
@@ -58,6 +63,7 @@ export default async function handler(req, res) {
       if (excludeAdditions === "true") params.set("exclude_additions", "true");
 
       const rawgRes = await fetch(`${BASE_URL}/games?${params.toString()}`);
+      if (!rawgRes.ok) return res.status(502).json({ error: "Failed to load upcoming games." });
       const data = await rawgRes.json();
       return res.status(200).json(data);
     }
@@ -66,6 +72,7 @@ export default async function handler(req, res) {
       const q = searchParams.get("q");
       if (!q) return res.status(400).json({ error: "Missing q query parameter" });
       const rawgRes = await fetch(`${BASE_URL}/games?key=${apiKey}&search=${encodeURIComponent(q)}&page_size=20`);
+      if (!rawgRes.ok) return res.status(502).json({ error: "Game search failed." });
       const data = await rawgRes.json();
       return res.status(200).json(data);
     }
@@ -74,6 +81,7 @@ export default async function handler(req, res) {
       const gameId = searchParams.get("gameId");
       if (!gameId) return res.status(400).json({ error: "Missing gameId query parameter" });
       const rawgRes = await fetch(`${BASE_URL}/games/${gameId}/additions?key=${apiKey}&page_size=20`);
+      if (!rawgRes.ok) return res.status(502).json({ error: "Failed to load additions." });
       const data = await rawgRes.json();
       return res.status(200).json(data);
     }

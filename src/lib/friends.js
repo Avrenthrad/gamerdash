@@ -37,11 +37,15 @@ export async function fetchFriends(userId) {
 }
 
 export async function removeFriend(userId, friendId) {
+  // Friendship rows are written symmetrically (one row per direction) —
+  // remove both, so an unfriend doesn't leave the other side still able
+  // to see/message this user as a friend.
   const { error } = await supabase
     .from("friends")
     .delete()
-    .eq("user_id", userId)
-    .eq("friend_id", friendId);
+    .or(
+      `and(user_id.eq.${userId},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${userId})`
+    );
   if (error) throw error;
 }
 

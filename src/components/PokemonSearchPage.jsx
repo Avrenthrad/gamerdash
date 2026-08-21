@@ -11,6 +11,7 @@ export default function PokemonSearchPage({ onBack, userId, isLoggedIn, onSignIn
   const [results, setResults] = useState([]);
   const [status, setStatus] = useState("idle"); // idle | loading | ready | error
   const [addedIds, setAddedIds] = useState(new Set());
+  const [addingIds, setAddingIds] = useState(new Set());
   // Same real bug this app already hit and fixed in MtgSearchPage/
   // FabSearchPage: a debounced autocomplete fetch still in flight when
   // the user submits a real search can resolve late and re-populate
@@ -24,21 +25,24 @@ export default function PokemonSearchPage({ onBack, userId, isLoggedIn, onSignIn
     }
     const timer = setTimeout(() => {
       const requestId = ++suggestionRequestId.current;
-      getPokemonCardAutocomplete(query).then((names) => {
-        if (requestId === suggestionRequestId.current) setSuggestions(names);
-      });
+      getPokemonCardAutocomplete(query)
+        .then((names) => {
+          if (requestId === suggestionRequestId.current) setSuggestions(names);
+        })
+        .catch((err) => console.error("Autocomplete failed:", err));
     }, 250);
     return () => clearTimeout(timer);
   }, [query]);
 
-  async function handleSearch(e) {
+  async function handleSearch(e, overrideQuery) {
     e?.preventDefault();
-    if (!query.trim()) return;
+    const q = overrideQuery ?? query;
+    if (!q.trim()) return;
     suggestionRequestId.current += 1;
     setSuggestions([]);
     setStatus("loading");
     try {
-      const { cards } = await searchPokemonCards(nameQuery(query.trim()));
+      const { cards } = await searchPokemonCards(nameQuery(q.trim()));
       setResults(cards);
       setStatus("ready");
     } catch (err) {
@@ -48,11 +52,19 @@ export default function PokemonSearchPage({ onBack, userId, isLoggedIn, onSignIn
   }
 
   async function handleAdd(card) {
+    if (addingIds.has(card.id) || addedIds.has(card.id)) return;
+    setAddingIds((prev) => new Set(prev).add(card.id));
     try {
       await addToCollection(userId, card);
       setAddedIds((prev) => new Set(prev).add(card.id));
     } catch (err) {
       console.error("Failed to add card to collection:", err);
+    } finally {
+      setAddingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(card.id);
+        return next;
+      });
     }
   }
 
@@ -83,7 +95,7 @@ export default function PokemonSearchPage({ onBack, userId, isLoggedIn, onSignIn
                 <button
                   type="button"
                   className="linking-row__connect"
-                  onClick={() => { setQuery(name); setSuggestions([]); handleSearch(); }}
+                  onClick={() => { setQuery(name); setSuggestions([]); handleSearch(undefined, name); }}
                   style={{ width: "100%", textAlign: "left" }}
                 >
                   {name}
@@ -122,9 +134,9 @@ export default function PokemonSearchPage({ onBack, userId, isLoggedIn, onSignIn
                     type="button"
                     className="linking-row__connect"
                     onClick={() => handleAdd(card)}
-                    disabled={addedIds.has(card.id)}
+                    disabled={addedIds.has(card.id) || addingIds.has(card.id)}
                   >
-                    {addedIds.has(card.id) ? "Added" : "Add to Collection"}
+                    {addedIds.has(card.id) ? "Added" : addingIds.has(card.id) ? "Adding…" : "Add to Collection"}
                   </button>
                 ) : (
                   <div className="backlog-card__actions">

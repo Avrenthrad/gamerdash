@@ -219,12 +219,18 @@ export async function fetchBinderCards(binderId) {
 // updates its quantity instead of stacking a duplicate row.
 export async function setBinderCardQuantity(binderId, card, quantity, { finish = null, condition = "Near Mint", source } = {}) {
   if (quantity <= 0) {
-    const { error } = await supabase
+    let deleteQuery = supabase
       .from("pokemon_binder_cards")
       .delete()
       .eq("binder_id", binderId)
-      .eq("pokemon_card_id", card.id)
-      .eq("finish", finish);
+      .eq("pokemon_card_id", card.id);
+    // Supabase's .eq() never matches NULL rows (SQL `= NULL` is never
+    // true) — finish is null whenever no specific finish was picked, so
+    // that case needs .is() instead or the delete matches nothing.
+    deleteQuery = finish === null
+      ? deleteQuery.is("finish", null)
+      : deleteQuery.eq("finish", finish);
+    const { error } = await deleteQuery;
     if (error) throw error;
     return null;
   }

@@ -119,12 +119,16 @@ function currentGameActivity(presence) {
 }
 
 async function updateCurrentActivity(userId, activity) {
-  await supabase.from("current_activity").upsert({
-    user_id: userId,
-    platform: activity ? normalizePlatform(activity) : null,
-    game_name: activity?.name || null,
-    updated_at: new Date().toISOString(),
-  });
+  const { error } = await supabase.from("current_activity").upsert(
+    {
+      user_id: userId,
+      platform: activity ? normalizePlatform(activity) : null,
+      game_name: activity?.name || null,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" },
+  );
+  if (error) console.error("updateCurrentActivity upsert failed:", error);
 }
 
 async function accumulatePlaytime(userId, platform, gameName, startedAt) {
@@ -143,13 +147,17 @@ async function accumulatePlaytime(userId, platform, gameName, startedAt) {
 
   const newTotal = (existing?.total_minutes || 0) + minutes;
 
-  await supabase.from("platform_playtime").upsert({
-    user_id: userId,
-    platform,
-    game_name: gameName,
-    total_minutes: newTotal,
-    updated_at: new Date().toISOString(),
-  });
+  const { error } = await supabase.from("platform_playtime").upsert(
+    {
+      user_id: userId,
+      platform,
+      game_name: gameName,
+      total_minutes: newTotal,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id,platform,game_name" },
+  );
+  if (error) console.error("accumulatePlaytime upsert failed:", error);
 }
 
 client.on("presenceUpdate", async (_oldPresence, newPresence) => {
