@@ -201,7 +201,7 @@ export function AppProvider({ children }) {
   const [overallMasteryComputedAt, setOverallMasteryComputedAt] = useState(null);
 
   const [themeMode, setThemeMode] = useState("dark");
-  const [accentColor, setAccentColor] = useState("red");
+  const [accentColor, setAccentColor] = useState("gold");
   const [wallpaperUrl, setWallpaperUrl] = useState(null);
   const [currency, setCurrency] = useState("AUD");
   const [xbxpricesKey, setXbxpricesKey] = useState("");
@@ -455,7 +455,10 @@ export function AppProvider({ children }) {
         setOverallMasteryBreakdown(profile.overall_mastery_breakdown || []);
         setOverallMasteryComputedAt(profile.overall_mastery_computed_at || null);
         setThemeMode(profile.theme_mode || "dark");
-        setAccentColor(profile.accent_color || "red");
+        // "yellow" was retired as its own preset in the gold-default
+        // redesign — gold replaces it, so treat old saved picks as gold
+        // rather than leaving the theme picker with nothing selected.
+        setAccentColor(profile.accent_color === "yellow" ? "gold" : profile.accent_color || "gold");
         setWallpaperUrl(profile.wallpaper_url || null);
         setCurrency(profile.currency || "AUD");
         setXbxpricesKey(profile.xbxprices_key || "");

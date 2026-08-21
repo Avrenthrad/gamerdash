@@ -405,8 +405,8 @@ export default function AccountSettingsPage({
 
         <div className="accent-swatch-row" role="radiogroup" aria-label="Accent colour">
           {[
+            { id: "gold", label: "Gold" },
             { id: "red", label: "Red" },
-            { id: "yellow", label: "Yellow" },
             { id: "purple", label: "Purple" },
             { id: "blue", label: "Blue" },
           ].map((option) => (

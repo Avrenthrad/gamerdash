@@ -18,6 +18,35 @@ import CollegeIcon from "./CollegeIcon";
 
 const NOT_BUILT_COLLEGES = [];
 
+// Animates 0 -> target once real data is in, instead of just swapping
+// the number in — the one deliberate "wow" moment on the app's front
+// page. Skips straight to the final value under reduced-motion.
+function useCountUp(target, active) {
+  const [value, setValue] = useState(0);
+
+  useEffect(() => {
+    if (!active) return;
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion || target <= 0) {
+      setValue(target);
+      return;
+    }
+    const duration = 900;
+    const start = performance.now();
+    let raf;
+    function tick(now) {
+      const progress = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setValue(Math.round(eased * target));
+      if (progress < 1) raf = requestAnimationFrame(tick);
+    }
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, active]);
+
+  return value;
+}
+
 export default function OverviewPage({
   isLoggedIn,
   userId,
@@ -61,12 +90,26 @@ export default function OverviewPage({
   const showGaming = selectedColleges.includes("gaming");
   const showTcg = selectedColleges.includes("tcg");
 
+  const heroReady = isLoggedIn && status === "ready";
+  const totalCollected = (gameCount || 0) + (cardCount || 0) + (entertainmentCount || 0) + (collectiblesCount || 0) + (tabletopCount || 0);
+  const animatedTotal = useCountUp(totalCollected, heroReady);
+
   return (
     <div className="overview-page">
       <div className="price-page__head">
         <h1 className="price-page__title">Overview</h1>
         <p className="price-page__subtitle">What's actually going on across your Colleges.</p>
       </div>
+
+      {heroReady && (
+        <div className="overview-hero">
+          <span className="overview-hero__eyebrow">Your collection</span>
+          <div className="overview-hero__value">
+            <span className="overview-hero__number">{animatedTotal.toLocaleString()}</span>
+            <span className="overview-hero__unit">pieces collected across your Colleges</span>
+          </div>
+        </div>
+      )}
 
       {showGaming && isLoggedIn && <SteamPresenceCard linkedSteamId={linkedSteamId} />}
       {isLoggedIn && <FriendsActivityCard userId={userId} onGoToFriends={onGoToFriends} />}
