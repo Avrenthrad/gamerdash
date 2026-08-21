@@ -16,13 +16,15 @@
      hundreds of existing rules reference var(--red) directly (not
      just var(--accent)), so repointing what this slot HOLDS is far
      lower-risk than a mass rename across ~6,500 lines. Default is a
-     muted antique brass gold, used sparingly (hairlines, small fills,
-     active states) — never as a flood fill. data-accent="red" below
-     restores the original red for the Account Settings theme picker. */
-  --red: #BE9553;
-  --red-deep: #7E6230;
-  --red-bright: #E2BC79;
-  --alpha-yellow: #C9A155;
+     real, saturated yellow-gold (jewelry-metal gold, not a muted
+     bronze), used deliberately rather than flooded everywhere.
+     data-accent="red" below restores the original red for the
+     Account Settings theme picker. */
+  --red: #D4AF37;
+  --red-deep: #9C7A24;
+  --red-bright: #F2CC66;
+  --red-highlight: #FCEABB;
+  --alpha-yellow: #E0B93A;
 
   /* Section accents (solid, used for text/icons/small fills) —
      unchanged categorical colors, one per dashboard widget type. */
@@ -33,8 +35,10 @@
   --sky: #5AA9E6;     /* live service calendar / feed */
   --lime: #8FC33D;    /* friends */
 
-  /* Section accents (gradients, used for panel top bars / glows) */
-  --grad-red:    linear-gradient(90deg, var(--red), var(--red-deep));
+  /* Section accents (gradients, used for panel top bars / glows).
+     --grad-red gets a third highlight stop and a diagonal angle for
+     an actual metallic-shine read, not just a two-color fade. */
+  --grad-red:    linear-gradient(135deg, var(--red-highlight) 0%, var(--red) 45%, var(--red-deep) 100%);
   --grad-amber:  linear-gradient(90deg, #F2B94D, var(--red));
   --grad-teal:   linear-gradient(90deg, #55D6DE, #1D7DE0);
   --grad-violet: linear-gradient(90deg, #B4A6FF, #6B54D6);
@@ -327,7 +331,7 @@ button { font-family: inherit; }
   font-family: var(--font-mono);
   font-weight: 700;
   font-size: 12px;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--alpha-yellow);
 }
@@ -381,6 +385,7 @@ button { font-family: inherit; }
 }
 
 .dash-header__score-label {
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -555,7 +560,7 @@ button { font-family: inherit; }
   font-size: 11px;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
 }
 
 .panel__title {
@@ -601,7 +606,7 @@ button { font-family: inherit; }
 }
 
 .panel__stat-value {
-  font-family: var(--font-display);
+  font-family: var(--font-mono);
   font-size: 22px;
   font-weight: 600;
   color: var(--violet);
@@ -769,6 +774,7 @@ button { font-family: inherit; }
   display: flex;
   align-items: center;
   gap: 10px;
+  font-family: var(--font-display);
   font-size: 15px;
   font-weight: 600;
   margin: 0 0 10px;
@@ -864,10 +870,11 @@ button { font-family: inherit; }
 
 .library-table th {
   text-align: left;
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   font-weight: 500;
   padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
@@ -1231,7 +1238,7 @@ button { font-family: inherit; }
 
 .auth-form__submit {
   margin-top: 4px;
-  background: var(--accent);
+  background: var(--grad-red);
   border: none;
   color: var(--text-on-accent);
   font-weight: 600;
@@ -1239,12 +1246,12 @@ button { font-family: inherit; }
   padding: 11px;
   border-radius: var(--radius-pill);
   box-shadow: var(--shadow-sm);
-  transition: background var(--duration-fast) var(--ease-standard);
+  transition: filter var(--duration-fast) var(--ease-standard);
   cursor: pointer;
 }
 
 .auth-form__submit:hover {
-  background: var(--accent-bright);
+  filter: brightness(1.08);
 }
 
 .auth-divider {
@@ -1252,10 +1259,11 @@ button { font-family: inherit; }
   display: flex;
   align-items: center;
   gap: 10px;
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
 }
 
 .auth-divider::before,
@@ -1775,6 +1783,7 @@ button { font-family: inherit; }
 
 .dash-header__notifications-title {
   display: block;
+  font-family: var(--font-mono);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -1987,6 +1996,7 @@ button { font-family: inherit; }
 }
 
 .dash-drawer__section-label {
+  font-family: var(--font-mono);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -2247,9 +2257,9 @@ button { font-family: inherit; }
 }
 
 .quickdash-label__title {
-  font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -2459,10 +2469,10 @@ button { font-family: inherit; }
   outline: none;
 }
 
-/* Flat solid fill rather than a gradient — every primary action in
-   the app reads as the same brass plate, not a glossy button. */
+/* Metallic gold gradient fill — every primary action in the app
+   shares the same shine, not a flat plate. */
 .price-search__button {
-  background: var(--accent);
+  background: var(--grad-red);
   border: none;
   color: var(--text-on-accent);
   font-weight: 600;
@@ -2471,12 +2481,12 @@ button { font-family: inherit; }
   border-radius: var(--radius-pill);
   cursor: pointer;
   box-shadow: var(--shadow-sm);
-  transition: background var(--duration-fast) var(--ease-standard),
+  transition: filter var(--duration-fast) var(--ease-standard),
     box-shadow var(--duration-fast) var(--ease-standard);
 }
 
 .price-search__button:hover {
-  background: var(--accent-bright);
+  filter: brightness(1.08);
   box-shadow: var(--shadow-md);
 }
 
@@ -3298,12 +3308,12 @@ button { font-family: inherit; }
   font-size: 11px;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
 }
 
 .account-gate-page__title {
   font-family: var(--font-display);
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 600;
   margin: 0;
 }
@@ -3358,7 +3368,7 @@ button { font-family: inherit; }
 }
 
 .account-gate-popover__primary {
-  background: var(--accent);
+  background: var(--grad-red);
   border: none;
   color: var(--text-on-accent);
   font-weight: 600;
@@ -3366,11 +3376,11 @@ button { font-family: inherit; }
   padding: 8px 16px;
   border-radius: var(--radius-pill);
   cursor: pointer;
-  transition: background var(--duration-fast) var(--ease-standard);
+  transition: filter var(--duration-fast) var(--ease-standard);
 }
 
 .account-gate-popover__primary:hover {
-  background: var(--accent-bright);
+  filter: brightness(1.08);
 }
 
 .account-gate-popover__secondary {
@@ -4277,7 +4287,7 @@ button { font-family: inherit; }
   width: 44px;
   height: 44px;
   border-radius: var(--radius-md);
-  background: var(--accent);
+  background: var(--grad-red);
   color: var(--text-on-accent);
   font-family: var(--font-display);
   font-weight: 700;
@@ -4296,7 +4306,7 @@ button { font-family: inherit; }
 }
 
 .guild-row__logo--placeholder {
-  background: var(--accent);
+  background: var(--grad-red);
   color: var(--text-on-accent);
   font-family: var(--font-display);
   font-weight: 700;
@@ -4329,7 +4339,7 @@ button { font-family: inherit; }
 }
 
 .guild-detail__logo--placeholder {
-  background: var(--accent);
+  background: var(--grad-red);
   color: var(--text-on-accent);
   font-family: var(--font-display);
   font-weight: 700;
@@ -4651,6 +4661,7 @@ button { font-family: inherit; }
 }
 
 .backlog-card__title {
+  font-family: var(--font-display);
   font-weight: 600;
 }
 
@@ -4870,11 +4881,12 @@ button { font-family: inherit; }
 
 .current-rotation__eyebrow {
   display: block;
+  font-family: var(--font-mono);
   font-size: 11px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--red);
-  font-weight: 600;
+  color: var(--text-muted);
+  font-weight: 500;
   margin-bottom: 4px;
 }
 
@@ -4970,6 +4982,7 @@ button { font-family: inherit; }
 }
 
 .current-rotation__card-title {
+  font-family: var(--font-display);
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
@@ -5083,10 +5096,6 @@ button { font-family: inherit; }
   border-radius: 14px;
 }
 
-.panel__eyebrow {
-  letter-spacing: 0.06em;
-}
-
 .panel-empty {
   padding: 8px 0 4px;
   color: var(--text-muted);
@@ -5147,7 +5156,7 @@ button { font-family: inherit; }
   margin: 0 0 8px;
   font-family: var(--font-display);
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text);
 }
 
@@ -5178,6 +5187,7 @@ html[data-mode="light"] .current-rotation {
 /* ---------- Header drawer: Trading Cards section divider ---------- */
 
 .dash-drawer__section-label {
+  font-family: var(--font-mono);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -5362,9 +5372,10 @@ html[data-mode="light"] .current-rotation {
   position: absolute;
   top: 10px;
   right: 10px;
+  font-family: var(--font-mono);
   font-size: 9px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   color: var(--text-muted);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -5393,7 +5404,7 @@ html[data-mode="light"] .current-rotation {
   font-weight: 500;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.06em;
 }
 
 .overview-hero__value {
@@ -5401,16 +5412,53 @@ html[data-mode="light"] .current-rotation {
   display: inline-flex;
   align-items: baseline;
   gap: 10px;
-  overflow: hidden;
+  animation: overviewHeroValueIn 0.35s var(--ease-standard);
+}
+
+@keyframes overviewHeroValueIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.overview-hero .hero-card__dots {
+  margin-top: 12px;
+}
+
+/* Soft breathing glow behind the number — the "this is live" signal.
+   Lives on the un-clipped .overview-hero__value (not the number
+   itself) so it can bleed outward instead of being cut off. */
+.overview-hero__aura {
+  position: absolute;
+  left: -30px;
+  top: 50%;
+  width: 200px;
+  height: 200px;
+  transform: translateY(-50%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 38%, transparent), transparent 70%);
+  filter: blur(24px);
+  z-index: -1;
+  animation: overviewAuraPulse 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes overviewAuraPulse {
+  0%, 100% { opacity: 0.55; transform: translateY(-50%) scale(0.92); }
+  50% { opacity: 1; transform: translateY(-50%) scale(1.08); }
 }
 
 .overview-hero__number {
+  position: relative;
+  overflow: hidden;
   font-family: var(--font-display);
   font-size: 64px;
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+  background: var(--grad-red);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .overview-hero__unit {
@@ -5419,7 +5467,7 @@ html[data-mode="light"] .current-rotation {
   font-weight: 500;
 }
 
-.overview-hero__value::after {
+.overview-hero__number::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -5436,14 +5484,95 @@ html[data-mode="light"] .current-rotation {
   to { transform: translateX(130%); }
 }
 
+/* ---------- Overview live-activity ticker ----------
+   A continuous scrolling strip under the hero number, reusing the
+   same real Guild-activity feed FriendsActivityCard shows as a list
+   — just given a live, always-moving treatment here instead. Hover
+   pauses it so it's actually readable on demand. */
+.overview-ticker {
+  position: relative;
+  margin-top: 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.overview-ticker::before,
+.overview-ticker::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 48px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.overview-ticker::before {
+  left: 0;
+  background: linear-gradient(90deg, var(--bg), transparent);
+}
+
+.overview-ticker::after {
+  right: 0;
+  background: linear-gradient(270deg, var(--bg), transparent);
+}
+
+.overview-ticker__track {
+  display: flex;
+  align-items: center;
+  gap: 36px;
+  width: max-content;
+  animation: overviewTickerScroll 26s linear infinite;
+}
+
+.overview-ticker:hover .overview-ticker__track {
+  animation-play-state: paused;
+}
+
+@keyframes overviewTickerScroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.overview-ticker__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.overview-ticker__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
 @media (max-width: 640px) {
   .overview-hero__number { font-size: 44px; }
+  .overview-hero__aura { width: 140px; height: 140px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .overview-hero__value::after {
+  .overview-hero__number::after {
     animation: none;
     display: none;
+  }
+  .overview-hero__aura {
+    animation: none;
+    opacity: 0.7;
+  }
+  .overview-ticker__track {
+    animation: none;
+  }
+  .overview-ticker {
+    overflow-x: auto;
   }
 }
 
@@ -5491,20 +5620,22 @@ html[data-mode="light"] .current-rotation {
 
 /* Signature corner tag — a small folded-corner plate, like a catalog
    card's turned-up corner, instead of the old full-width gradient
-   stripe every card used to carry regardless of what it was. Grows
-   slightly on hover rather than just brightening. */
+   stripe every card used to carry regardless of what it was. A
+   clip-path triangle (not a border-triangle) so it can carry the same
+   metallic gold shine as everything else. Grows slightly on hover
+   rather than just brightening. */
 .overview-card::before {
   content: "";
   position: absolute;
   top: 0;
   right: 0;
-  width: 0;
-  height: 0;
-  border-style: solid;
-  border-width: 0 20px 20px 0;
-  border-color: transparent var(--accent) transparent transparent;
-  opacity: 0.8;
-  transition: border-width var(--duration-base) var(--ease-standard),
+  width: 22px;
+  height: 22px;
+  background: var(--grad-red);
+  clip-path: polygon(100% 0, 100% 100%, 0 0);
+  opacity: 0.85;
+  transition: width var(--duration-base) var(--ease-standard),
+    height var(--duration-base) var(--ease-standard),
     opacity var(--duration-base) var(--ease-standard);
 }
 
@@ -5515,7 +5646,8 @@ html[data-mode="light"] .current-rotation {
 }
 
 .overview-card:hover::before {
-  border-width: 0 26px 26px 0;
+  width: 28px;
+  height: 28px;
   opacity: 1;
 }
 
@@ -5553,7 +5685,7 @@ html[data-mode="light"] .current-rotation {
   color: var(--text-muted);
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.06em;
 }
 
 .overview-card__value {
@@ -5616,18 +5748,19 @@ html[data-mode="light"] .current-rotation {
   box-shadow: var(--shadow-sm);
 }
 
-/* Solid flat fill, not a gradient — reads as a brass name-plate
-   rather than a glowing SaaS nav pill. */
+/* Metallic gold shine — the same gradient every primary fill in the
+   app uses, not a flat plate. */
 .college-tabs__item--active {
   color: var(--text-on-accent);
-  background: var(--accent);
+  background: var(--grad-red);
   font-weight: 600;
   box-shadow: var(--shadow-sm);
 }
 
 .college-tabs__item--active:hover {
   color: var(--text-on-accent);
-  background: var(--accent);
+  background: var(--grad-red);
+  filter: brightness(1.06);
   transform: none;
 }
 
@@ -5675,6 +5808,7 @@ html[data-mode="light"] .current-rotation {
   display: flex;
   align-items: center;
   gap: 8px;
+  font-family: var(--font-mono);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -6063,9 +6197,10 @@ html[data-mode="light"] .current-rotation {
 }
 
 .mastery-ps-grid__row--head > span {
+  font-family: var(--font-mono);
   font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   color: var(--text-tertiary);
   font-weight: 600;
 }
@@ -6290,6 +6425,7 @@ html[data-mode="light"] .current-rotation {
 
 .cmdk__section-label {
   display: block;
+  font-family: var(--font-mono);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -6431,6 +6567,7 @@ html[data-mode="light"] .current-rotation {
 }
 
 .presence-card__title {
+  font-family: var(--font-display);
   font-weight: 600;
   font-size: 14px;
   color: var(--text-primary);

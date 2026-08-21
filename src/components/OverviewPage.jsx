@@ -12,6 +12,7 @@ import { fetchCollection } from "../lib/mtg";
 import { fetchEntertainmentEntries } from "../lib/entertainment";
 import { fetchCollectibles } from "../lib/collectibles";
 import { fetchCampaigns, fetchArmies } from "../lib/tabletop";
+import { fetchRecentActivityForUser, describeActivity } from "../lib/guilds";
 import SteamPresenceCard from "./SteamPresenceCard";
 import FriendsActivityCard from "./FriendsActivityCard";
 import CollegeIcon from "./CollegeIcon";
@@ -61,6 +62,7 @@ export default function OverviewPage({
   const [collectiblesCount, setCollectiblesCount] = useState(null);
   const [tabletopCount, setTabletopCount] = useState(null);
   const [status, setStatus] = useState("idle");
+  const [tickerActivity, setTickerActivity] = useState([]);
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -87,12 +89,55 @@ export default function OverviewPage({
       });
   }, [isLoggedIn, userId, linkedSteamId]);
 
+  // Kept as its own effect/request, separate from the Promise.all
+  // above, so a Guild-activity hiccup can never take down the hero
+  // number or College tiles (and vice versa).
+  useEffect(() => {
+    if (!isLoggedIn || !userId) return;
+    fetchRecentActivityForUser(userId, 8)
+      .then(setTickerActivity)
+      .catch((err) => console.error("Overview ticker fetch failed:", err));
+  }, [isLoggedIn, userId]);
+
   const showGaming = selectedColleges.includes("gaming");
   const showTcg = selectedColleges.includes("tcg");
 
   const heroReady = isLoggedIn && status === "ready";
   const totalCollected = (gameCount || 0) + (cardCount || 0) + (entertainmentCount || 0) + (collectiblesCount || 0) + (tabletopCount || 0);
-  const animatedTotal = useCountUp(totalCollected, heroReady);
+
+  // Only real, already-fetched numbers make the rotation — no invented
+  // stats. A count of 0 still counts as "real" (matches this page's
+  // existing honest-empty-state rule above), so it isn't filtered out;
+  // only Colleges the user hasn't turned on, or that never returned
+  // data (null), are skipped.
+  const heroSlides = [
+    { key: "total", label: "Your collection", value: totalCollected, unit: "pieces collected across your Colleges" },
+    showGaming && gameCount !== null && { key: "gaming", label: "Gaming library", value: gameCount, unit: "games in your library" },
+    showTcg && cardCount !== null && { key: "tcg", label: "TCG collection", value: cardCount, unit: "cards collected" },
+    selectedColleges.includes("entertainment") && entertainmentCount !== null && { key: "entertainment", label: "Entertainment", value: entertainmentCount, unit: "movies, shows, anime & books tracked" },
+    selectedColleges.includes("collectibles") && collectiblesCount !== null && { key: "collectibles", label: "Collectibles", value: collectiblesCount, unit: "items on your shelf" },
+    selectedColleges.includes("tabletop") && tabletopCount !== null && { key: "tabletop", label: "Tabletop", value: tabletopCount, unit: "campaigns & armies" },
+  ].filter(Boolean);
+
+  const [slideIndex, setSlideIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    if (!heroReady || paused || heroSlides.length < 2) return;
+    const timer = setInterval(() => {
+      setSlideIndex((i) => (i + 1) % heroSlides.length);
+    }, 4200);
+    return () => clearInterval(timer);
+    // heroSlides is rebuilt every render, but its length/identity per
+    // College selection is what actually matters for the interval —
+    // depending on the array itself would restart the timer on every
+    // render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [heroReady, paused, heroSlides.length]);
+
+  // Clamp in case a College got deselected mid-rotation and shrank the list.
+  const currentSlide = heroSlides[slideIndex % heroSlides.length] || heroSlides[0];
+  const animatedValue = useCountUp(currentSlide?.value ?? 0, heroReady);
 
   return (
     <div className="overview-page">
@@ -101,13 +146,47 @@ export default function OverviewPage({
         <p className="price-page__subtitle">What's actually going on across your Colleges.</p>
       </div>
 
-      {heroReady && (
-        <div className="overview-hero">
-          <span className="overview-hero__eyebrow">Your collection</span>
-          <div className="overview-hero__value">
-            <span className="overview-hero__number">{animatedTotal.toLocaleString()}</span>
-            <span className="overview-hero__unit">pieces collected across your Colleges</span>
+      {heroReady && currentSlide && (
+        <div
+          className="overview-hero"
+          onMouseEnter={() => setPaused(true)}
+          onMouseLeave={() => setPaused(false)}
+        >
+          <span className="overview-hero__eyebrow">{currentSlide.label}</span>
+          <div className="overview-hero__value" key={currentSlide.key}>
+            <span className="overview-hero__aura" aria-hidden="true" />
+            <span className="overview-hero__number">{animatedValue.toLocaleString()}</span>
+            <span className="overview-hero__unit">{currentSlide.unit}</span>
           </div>
+
+          {heroSlides.length > 1 && (
+            <div className="hero-card__dots" role="tablist" aria-label="Collection stat">
+              {heroSlides.map((slide, i) => (
+                <button
+                  key={slide.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={i === slideIndex}
+                  aria-label={slide.label}
+                  className={`hero-card__dot ${i === slideIndex ? "hero-card__dot--active" : ""}`}
+                  onClick={() => setSlideIndex(i)}
+                />
+              ))}
+            </div>
+          )}
+
+          {tickerActivity.length > 0 && (
+            <div className="overview-ticker">
+              <div className="overview-ticker__track">
+                {[...tickerActivity, ...tickerActivity].map((entry, i) => (
+                  <span className="overview-ticker__item" key={`${entry.id}-${i}`}>
+                    <span className="overview-ticker__dot" aria-hidden="true" />
+                    {describeActivity(entry)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
