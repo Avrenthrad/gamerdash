@@ -226,7 +226,7 @@ export default function BacklogPage({ onBack, userId, linkedSteamId }) {
   return (
     <div className="price-page">
       <div className="price-page__head">
-        <button type="button" className="back-link" onClick={onBack}>← Back to Collections</button>
+        <button type="button" className="back-link" onClick={onBack}>← Back to Gaming</button>
         <h1 className="price-page__title">Backlog / To Be Played</h1>
         <p className="price-page__subtitle">
           Ratings, release dates, and achievements — plus your own estimate for how long each game takes.

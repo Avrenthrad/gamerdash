@@ -67,6 +67,7 @@ export default function App() {
     view,
     loginMode,
     goTo,
+    goBack,
     navigateToView,
     navigateHome,
     handleLoginSuccess,
@@ -548,7 +549,7 @@ export default function App() {
 
           {view === "guilds" && (
             <GuildsPage
-              onBack={() => goTo("overview")}
+              onBack={() => goBack("overview")}
               userId={userId}
               isLoggedIn={isLoggedIn}
               onSignIn={() => goTo("login", "login")}
@@ -558,7 +559,7 @@ export default function App() {
 
           {view === "friends" && (
             <FriendsPage
-              onBack={() => goTo("overview")}
+              onBack={() => goBack("overview")}
               userId={userId}
               isLoggedIn={isLoggedIn}
               onSignIn={() => goTo("login", "login")}
@@ -569,7 +570,7 @@ export default function App() {
 
           {view === "inbox" && (
             <InboxPage
-              onBack={() => goTo("overview")}
+              onBack={() => goBack("overview")}
               userId={userId}
               isLoggedIn={isLoggedIn}
               onSignIn={() => goTo("login", "login")}

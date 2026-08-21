@@ -620,6 +620,20 @@ export function AppProvider({ children }) {
     window.location.hash = hashFor(nextView, mode);
   }, []);
 
+  // Every goTo() push a new hash entry onto the browser's real history
+  // stack, so "back" almost always means "wherever the hash was before
+  // this one" — using the browser's own history instead of a hardcoded
+  // destination (the old goTo("overview") pattern) is what lets Friends/
+  // Inbox/Guilds/a sign-in gate return to whatever page actually opened
+  // them, not always the same fixed spot.
+  const goBack = useCallback((fallbackView = "overview") => {
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      goTo(fallbackView);
+    }
+  }, [goTo]);
+
   const navigateToSection = useCallback(
     (sectionId) => {
       goTo("dashboard");
@@ -644,9 +658,18 @@ export function AppProvider({ children }) {
 
   const handleLoginSuccess = useCallback(
     (mode) => {
-      goTo(mode === "signup" ? "onboarding" : "dashboard");
+      // Signup always continues into onboarding regardless of where the
+      // signup form was opened from. A plain sign-in, though, is almost
+      // always triggered by an AccountGate on the page the user actually
+      // wanted — goBack() returns them there instead of dumping every
+      // successful sign-in on the Gaming dashboard.
+      if (mode === "signup") {
+        goTo("onboarding");
+      } else {
+        goBack("dashboard");
+      }
     },
-    [goTo]
+    [goTo, goBack]
   );
 
   const handleLogout = useCallback(() => {
@@ -762,6 +785,7 @@ export function AppProvider({ children }) {
       view,
       loginMode,
       goTo,
+      goBack,
       navigateToSection,
       navigateToView,
       navigateHome,
@@ -849,6 +873,7 @@ export function AppProvider({ children }) {
       view,
       loginMode,
       goTo,
+      goBack,
       navigateToSection,
       navigateToView,
       navigateHome,

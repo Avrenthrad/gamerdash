@@ -44,7 +44,11 @@ const MASTERY_COLLEGES = COLLEGES.filter((c) => c.id !== "overview");
 // Kept here since it's genuinely Header-adjacent navigation data, not
 // because Header renders it directly.
 export const GAMING_SIDEBAR_ITEMS = [
-  { id: "dashboard", label: "Overview" },
+  // Labeled "Dashboard" rather than "Overview" — the top College tabs
+  // already have an "Overview" (the cross-College summary page), and
+  // both render at once on every Gaming page, so the two need visibly
+  // different names even though this one still maps to the "dashboard" view.
+  { id: "dashboard", label: "Dashboard" },
   { id: "backlog", label: "Backlog" },
   { id: "prices", label: "Market" },
   { id: "achievements", label: "Achievements" },
