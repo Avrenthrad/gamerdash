@@ -34,10 +34,18 @@ export default async function handler(req, res) {
     try {
       const url = `https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?appid=${encodeURIComponent(appid)}`;
       const steamRes = await fetch(url);
-      if (!steamRes.ok) {
+      // Steam's own convention for this specific endpoint: a 404 status
+      // with a genuinely valid JSON body ({"response":{"result":42}})
+      // is how it signals "no live player-count data for this appid" —
+      // true for the majority of non-blockbuster titles, not a real
+      // failure. Treating !ok as a hard error here discarded that valid
+      // body and turned "no data" into a thrown error for every such
+      // wishlist item. Only a body that doesn't even parse as the
+      // expected shape is a genuine failure.
+      const data = await steamRes.json().catch(() => null);
+      if (!data?.response) {
         return res.status(steamRes.status).json({ error: "Steam API request failed" });
       }
-      const data = await steamRes.json();
       return res.status(200).json(data);
     } catch (err) {
       return res.status(500).json({ error: err.message });
