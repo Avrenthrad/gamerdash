@@ -2288,3 +2288,49 @@ create policy "Guild members can view their guild's activity feed"
       or exists (select 1 from public.profiles where profiles.id = guild_activity.user_id and profiles.share_activity_with_guilds = true)
     )
   );
+
+-- ---------- Game Completions: 100%-achievement alerts (additive) ----------
+-- Steam only — its achievement schema is real and authoritative (every
+-- achievement that exists, not just ones a person chose to track), so
+-- "100%" here is a genuine, verifiable claim. Xbox/PlayStation's manual
+-- checklists in lib/platformAchievements.js don't get this: 100% of a
+-- self-typed list isn't the same claim as 100% of a real platform.
+--
+-- One row per person per completed game. The unique constraint is what
+-- makes the alert fire exactly once (see recordGameCompletionIfNew in
+-- lib/achievements.js) — an insert conflict just means it was already
+-- recorded, safe even if two tabs/devices detect the same completion
+-- at once.
+create table public.game_completions (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  appid bigint not null,
+  game_name text not null,
+  total_achievements int not null,
+  completed_at timestamptz default now(),
+  unique (user_id, appid)
+);
+
+alter table public.game_completions enable row level security;
+
+create policy "Users can view their own game completions"
+  on public.game_completions for select
+  using (auth.uid() = user_id);
+
+create policy "Users can record their own game completions"
+  on public.game_completions for insert
+  with check (auth.uid() = user_id);
+
+create index game_completions_user_id_idx on public.game_completions (user_id);
+
+-- New Guild Pulse event type for a 100%-completion, broadcast through
+-- the exact same logActivityForUser fan-out every other real event
+-- already uses. guild_activity's CHECK constraint can't add a value in
+-- place — drop/recreate, same as every prior addition above.
+alter table public.guild_activity drop constraint if exists guild_activity_event_type_check;
+alter table public.guild_activity add constraint guild_activity_event_type_check
+  check (event_type in (
+    'achievement_unlocked', 'gd_score_milestone', 'backlog_status_change',
+    'wishlist_added', 'mtg_card_added', 'fab_card_added', 'pokemon_card_added',
+    'joined_guild', 'guild_post_commented', 'guild_comment_replied', 'game_completed'
+  ));

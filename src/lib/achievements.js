@@ -9,6 +9,8 @@
 // reasonable number of API calls.
 
 import { fetchOwnedGames, fetchAchievements, fetchAchievementSchema, fetchGlobalAchievementPercentages } from "./steam";
+import { supabase } from "./supabaseClient";
+import { logActivityForUser } from "./guilds";
 
 const GAMES_TO_CHECK = 8;
 
@@ -69,4 +71,24 @@ export async function fetchRecentAchievements(steamId, resultLimit = 5) {
       globalPercent: percentEntry ? Number(percentEntry.percent) : null,
     };
   });
+}
+
+// Records a real 100%-achievement completion the first time it's seen
+// for this person+game, and fans it out as a "game_completed" Guild
+// Pulse event — same logActivityForUser path every other real event
+// uses. Steam only (see schema.sql's game_completions table comment).
+// The unique (user_id, appid) constraint is what actually prevents a
+// duplicate alert, not this function — a 23505 conflict here just
+// means the completion was already recorded, so this returns false
+// instead of re-firing the activity.
+export async function recordGameCompletionIfNew(userId, { appid, gameName, totalAchievements }) {
+  const { error } = await supabase
+    .from("game_completions")
+    .insert({ user_id: userId, appid, game_name: gameName, total_achievements: totalAchievements });
+  if (error) {
+    if (error.code !== "23505") console.error("Failed to record game completion:", error);
+    return false;
+  }
+  await logActivityForUser(userId, "game_completed", { title: gameName, appid, totalAchievements });
+  return true;
 }

@@ -64,11 +64,13 @@ export default function GuildPulseCard({ userId, onGoToGuilds }) {
         <ul className="guild-pulse__list">
           {events.map((entry) => {
             const college = collegeForPulseEvent(entry.event_type);
+            const isCompletion = entry.event_type === "game_completed";
             return (
-              <li key={entry.id} className="guild-pulse__row">
+              <li key={entry.id} className={`guild-pulse__row ${isCompletion ? "guild-pulse__row--special" : ""}`}>
                 <MiniAvatar profile={entry.profile} />
                 <div className="guild-pulse__row-body">
                   <span className="guild-pulse__row-text">
+                    {isCompletion && <span aria-hidden="true">🏆 </span>}
                     <strong>{displayName(entry.profile)}</strong> {describeActivity(entry)}
                   </span>
                   <span className="guild-pulse__row-meta">

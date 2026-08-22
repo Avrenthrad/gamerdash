@@ -11,6 +11,7 @@ import { getPublicProfiles } from "./publicProfiles";
 
 const EVENT_LABELS = {
   achievement_unlocked: "unlocked an achievement in",
+  game_completed: "hit 100% achievements in",
   gd_score_milestone: "hit a new GD Score high",
   backlog_status_change: "updated their backlog:",
   wishlist_added: "added to their wishlist:",
@@ -284,6 +285,7 @@ const GUILD_PULSE_EVENT_TYPES = [
   "backlog_status_change",
   "achievement_unlocked",
   "wishlist_added",
+  "game_completed",
 ];
 
 // Which College a Guild Pulse event belongs to, for the College chip
@@ -296,6 +298,7 @@ const PULSE_EVENT_COLLEGE = {
   backlog_status_change: "gaming",
   achievement_unlocked: "gaming",
   wishlist_added: "gaming",
+  game_completed: "gaming",
 };
 
 export function collegeForPulseEvent(eventType) {

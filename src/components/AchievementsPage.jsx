@@ -27,6 +27,7 @@ import {
   toggleAchievementUnlocked,
   deletePlatformAchievement,
 } from "../lib/platformAchievements";
+import { recordGameCompletionIfNew } from "../lib/achievements";
 
 const GAMES_PER_PAGE = 5;
 
@@ -97,14 +98,14 @@ export default function AchievementsPage({ onBack, userId, linkedSteamId }) {
         ))}
       </div>
 
-      {tab === "steam" && <SteamAchievements linkedSteamId={linkedSteamId} />}
+      {tab === "steam" && <SteamAchievements linkedSteamId={linkedSteamId} userId={userId} />}
       {tab === "xbox" && <ManualAchievements userId={userId} platform="xbox" platformLabel="Xbox" />}
       {tab === "playstation" && <ManualAchievements userId={userId} platform="playstation" platformLabel="PlayStation" />}
     </div>
   );
 }
 
-function SteamAchievements({ linkedSteamId }) {
+function SteamAchievements({ linkedSteamId, userId }) {
   const [games, setGames] = useState([]);
   const [gamesStatus, setGamesStatus] = useState("idle"); // idle | loading | ready | error
   const [page, setPage] = useState(0);
@@ -112,6 +113,7 @@ function SteamAchievements({ linkedSteamId }) {
   const [pageStatus, setPageStatus] = useState("idle");
   const [filter, setFilter] = useState("all"); // all | unlocked | locked
   const [liveAchievement, setLiveAchievement] = useState(undefined); // undefined = not checked yet, null = none found
+  const [newCompletion, setNewCompletion] = useState(null); // { gameName, totalAchievements } — a freshly detected 100%
 
   // Real recency proxy — same one ContinuePlayingCard uses, since Steam's
   // true per-game last-played timestamp (rtime_last_played) doesn't
@@ -171,6 +173,25 @@ function SteamAchievements({ linkedSteamId }) {
         });
         setLiveAchievement(latest);
       }
+
+      // 100%-completion detection — a real, verifiable claim since
+      // Steam's schema lists every achievement that exists, not just
+      // ones the person chose to track. recordGameCompletionIfNew's own
+      // unique constraint (not this check) is what stops it firing more
+      // than once per game; this just avoids a wasted round-trip for
+      // games we already know aren't complete.
+      results.forEach(({ appid, rows }) => {
+        if (!rows || rows.length === 0) return;
+        const unlockedCount = rows.filter((r) => r.unlocked).length;
+        if (unlockedCount !== rows.length) return;
+        const game = pageGames.find((g) => g.appid === appid);
+        recordGameCompletionIfNew(userId, { appid, gameName: game?.name || "", totalAchievements: rows.length })
+          .then((isNew) => {
+            if (!cancelled && isNew) {
+              setNewCompletion({ gameName: game?.name || "", totalAchievements: rows.length });
+            }
+          });
+      });
     });
 
     return () => { cancelled = true; };
@@ -187,6 +208,26 @@ function SteamAchievements({ linkedSteamId }) {
       {gamesStatus === "error" && <p className="panel__status panel__status--error">Couldn't load your Steam library right now.</p>}
       {gamesStatus === "ready" && games.length === 0 && (
         <p className="panel__status">No owned games visible on this Steam profile.</p>
+      )}
+
+      {newCompletion && (
+        <div className="completion-banner">
+          <span className="completion-banner__icon" aria-hidden="true">🏆</span>
+          <div className="completion-banner__body">
+            <span className="completion-banner__title">100% Complete</span>
+            <span className="completion-banner__desc">
+              Every one of {newCompletion.totalAchievements} achievements unlocked in {newCompletion.gameName}. Your Guilds just heard about it.
+            </span>
+          </div>
+          <button
+            type="button"
+            className="game-popup__close"
+            onClick={() => setNewCompletion(null)}
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
       )}
 
       {liveAchievement && (
