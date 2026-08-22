@@ -17,6 +17,7 @@ import SteamPresenceCard from "./SteamPresenceCard";
 import FriendsActivityCard from "./FriendsActivityCard";
 import GuildPulseCard from "./GuildPulseCard";
 import CollegeIcon from "./CollegeIcon";
+import CollegeMorphHero from "./CollegeMorphHero";
 
 const NOT_BUILT_COLLEGES = [];
 
@@ -147,6 +148,8 @@ export default function OverviewPage({
         <h1 className="price-page__title">Overview</h1>
         <p className="price-page__subtitle">What's actually going on across your Colleges.</p>
       </div>
+
+      <CollegeMorphHero />
 
       {heroReady && currentSlide && (
         <div
