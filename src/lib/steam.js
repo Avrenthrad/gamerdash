@@ -150,6 +150,35 @@ export async function fetchWishlist(steamId) {
   return data?.items || [];
 }
 
+// The real, reachable equivalent of Steam's own "Personal Calendar" —
+// that page (store.steampowered.com/personalcalendar) requires the
+// visitor's own logged-in Steam session and can't be reached from a
+// server-side API key (verified live: an unauthenticated request 302s
+// straight to /login, no public-steamid path exists like there is for
+// the wishlist page). This cross-references two endpoints Steam does
+// expose publicly instead: the wishlist itself, then each wishlisted
+// game's real release_date from Steam's own store API via
+// resolveGameName (already 24h-cached) — the same underlying data
+// Steam's calendar draws from, just assembled from the pieces we can
+// legitimately reach. Capped at `limit` wishlist items (oldest-added
+// first isn't guaranteed here, so this is "your first N wishlisted
+// games", not "your soonest N") to keep this to a bounded number of
+// appinfo calls per load.
+export async function fetchWishlistUpcoming(steamId, limit = 40) {
+  const items = await fetchWishlist(steamId);
+  const infos = await Promise.all(
+    items.slice(0, limit).map((item) =>
+      resolveGameName(item.appid)
+        .then((info) => ({ ...info, appid: item.appid }))
+        .catch(() => null)
+    )
+  );
+  return infos
+    .filter((info) => info?.comingSoon && info.releaseDate && !Number.isNaN(Date.parse(info.releaseDate)))
+    .map((info) => ({ appid: info.appid, name: info.name, releaseDate: info.releaseDate }))
+    .sort((a, b) => new Date(a.releaseDate) - new Date(b.releaseDate));
+}
+
 // Real, official dev-posted news for one app — patch notes, beta
 // access, preorder/launch announcements, whatever the developer
 // actually posted to their Steam Community hub. Public, no key

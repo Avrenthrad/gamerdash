@@ -84,7 +84,7 @@ export default function GamingDashboard({
             <p className="panel__status">Sign in to see your Mastery breakdown here.</p>
           </div>
         )}
-        <ReleaseCalendarCard wishlist={wishlist} onOpenUpcomingReleases={() => goTo("upcoming-releases")} />
+        <ReleaseCalendarCard wishlist={wishlist} linkedSteamId={linkedSteamId} onOpenUpcomingReleases={() => goTo("upcoming-releases")} />
       </div>
 
       {/* Social row — what your Guild and friends are up to, at a glance */}
