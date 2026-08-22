@@ -12,6 +12,7 @@ import { useState } from "react";
 import LykodexLogo from "./LykodexLogo";
 import { signUp, signIn, signInWithOAuth } from "../lib/auth";
 import { supabaseConfigured } from "../lib/supabaseClient";
+import CollectionConstellationBackground from "./CollectionConstellationBackground";
 
 const oauthProviders = [
   { name: "Google", provider: "google", initial: "G" },
@@ -103,6 +104,7 @@ export default function LoginPage({ onLoginSuccess, initialMode }) {
 
   return (
     <div className="auth-page">
+      <CollectionConstellationBackground />
       <div className="auth-card">
         <LykodexLogo className="auth-card__logo" />
         <h1 className="auth-card__title">

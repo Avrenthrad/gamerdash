@@ -1153,11 +1153,64 @@ button { font-family: inherit; }
 /* ---------- Auth page ---------- */
 
 .auth-page {
+  position: relative;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 48px 16px;
+  overflow: hidden;
+}
+
+/* ---------- Collection constellation (login screen background) ----------
+   A slow particle field with the 5 real Colleges anchored as nodes —
+   framed as "your collection's universe", not market data. Sits behind
+   the auth card via explicit z-index (both this and .auth-card are
+   positioned, so stacking is deterministic rather than relying on DOM
+   order — an absolutely-positioned sibling would otherwise paint above
+   plain in-flow content regardless of source order). */
+.constellation-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.constellation-bg__canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.constellation-bg__scrim {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, transparent 0%, var(--bg) 78%);
+}
+
+.constellation-bg__node {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  transform: translate(-50%, -50%);
+  opacity: 0.5;
+}
+
+.constellation-bg__node-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .constellation-bg__node { display: none; }
 }
 
 .auth-card {
@@ -1172,6 +1225,7 @@ button { font-family: inherit; }
   border-radius: 16px;
   padding: 32px 28px;
   position: relative;
+  z-index: 1;
   overflow: hidden;
 }
 
