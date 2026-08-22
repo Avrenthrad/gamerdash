@@ -1,0 +1,73 @@
+name: Release desktop app
+
+# Windows-only on every push to main — matches this app's actual
+# tested/distributed platform right now. This is a private repo, so
+# Actions minutes are metered (macOS runners bill at 10x); Mac/Linux
+# builds are available on demand via the "Run workflow" button instead
+# of burning quota on every commit for platforms nobody's using yet.
+# Extend `matrix.platform` below with macos-latest/ubuntu-latest
+# (and switch this trigger to workflow_dispatch-only, or accept the
+# cost) once this is actually being distributed there.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "src-tauri/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/release-desktop.yml"
+  workflow_dispatch:
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # Every release needs a strictly-increasing version so the
+      # updater plugin (which compares semver against latest.json)
+      # actually detects it as newer than what's installed — using the
+      # run number instead of a manually-bumped version means this
+      # never needs a human to remember to do that.
+      - name: Set desktop build version
+        shell: bash
+        run: |
+          VERSION="0.1.${{ github.run_number }}"
+          echo "DESKTOP_VERSION=$VERSION" >> "$GITHUB_ENV"
+          node -e "
+            const fs = require('fs');
+            const p = 'src-tauri/tauri.conf.json';
+            const conf = JSON.parse(fs.readFileSync(p, 'utf8'));
+            conf.version = '$VERSION';
+            fs.writeFileSync(p, JSON.stringify(conf, null, 2) + '\n');
+          "
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Packaged builds load from a local file origin, not a live
+          # server — see src/lib/apiBase.js. Not a secret, just a
+          # public URL, safe to inline here.
+          VITE_API_BASE_URL: https://lykodex.vercel.app
+        with:
+          tagName: desktop-v${{ env.DESKTOP_VERSION }}
+          releaseName: "Lykodex Desktop ${{ env.DESKTOP_VERSION }}"
+          releaseBody: "Automated desktop build from the latest push to main."
+          releaseDraft: false
+          prerelease: false

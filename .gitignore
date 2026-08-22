@@ -22,3 +22,11 @@ npm-debug.log*
 *.log
 
 .vercel
+
+# Tauri updater signing key — never commit. The .pub key (safe, public)
+# is embedded directly in tauri.conf.json instead of read from a file.
+src-tauri/*.key
+
+# Auto-regenerated on every build (capability/permission JSON schemas
+# for editor validation) — not build input, no need to track.
+src-tauri/gen/

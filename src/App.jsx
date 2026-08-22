@@ -20,6 +20,7 @@ import LoginPage from "./components/LoginPage";
 import { AccountGatePage } from "./components/AccountGate";
 import LoadingSplash from "./components/LoadingSplash";
 import PageLoadingFallback from "./components/PageLoadingFallback";
+import DesktopUpdateBanner from "./components/DesktopUpdateBanner";
 import GamingDashboard from "./components/GamingDashboard";
 
 import { useApp } from "./hooks/useApp";
@@ -763,6 +764,7 @@ export default function App() {
     <>
       {splashVisible && <LoadingSplash fadingOut={splashFading} />}
       <Suspense fallback={<PageLoadingFallback />}>{content}</Suspense>
+      <DesktopUpdateBanner />
       {paletteOpen && (
         <Suspense fallback={null}>
           <CommandPalette

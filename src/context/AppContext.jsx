@@ -28,6 +28,7 @@ import {
 } from "react";
 import { initialWishlist } from "../data/wishlist";
 import { DEFAULT_DASHBOARD_LAYOUT } from "../data/dashboardLayout";
+import { isPackagedApp } from "../lib/platform";
 import { DEFAULT_PLATFORM_ORDER } from "../data/platformOrder";
 import { supabase, supabaseConfigured } from "../lib/supabaseClient";
 import { signOut as supabaseSignOut } from "../lib/auth";
@@ -293,6 +294,12 @@ export function AppProvider({ children }) {
   const hydratedRef = useRef(false);
   const writeTimerRef = useRef(null);
   const wallpaperWriteTimerRef = useRef(null);
+  // True only when the hash-routing init effect defaulted a packaged
+  // app straight to "login" with no explicit hash — lets the
+  // auth-session effect below bounce a person with an already-
+  // persisted session on to the dashboard once that resolves, without
+  // also hijacking a deliberate later navigation back to login.
+  const bootRedirectPendingRef = useRef(false);
 
   // ---------- derived ----------
   const effectivePlatformOrder = useMemo(
@@ -602,7 +609,17 @@ export function AppProvider({ children }) {
     window.addEventListener("hashchange", syncFromHash);
 
     if (!window.location.hash) {
-      window.history.replaceState(null, "", hashFor("dashboard"));
+      // The website intentionally allows anonymous browsing (most
+      // pages already show real content with inline "Sign in to see X
+      // here" prompts rather than a hard wall) — but a packaged
+      // desktop/mobile install is opened specifically to use an
+      // account, so it boots straight to login instead. If a session
+      // is actually already persisted, the auth-session effect below
+      // bounces it on to the dashboard once that resolves.
+      const defaultView = isPackagedApp() ? "login" : "dashboard";
+      if (defaultView === "login") bootRedirectPendingRef.current = true;
+      window.history.replaceState(null, "", hashFor(defaultView));
+      setView(defaultView);
     } else {
       syncFromHash();
     }
@@ -624,6 +641,16 @@ export function AppProvider({ children }) {
   const goTo = useCallback((nextView, mode) => {
     window.location.hash = hashFor(nextView, mode);
   }, []);
+
+  // Completes the packaged-app boot redirect above: if a session was
+  // already persisted from a previous launch, skip past the login
+  // screen it defaulted to and go straight to the dashboard.
+  useEffect(() => {
+    if (isLoggedIn && bootRedirectPendingRef.current) {
+      bootRedirectPendingRef.current = false;
+      goTo("dashboard");
+    }
+  }, [isLoggedIn, goTo]);
 
   // Every goTo() push a new hash entry onto the browser's real history
   // stack, so "back" almost always means "wherever the hash was before
