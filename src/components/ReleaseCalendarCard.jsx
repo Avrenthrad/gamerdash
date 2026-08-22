@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from "react";
 import { fetchUpcomingReleases } from "../lib/rawg";
-import { fetchWishlistUpcoming } from "../lib/steam";
+import { fetchWishlistUpcoming, fetchOwnedGames } from "../lib/steam";
 
 const PREVIEW_COUNT = 6;
 const WINDOW_DAYS = 60;
@@ -33,6 +33,8 @@ export default function ReleaseCalendarCard({ wishlist, linkedSteamId, onOpenUpc
   const [releases, setReleases] = useState([]);
   const [status, setStatus] = useState("loading"); // loading | ready | no_key | error
   const [steamUpcoming, setSteamUpcoming] = useState([]); // real releases from the linked Steam wishlist
+  const [ownedAppids, setOwnedAppids] = useState(new Set());
+  const [ownedNames, setOwnedNames] = useState(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -84,6 +86,32 @@ export default function ReleaseCalendarCard({ wishlist, linkedSteamId, onOpenUpc
     return () => { cancelled = true; };
   }, [linkedSteamId]);
 
+  // Real owned-library check — so an upcoming DLC/expansion for a game
+  // you already own (or, rarer, a re-release you already have) gets
+  // flagged the same honest way "Wishlisted" already is.
+  useEffect(() => {
+    if (!linkedSteamId) {
+      setOwnedAppids(new Set());
+      setOwnedNames(new Set());
+      return;
+    }
+    let cancelled = false;
+    fetchOwnedGames(linkedSteamId)
+      .then((games) => {
+        if (cancelled) return;
+        setOwnedAppids(new Set(games.map((g) => g.appid)));
+        setOwnedNames(new Set(games.map((g) => g.name.toLowerCase())));
+      })
+      .catch((err) => {
+        console.error("Steam library lookup failed:", err);
+        if (!cancelled) {
+          setOwnedAppids(new Set());
+          setOwnedNames(new Set());
+        }
+      });
+    return () => { cancelled = true; };
+  }, [linkedSteamId]);
+
   const wishlistTitles = new Set((wishlist || []).map((w) => w.title.toLowerCase()));
 
   // Steam-sourced entries are more accurate (real per-title release
@@ -116,6 +144,9 @@ export default function ReleaseCalendarCard({ wishlist, linkedSteamId, onOpenUpc
               <span className="release-calendar-row__countdown">{countdownLabel(daysUntil(game.releaseDate))}</span>
               <span className="release-calendar-row__name">{game.name}</span>
               <span className="tag tag--amber-outline">Steam Wishlist</span>
+              {ownedAppids.has(game.appid) && (
+                <span className="tag tag--lime-outline">In Library</span>
+              )}
             </li>
           ))}
           {status === "ready" && generalReleases.map((game) => (
@@ -124,6 +155,9 @@ export default function ReleaseCalendarCard({ wishlist, linkedSteamId, onOpenUpc
               <span className="release-calendar-row__name">{game.name}</span>
               {wishlistTitles.has(game.name.toLowerCase()) && (
                 <span className="tag tag--rose-outline">Wishlisted</span>
+              )}
+              {ownedNames.has(game.name.toLowerCase()) && (
+                <span className="tag tag--lime-outline">In Library</span>
               )}
             </li>
           ))}

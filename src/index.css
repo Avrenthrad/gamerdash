@@ -949,6 +949,11 @@ button { font-family: inherit; }
   color: var(--amber);
 }
 
+.tag--lime-outline {
+  border: 1px solid var(--lime);
+  color: var(--lime);
+}
+
 .tag--muted {
   border: 1px solid var(--border);
   color: var(--text-muted);
