@@ -26,7 +26,7 @@ const BASE_URL = "https://api.scryfall.com";
 // from the HTTP client) with a 400 — confirmed live, not documented
 // anywhere obvious. Every request needs both of these headers.
 const SCRYFALL_HEADERS = {
-  "User-Agent": "Lykodex/1.0 (+https://gamerdash.vercel.app)",
+  "User-Agent": "Lykodex/1.0 (+https://lykodex.vercel.app)",
   Accept: "application/json",
 };
 

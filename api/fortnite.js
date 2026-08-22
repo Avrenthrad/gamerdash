@@ -12,7 +12,7 @@ export default async function handler(req, res) {
   try {
     const fnRes = await fetch(BASE_URL, {
       headers: {
-        "User-Agent": "Lykodex/1.0 (+https://gamerdash.vercel.app)",
+        "User-Agent": "Lykodex/1.0 (+https://lykodex.vercel.app)",
         "Accept": "application/json",
       },
     });

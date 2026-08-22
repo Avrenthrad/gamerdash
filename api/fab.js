@@ -33,7 +33,7 @@ const BASE_URL = "https://api.goagain.dev";
 const UPSTREAM_TIMEOUT_MS = 8000;
 
 const FAB_HEADERS = {
-  "User-Agent": "Lykodex/1.0 (+https://gamerdash.vercel.app)",
+  "User-Agent": "Lykodex/1.0 (+https://lykodex.vercel.app)",
   Accept: "application/json",
 };
 

@@ -45,7 +45,7 @@ import {
 // The site's own /api/steam Vercel function — same proxy the browser
 // calls, reused here instead of duplicating a second STEAM_API_KEY +
 // the fetch logic in api/steam.js on the bot's side.
-const SITE_BASE_URL = process.env.SITE_BASE_URL || "https://gamerdash.vercel.app";
+const SITE_BASE_URL = process.env.SITE_BASE_URL || "https://lykodex.vercel.app";
 
 // Same bound as gameMasteryData.js's GAMES_TO_SCAN — scanning a
 // person's entire library isn't worth the API load for a periodic

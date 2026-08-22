@@ -92,7 +92,7 @@ async function handleCheapshark(searchParams, res) {
 
   try {
     const csRes = await fetch(url, {
-      headers: { "User-Agent": "Lykodex/1.0 (+https://gamerdash.vercel.app)", "Accept": "application/json" },
+      headers: { "User-Agent": "Lykodex/1.0 (+https://lykodex.vercel.app)", "Accept": "application/json" },
     });
     if (!csRes.ok) {
       const bodyText = await csRes.text().catch(() => "");
@@ -129,7 +129,7 @@ let ckCache = null; // { byScryfallId: Map<string, Array<entry>>, fetchedAt: num
 async function loadCardKingdomIndex() {
   if (ckCache && Date.now() - ckCache.fetchedAt < CARD_KINGDOM_TTL_MS) return ckCache;
 
-  const ckRes = await fetch(CARD_KINGDOM_URL, { headers: { "User-Agent": "Lykodex/1.0 (+https://gamerdash.vercel.app)" } });
+  const ckRes = await fetch(CARD_KINGDOM_URL, { headers: { "User-Agent": "Lykodex/1.0 (+https://lykodex.vercel.app)" } });
   if (!ckRes.ok) throw new Error(`Card Kingdom pricelist request failed (${ckRes.status})`);
   const json = await ckRes.json();
 
@@ -298,7 +298,7 @@ async function handleComicVine(searchParams, res) {
 
   try {
     const url = `${COMIC_VINE_BASE}/search/?api_key=${apiKey}&format=json&query=${encodeURIComponent(q)}&resources=issue&limit=10`;
-    const cvRes = await fetch(url, { headers: { "User-Agent": "Lykodex/1.0 (+https://gamerdash.vercel.app)" } });
+    const cvRes = await fetch(url, { headers: { "User-Agent": "Lykodex/1.0 (+https://lykodex.vercel.app)" } });
     if (!cvRes.ok) return res.status(cvRes.status).json({ error: "Comic Vine request failed" });
     const data = await cvRes.json();
     return res.status(200).json(data);
@@ -312,7 +312,7 @@ async function handleCurrency(res) {
   try {
     const url = "https://api.frankfurter.app/latest?from=USD&to=AUD,CAD,NZD,GBP,EUR";
     const fxRes = await fetch(url, {
-      headers: { "User-Agent": "Lykodex/1.0 (+https://gamerdash.vercel.app)", "Accept": "application/json" },
+      headers: { "User-Agent": "Lykodex/1.0 (+https://lykodex.vercel.app)", "Accept": "application/json" },
     });
     if (!fxRes.ok) return res.status(fxRes.status).json({ error: "Exchange rate request failed" });
     const data = await fxRes.json();

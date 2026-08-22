@@ -22,7 +22,7 @@
 // pattern already handles this honestly (no thumbnail, not a broken one).
 
 const BASE_URL = "https://api.discogs.com";
-const HEADERS = { "User-Agent": "Lykodex/1.0 (+https://gamerdash.vercel.app)" };
+const HEADERS = { "User-Agent": "Lykodex/1.0 (+https://lykodex.vercel.app)" };
 
 function normalizeRelease(r) {
   return {
