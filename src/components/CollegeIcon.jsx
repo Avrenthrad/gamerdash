@@ -15,7 +15,7 @@
 
 const WHITE = "#FFFFFF";
 
-const BADGE_COLOR = {
+export const BADGE_COLOR = {
   gaming: "var(--sky)",
   tcg: "var(--violet)",
   entertainment: "var(--rose)",
