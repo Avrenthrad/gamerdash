@@ -1,0 +1,8 @@
+# Native build outputs that have no business in a serverless web
+# deploy — vercel CLI doesn't reliably mirror .gitignore for these,
+# and src-tauri/target/ alone runs into multiple GB after a Tauri
+# build, well past Vercel's 100MB per-file / upload limits.
+src-tauri/target/
+src-tauri/gen/
+android/
+ios/
