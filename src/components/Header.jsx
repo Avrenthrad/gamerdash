@@ -108,6 +108,26 @@ function InboxIcon() {
   );
 }
 
+function HomeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 11l8-7 8 7" />
+      <path d="M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9" />
+    </svg>
+  );
+}
+
+function GridIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
+      <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
+      <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" />
+    </svg>
+  );
+}
+
 export default function Header({
   onNavigateView,
   onNavigateHome,
@@ -532,6 +552,58 @@ export default function Header({
         ))}
       </nav>
 
+      {/* Mobile-only fixed bottom nav — hidden on desktop via CSS. The
+          top College tabs row + header icon cluster above both get
+          hidden at the same breakpoint (see index.css); this replaces
+          them rather than adding on top, so mobile has exactly one
+          navigation surface, not two competing ones. */}
+      <nav className="mobile-tab-bar" aria-label="Primary">
+        <button
+          type="button"
+          className={`mobile-tab-bar__item ${activeCollegeId === "overview" ? "mobile-tab-bar__item--active" : ""}`}
+          onClick={() => onNavigateView("overview")}
+        >
+          <HomeIcon />
+          <span>Home</span>
+        </button>
+        <button
+          type="button"
+          className={`mobile-tab-bar__item ${openMenu === "settings" ? "mobile-tab-bar__item--active" : ""}`}
+          onClick={() => toggleMenu("settings")}
+        >
+          <GridIcon />
+          <span>Colleges</span>
+        </button>
+        <button type="button" className="mobile-tab-bar__item" onClick={onOpenPalette}>
+          <SearchIcon />
+          <span>Search</span>
+        </button>
+        {isLoggedIn && (
+          <button type="button" className="mobile-tab-bar__item" onClick={() => handleAccountClick("inbox")}>
+            <span className="mobile-tab-bar__icon-wrap">
+              <InboxIcon />
+              {unreadDmCount > 0 && <span className="mobile-tab-bar__dot" aria-hidden="true" />}
+            </span>
+            <span>Inbox</span>
+          </button>
+        )}
+        <button
+          type="button"
+          className={`mobile-tab-bar__item ${openMenu === "settings" ? "mobile-tab-bar__item--active" : ""}`}
+          onClick={() => (isLoggedIn ? toggleMenu("settings") : onNavigateView("login", "login"))}
+        >
+          <span className="mobile-tab-bar__icon-wrap">
+            {isLoggedIn && avatarUrl && !avatarBroken ? (
+              <img src={avatarUrl} alt="" className="mobile-tab-bar__avatar" onError={() => setAvatarBroken(true)} />
+            ) : (
+              <DefaultAvatarIcon />
+            )}
+            {isLoggedIn && hasUnseenActivity && <span className="mobile-tab-bar__dot" aria-hidden="true" />}
+          </span>
+          <span>{isLoggedIn ? "Account" : "Login"}</span>
+        </button>
+      </nav>
+
       {/* Rendered OUTSIDE <header> deliberately — the header has
           backdrop-filter for the floating/blurred sticky look, and
           filter/backdrop-filter on an ancestor creates a new
@@ -552,6 +624,48 @@ export default function Header({
             </button>
           </div>
           <div className="dash-drawer__list">
+            <span className="dash-drawer__section-label drawer-mobile-only">Colleges</span>
+            <div className="dash-drawer__college-grid drawer-mobile-only">
+              {(isLoggedIn
+                ? COLLEGES.filter((c) => c.alwaysShown || selectedColleges.includes(c.id))
+                : COLLEGES
+              ).map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={`dash-drawer__college-item ${activeCollegeId === c.id ? "dash-drawer__college-item--active" : ""}`}
+                  onClick={() => handleAccountClick(c.view)}
+                >
+                  {c.id !== "overview" && <CollegeIcon collegeId={c.id} size={18} active={activeCollegeId === c.id} />}
+                  {c.label}
+                </button>
+              ))}
+            </div>
+
+            {isLoggedIn && (
+              <>
+                <span className="dash-drawer__section-label drawer-mobile-only">Notifications</span>
+                <div className="dash-drawer__notifications-mobile drawer-mobile-only">
+                  {activity.length > 0 ? (
+                    activity.slice(0, 4).map((entry) => (
+                      <div key={entry.id} className="dash-header__notification-row">
+                        <span className="dash-header__notification-text" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <MiniAvatar profile={entry.profile} />
+                          {describeActivity(entry)}
+                        </span>
+                        <span className="dash-header__notification-meta">
+                          {entry.guilds?.name ? `${entry.guilds.name} · ` : ""}
+                          {relativeTime(entry.created_at)}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="dash-header__search-empty">No activity yet — join or create a Guild to see updates here.</p>
+                  )}
+                </div>
+              </>
+            )}
+
             <span className="dash-drawer__section-label">Social</span>
             <button
               type="button"
