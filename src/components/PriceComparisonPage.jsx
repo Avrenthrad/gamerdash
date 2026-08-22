@@ -126,7 +126,10 @@ export default function PriceComparisonPage({
 
         fetchPSPrice(deal.game)
           .then((result) => {
-            if (result === "no_key") return;
+            if (result === "no_key") {
+              setMetaByTitle((prev) => ({ ...prev, [title]: { ...prev[title], psNoKey: true } }));
+              return;
+            }
             setMetaByTitle((prev) => ({
               ...prev,
               [title]: {
@@ -193,7 +196,10 @@ export default function PriceComparisonPage({
 
       fetchPSPrice(deal.game)
         .then((result) => {
-          if (result === "no_key") return;
+          if (result === "no_key") {
+            setMetaByTitle((prev) => ({ ...prev, [title]: { ...prev[title], psNoKey: true } }));
+            return;
+          }
           setMetaByTitle((prev) => ({
             ...prev,
             [title]: {

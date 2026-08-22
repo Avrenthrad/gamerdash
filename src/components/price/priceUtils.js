@@ -112,9 +112,19 @@ export function buildStoreRow(deal, meta, platformOrder = PRIORITY_STORE_NAMES) 
       : null;
 
   const psPrice = meta?.psAuPrice;
-  const psState = !meta?.psChecked ? "pending" : psPrice != null ? "price" : "unsold";
+  // No PlatPrices key configured (not everyone's account is approved
+  // for one) — same honest fallback G2A/EB Games/JB Hi-Fi already use
+  // below: a real link to search the storefront directly, instead of
+  // either a fabricated price or a permanently-stuck "pending" chip.
+  const psState = meta?.psNoKey
+    ? "search-link"
+    : !meta?.psChecked
+      ? "pending"
+      : psPrice != null
+        ? "price"
+        : "unsold";
   const psLink =
-    psPrice != null
+    psState === "search-link" || psPrice != null
       ? `https://store.playstation.com/en-au/search/${encodeURIComponent(deal.game)}`
       : null;
 
