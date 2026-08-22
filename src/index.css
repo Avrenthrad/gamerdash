@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
 
 :root {
   /* Base surfaces — vault-black / parchment-gold theme. Warm neutrals
@@ -86,7 +86,7 @@
   --text-on-accent: #16130D;
 
   --font-display: 'Bricolage Grotesque', sans-serif;
-  --font-body: 'Inter', sans-serif;
+  --font-body: 'Hanken Grotesk', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
   /* ---------- Semantic design tokens ----------
@@ -5606,6 +5606,59 @@ html[data-mode="light"] .current-rotation {
   background: var(--accent);
   flex-shrink: 0;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+/* ---------- Guild Pulse card (Overview) ---------- */
+
+.guild-pulse__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.guild-pulse__list {
+  list-style: none;
+  margin: 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.guild-pulse__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.guild-pulse__row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.guild-pulse__row-text {
+  font-size: 13px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guild-pulse__row-meta {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.guild-pulse__chip {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  opacity: 0.85;
 }
 
 @media (max-width: 640px) {

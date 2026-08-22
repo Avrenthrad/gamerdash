@@ -2257,3 +2257,34 @@ create policy "Receiver can mark a DM read"
 
 create index direct_messages_sender_id_idx on public.direct_messages (sender_id, created_at desc);
 create index direct_messages_receiver_id_idx on public.direct_messages (receiver_id, created_at desc);
+
+-- ---------- Guild Pulse: privacy opt-in for the activity feed (additive) ----------
+-- Defaults to false (opt-in, not opt-out) — this is activity about a
+-- specific named person, so silence-by-default is the right call even
+-- though it means the pulse starts out emptier for everyone.
+alter table public.profiles add column if not exists share_activity_with_guilds boolean not null default false;
+
+-- accent_color's column default was never updated when the app's own
+-- default theme moved from red to gold — new signups were silently
+-- getting the real string 'red' from this default (not null), so the
+-- app's `profile.accent_color || "gold"` fallback never actually fired
+-- for them. Existing rows are untouched; this only changes what NEW
+-- rows get.
+alter table public.profiles alter column accent_color set default 'gold';
+
+-- Enforced at the RLS layer, not just in application code, so it's a
+-- real guarantee rather than a UI convention any direct API call could
+-- bypass — every existing reader of guild_activity (the notification
+-- bell, the Overview ticker, and the new Guild Pulse card below) gets
+-- this for free with no query-side changes. You can always see your
+-- own activity regardless of your own opt-in state.
+drop policy if exists "Guild members can view their guild's activity feed" on public.guild_activity;
+create policy "Guild members can view their guild's activity feed"
+  on public.guild_activity for select
+  using (
+    exists (select 1 from public.guild_members where guild_members.guild_id = guild_activity.guild_id and guild_members.user_id = auth.uid())
+    and (
+      auth.uid() = guild_activity.user_id
+      or exists (select 1 from public.profiles where profiles.id = guild_activity.user_id and profiles.share_activity_with_guilds = true)
+    )
+  );

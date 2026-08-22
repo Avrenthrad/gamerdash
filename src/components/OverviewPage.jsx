@@ -15,6 +15,7 @@ import { fetchCampaigns, fetchArmies } from "../lib/tabletop";
 import { fetchRecentActivityForUser, describeActivity } from "../lib/guilds";
 import SteamPresenceCard from "./SteamPresenceCard";
 import FriendsActivityCard from "./FriendsActivityCard";
+import GuildPulseCard from "./GuildPulseCard";
 import CollegeIcon from "./CollegeIcon";
 
 const NOT_BUILT_COLLEGES = [];
@@ -55,6 +56,7 @@ export default function OverviewPage({
   selectedColleges,
   onOpenCollege,
   onGoToFriends,
+  onGoToGuilds,
 }) {
   const [gameCount, setGameCount] = useState(null);
   const [cardCount, setCardCount] = useState(null);
@@ -191,6 +193,7 @@ export default function OverviewPage({
       )}
 
       {showGaming && isLoggedIn && <SteamPresenceCard linkedSteamId={linkedSteamId} />}
+      {isLoggedIn && <GuildPulseCard userId={userId} onGoToGuilds={onGoToGuilds} />}
       {isLoggedIn && <FriendsActivityCard userId={userId} onGoToFriends={onGoToFriends} />}
 
       <div className="overview-grid">

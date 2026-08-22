@@ -204,6 +204,7 @@ export function AppProvider({ children }) {
   const [accentColor, setAccentColor] = useState("gold");
   const [wallpaperUrl, setWallpaperUrl] = useState(null);
   const [currency, setCurrency] = useState("AUD");
+  const [shareActivityWithGuilds, setShareActivityWithGuilds] = useState(false);
   const [xbxpricesKey, setXbxpricesKey] = useState("");
   const [platpricesKey, setPlatpricesKey] = useState("");
 
@@ -421,6 +422,7 @@ export function AppProvider({ children }) {
       setCurrency("AUD");
       setXbxpricesKey("");
       setPlatpricesKey("");
+      setShareActivityWithGuilds(false);
       // Layout deliberately kept — still useful offline
       return;
     }
@@ -461,6 +463,7 @@ export function AppProvider({ children }) {
         setAccentColor(profile.accent_color === "yellow" ? "gold" : profile.accent_color || "gold");
         setWallpaperUrl(profile.wallpaper_url || null);
         setCurrency(profile.currency || "AUD");
+        setShareActivityWithGuilds(profile.share_activity_with_guilds || false);
         setXbxpricesKey(profile.xbxprices_key || "");
         setPlatpricesKey(profile.platprices_key || "");
         if (profile.dashfeed_games) setGameToggles(profile.dashfeed_games);
@@ -526,6 +529,7 @@ export function AppProvider({ children }) {
         theme_mode: themeMode,
         accent_color: accentColor,
         currency,
+        share_activity_with_guilds: shareActivityWithGuilds,
         linked_steam_id: linkedSteamId,
         dashboard_layout: dashboardLayout,
         platform_order: platformOrder,
@@ -550,6 +554,7 @@ export function AppProvider({ children }) {
     themeMode,
     accentColor,
     currency,
+    shareActivityWithGuilds,
     linkedSteamId,
     dashboardLayout,
     platformOrder,
@@ -829,6 +834,8 @@ export function AppProvider({ children }) {
       setWallpaperUrl,
       currency,
       setCurrency,
+      shareActivityWithGuilds,
+      setShareActivityWithGuilds,
       xbxpricesKey,
       setXbxpricesKey,
       platpricesKey,
@@ -904,6 +911,7 @@ export function AppProvider({ children }) {
       accentColor,
       wallpaperUrl,
       currency,
+      shareActivityWithGuilds,
       xbxpricesKey,
       platpricesKey,
       toggleThemeMode,

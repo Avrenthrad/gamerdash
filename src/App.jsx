@@ -107,6 +107,8 @@ export default function App() {
     setWallpaperUrl,
     currency,
     setCurrency,
+    shareActivityWithGuilds,
+    setShareActivityWithGuilds,
     xbxpricesKey,
     setXbxpricesKey,
     platpricesKey,
@@ -339,6 +341,8 @@ export default function App() {
                 onProfileDetailsChange={updateProfileDetails}
                 selectedColleges={selectedColleges}
                 onSelectedCollegesChange={setSelectedColleges}
+                shareActivityWithGuilds={shareActivityWithGuilds}
+                onShareActivityWithGuildsChange={setShareActivityWithGuilds}
                 userId={userId}
                 onGoToFriends={() => goTo("friends")}
               />
@@ -592,6 +596,7 @@ export default function App() {
                 else if (collegeId === "tabletop") goTo("college-tabletop");
               }}
               onGoToFriends={() => goTo("friends")}
+              onGoToGuilds={() => goTo("guilds")}
             />
           )}
 

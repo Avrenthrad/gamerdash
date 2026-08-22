@@ -88,6 +88,8 @@ export default function AccountSettingsPage({
   onProfileDetailsChange,
   selectedColleges,
   onSelectedCollegesChange,
+  shareActivityWithGuilds,
+  onShareActivityWithGuildsChange,
   userId,
   onGoToFriends,
 }) {
@@ -371,6 +373,26 @@ export default function AccountSettingsPage({
             <span>Both (e.g. "John Dashboard (@johndash)")</span>
           </label>
         </div>
+      </section>
+
+      {/* Privacy */}
+      <section className="settings-card">
+        <h2 className="settings-card__title">Privacy</h2>
+        <p className="settings-card__note">
+          Off by default — turn this on if you want your Guild-mates to see it.
+        </p>
+        <label className="toggle-row">
+          <span className="toggle-row__label">Share my activity with Guilds</span>
+          <span className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={shareActivityWithGuilds}
+              onChange={(e) => onShareActivityWithGuildsChange(e.target.checked)}
+            />
+            <span className="toggle-switch__track" />
+            <span className="toggle-switch__thumb" />
+          </span>
+        </label>
       </section>
 
       {/* Appearance */}

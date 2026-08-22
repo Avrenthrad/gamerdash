@@ -268,6 +268,71 @@ export async function fetchRecentActivityForUser(userId, limit = 10) {
   return attachProfiles(data || []);
 }
 
+// Event types "Guild Pulse" (the Overview card) is confident enough in
+// to show — every one of these already has a real write path
+// somewhere in the app (fabCollection.js, mtg.js, pokemonCollection.js,
+// BacklogPage.jsx). Deliberately excludes joined_guild/guild_post_*
+// events — those are already visible in the Guild's own feed, and
+// mixing them into a "what's been collected/played lately" pulse would
+// muddy it. hours_active/session_logged and price_move aren't here
+// because neither has a real data source yet (see the Guild Pulse
+// planning notes) — added the moment they do, never faked meanwhile.
+const GUILD_PULSE_EVENT_TYPES = [
+  "mtg_card_added",
+  "fab_card_added",
+  "pokemon_card_added",
+  "backlog_status_change",
+  "achievement_unlocked",
+  "wishlist_added",
+];
+
+// Which College a Guild Pulse event belongs to, for the College chip
+// next to each row. Kept here (not a generic lookup) since it only
+// needs to cover the pulse's own deliberately-narrow event type list.
+const PULSE_EVENT_COLLEGE = {
+  mtg_card_added: "tcg",
+  fab_card_added: "tcg",
+  pokemon_card_added: "tcg",
+  backlog_status_change: "gaming",
+  achievement_unlocked: "gaming",
+  wishlist_added: "gaming",
+};
+
+export function collegeForPulseEvent(eventType) {
+  return PULSE_EVENT_COLLEGE[eventType] || null;
+}
+
+// Powers the Overview "Guild Pulse" card — the last `days` of real
+// activity across every Guild the user is in, already narrowed to
+// GUILD_PULSE_EVENT_TYPES. Privacy is enforced by guild_activity's own
+// RLS policy (opted-out members' rows never come back from this query
+// at all, this function doesn't need to filter them out itself) —
+// see the "Guild Pulse" migration in schema.sql.
+export async function fetchGuildPulse(userId, days = 14) {
+  const { data: memberships, error: memberError } = await supabase
+    .from("guild_members")
+    .select("guild_id")
+    .eq("user_id", userId);
+  if (memberError) throw memberError;
+
+  const guildIds = (memberships || []).map((m) => m.guild_id);
+  if (guildIds.length === 0) return { inGuild: false, events: [] };
+
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data, error } = await supabase
+    .from("guild_activity")
+    .select("*, guilds(name)")
+    .in("guild_id", guildIds)
+    .in("event_type", GUILD_PULSE_EVENT_TYPES)
+    .gte("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(40);
+  if (error) throw error;
+
+  return { inGuild: true, events: await attachProfiles(data || []) };
+}
+
 // The one function the rest of the app actually calls when something
 // real happens (a backlog status change, a wishlist add, etc.) — logs
 // it to every guild the user is currently in. Silently does nothing
