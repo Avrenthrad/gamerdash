@@ -101,6 +101,30 @@ export async function fetchGuildMembersWithProfiles(guildId) {
   return members.map((m) => ({ ...m, profile: profileById[m.user_id] || null }));
 }
 
+// ---------- Roles: moderator/admin tiers ----------
+// Owner is never a role row (it's the immutable guilds.created_by) —
+// these two only ever touch a non-owner member's row, enforced at the
+// RLS layer (see the "Managers can..." policies in schema.sql), not
+// just by this client code.
+
+export async function updateGuildMemberRole(guildId, targetUserId, role) {
+  const { error } = await supabase
+    .from("guild_members")
+    .update({ role })
+    .eq("guild_id", guildId)
+    .eq("user_id", targetUserId);
+  if (error) throw error;
+}
+
+export async function kickGuildMember(guildId, targetUserId) {
+  const { error } = await supabase
+    .from("guild_members")
+    .delete()
+    .eq("guild_id", guildId)
+    .eq("user_id", targetUserId);
+  if (error) throw error;
+}
+
 // ---------- Privacy: browsable/request-to-join ----------
 
 export async function updateGuildPrivacy(guildId, isPrivate) {

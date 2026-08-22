@@ -2334,3 +2334,79 @@ alter table public.guild_activity add constraint guild_activity_event_type_check
     'wishlist_added', 'mtg_card_added', 'fab_card_added', 'pokemon_card_added',
     'joined_guild', 'guild_post_commented', 'guild_comment_replied', 'game_completed'
   ));
+
+-- ---------- Guild roles: moderator/admin tiers (additive) ----------
+-- Owner stays exactly as before — the immutable guilds.created_by,
+-- never a role row, so an owner can never be demoted or kicked through
+-- the new role-management policies below. This adds two tiers *under*
+-- owner: admin (can manage members' roles + kick + moderate content)
+-- and moderator (can moderate content only). Every existing membership
+-- row defaults to 'member', so nothing changes for anyone until an
+-- owner/admin actively promotes someone.
+alter table public.guild_members add column if not exists role text not null default 'member' check (role in ('member', 'moderator', 'admin'));
+
+create or replace function public.can_manage_guild_members(p_guild_id uuid, p_user_id uuid)
+returns boolean
+language sql security definer set search_path = public stable
+as $$
+  select
+    exists (select 1 from public.guilds where id = p_guild_id and created_by = p_user_id)
+    or exists (select 1 from public.guild_members where guild_id = p_guild_id and user_id = p_user_id and role = 'admin');
+$$;
+
+create or replace function public.can_moderate_guild_content(p_guild_id uuid, p_user_id uuid)
+returns boolean
+language sql security definer set search_path = public stable
+as $$
+  select
+    public.can_manage_guild_members(p_guild_id, p_user_id)
+    or exists (select 1 from public.guild_members where guild_id = p_guild_id and user_id = p_user_id and role = 'moderator');
+$$;
+
+-- Owner/admin can change another member's role. Excludes the owner's
+-- own row (ownership isn't a role, so it can't be targeted at all) and
+-- the actor's own row (no self-promotion). No column-level restriction
+-- on the UPDATE beyond that — same trust-the-app-layer precedent
+-- direct_messages' own update policy already uses, since the app only
+-- ever writes the role column here.
+create policy "Managers can change another member's role"
+  on public.guild_members for update
+  using (
+    public.can_manage_guild_members(guild_id, auth.uid())
+    and user_id <> auth.uid()
+    and user_id <> (select created_by from public.guilds where id = guild_id)
+  )
+  with check (
+    public.can_manage_guild_members(guild_id, auth.uid())
+    and user_id <> auth.uid()
+    and user_id <> (select created_by from public.guilds where id = guild_id)
+  );
+
+-- Owner/admin can kick another member — same exclusions as above.
+-- Removing your own membership still goes through the existing "Users
+-- can leave a guild themselves" policy, not this one.
+create policy "Managers can kick another member"
+  on public.guild_members for delete
+  using (
+    public.can_manage_guild_members(guild_id, auth.uid())
+    and user_id <> auth.uid()
+    and user_id <> (select created_by from public.guilds where id = guild_id)
+  );
+
+-- Owner/admin/moderator can delete any post or comment in a guild they
+-- moderate — additive alongside the existing "Authors can delete their
+-- own X" policies (RLS ORs permissive policies together for the same
+-- command, so this doesn't replace self-delete, just adds to it).
+create policy "Moderators can delete any post in their guild"
+  on public.guild_posts for delete
+  using (public.can_moderate_guild_content(guild_id, auth.uid()));
+
+create policy "Moderators can delete any comment in their guild"
+  on public.guild_post_comments for delete
+  using (
+    exists (
+      select 1 from public.guild_posts
+      where guild_posts.id = guild_post_comments.post_id
+        and public.can_moderate_guild_content(guild_posts.guild_id, auth.uid())
+    )
+  );

@@ -17,6 +17,7 @@ import {
   inviteToGuild, fetchMyGuildInvites, acceptGuildInvite, declineGuildInvite,
   fetchGuildPosts, createGuildPost, deleteGuildPost, voteOnPost,
   fetchPostComments, addPostComment, deletePostComment, uploadPostImage,
+  updateGuildMemberRole, kickGuildMember,
 } from "../lib/guilds";
 import { findUserByFriendCode } from "../lib/friends";
 import { supabase } from "../lib/supabaseClient";
@@ -416,6 +417,28 @@ function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, o
     }
   }
 
+  async function handleRoleChange(targetUserId, role) {
+    const prev = members;
+    setMembers((list) => list.map((m) => (m.user_id === targetUserId ? { ...m, role } : m)));
+    try {
+      await updateGuildMemberRole(guild.id, targetUserId, role);
+    } catch (err) {
+      console.error("Failed to update member role:", err);
+      setMembers(prev);
+    }
+  }
+
+  async function handleKick(targetUserId) {
+    const prev = members;
+    setMembers((list) => list.filter((m) => m.user_id !== targetUserId));
+    try {
+      await kickGuildMember(guild.id, targetUserId);
+    } catch (err) {
+      console.error("Failed to kick member:", err);
+      setMembers(prev);
+    }
+  }
+
   async function handleRespond(requestId, approve) {
     try {
       await respondToJoinRequest(requestId, approve);
@@ -447,6 +470,10 @@ function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, o
       setInviteMessage(err.message || "Couldn't send that invite.");
     }
   }
+
+  const myRole = members.find((m) => m.user_id === userId)?.role || "member";
+  const canManage = isOwner || myRole === "admin";
+  const canModerate = canManage || myRole === "moderator";
 
   return (
     <div className="price-page">
@@ -497,7 +524,7 @@ function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, o
         )}
       </div>
 
-      {tab === "posts" && <PostsTab guildId={guild.id} userId={userId} isMember={isMember} />}
+      {tab === "posts" && <PostsTab guildId={guild.id} userId={userId} isMember={isMember} canModerate={canModerate} />}
 
       {tab === "settings" && isOwner && (
         <section className="settings-card">
@@ -606,15 +633,41 @@ function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, o
           {status === "loading" && <p className="panel__status">Loading…</p>}
           {status === "ready" && (
             <ul className="backlog-list">
-              {members.map((m) => (
-                <li key={m.id} className="backlog-card">
-                  <MiniAvatar profile={m.profile} />
-                  <div className="backlog-card__info">
-                    <span className="backlog-card__title">{displayName(m.profile)}</span>
-                    {m.user_id === guild.created_by && <span className="backlog-card__meta">Owner</span>}
-                  </div>
-                </li>
-              ))}
+              {members.map((m) => {
+                const memberIsOwner = m.user_id === guild.created_by;
+                const memberIsSelf = m.user_id === userId;
+                return (
+                  <li key={m.id} className="backlog-card">
+                    <MiniAvatar profile={m.profile} />
+                    <div className="backlog-card__info">
+                      <span className="backlog-card__title">{displayName(m.profile)}</span>
+                      {memberIsOwner && <span className="backlog-card__meta">Owner</span>}
+                      {!memberIsOwner && m.role !== "member" && (
+                        <span className="backlog-card__meta">{m.role === "admin" ? "Admin" : "Moderator"}</span>
+                      )}
+                    </div>
+                    {canManage && !memberIsOwner && !memberIsSelf && (
+                      <div className="backlog-card__actions">
+                        <select
+                          className="backlog-card__status-select"
+                          value={m.role}
+                          onChange={(e) => handleRoleChange(m.user_id, e.target.value)}
+                        >
+                          <option value="member">Member</option>
+                          <option value="moderator">Moderator</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                        <button
+                          type="button"
+                          className="game-popup__close"
+                          onClick={() => handleKick(m.user_id)}
+                          aria-label="Kick member"
+                        >✕</button>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </>
@@ -648,7 +701,7 @@ function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, o
   );
 }
 
-function PostsTab({ guildId, userId, isMember }) {
+function PostsTab({ guildId, userId, isMember, canModerate }) {
   const [posts, setPosts] = useState([]);
   const [status, setStatus] = useState("loading");
   const [title, setTitle] = useState("");
@@ -797,12 +850,12 @@ function PostsTab({ guildId, userId, isMember }) {
                     {expandedPostId === post.id ? "Hide comments ▲" : `${post.commentCount} comment${post.commentCount === 1 ? "" : "s"} ▾`}
                   </button>
                 </div>
-                {post.user_id === userId && (
+                {(post.user_id === userId || canModerate) && (
                   <button type="button" className="game-popup__close" onClick={() => handleDelete(post.id)} aria-label="Delete post">✕</button>
                 )}
               </div>
               {expandedPostId === post.id && (
-                <CommentsPanel postId={post.id} guildId={guildId} userId={userId} isMember={isMember} onCommentAdded={() => setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, commentCount: p.commentCount + 1 } : p)))} />
+                <CommentsPanel postId={post.id} guildId={guildId} userId={userId} isMember={isMember} canModerate={canModerate} onCommentAdded={() => setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, commentCount: p.commentCount + 1 } : p)))} />
               )}
             </li>
           ))}
@@ -812,7 +865,7 @@ function PostsTab({ guildId, userId, isMember }) {
   );
 }
 
-function CommentsPanel({ postId, guildId, userId, isMember, onCommentAdded }) {
+function CommentsPanel({ postId, guildId, userId, isMember, canModerate, onCommentAdded }) {
   const [comments, setComments] = useState([]);
   const [status, setStatus] = useState("loading");
   const [text, setText] = useState("");
@@ -902,7 +955,7 @@ function CommentsPanel({ postId, guildId, userId, isMember, onCommentAdded }) {
               Reply
             </button>
           )}
-          {c.user_id === userId && (
+          {(c.user_id === userId || canModerate) && (
             <button type="button" className="game-popup__close" onClick={() => handleDelete(c.id)} aria-label="Delete comment">✕</button>
           )}
         </div>
