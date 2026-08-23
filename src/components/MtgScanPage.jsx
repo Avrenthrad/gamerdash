@@ -9,92 +9,117 @@
 // why this shows a few candidate matches to confirm rather than
 // silently trusting the first guess and adding it straight to your
 // collection — a wrong silent add would be worse than asking.
+//
+// Three ways to get a photo in, all feeding the same per-photo
+// pipeline below (each becomes one "job" in the list):
+//   - Single photo: <input capture="environment"> — on mobile this
+//     opens the real camera app directly; desktop browsers ignore
+//     `capture` and just show a normal file picker.
+//   - Bulk upload: the same input with `multiple` — desktop's real
+//     equivalent of scanning a whole binder page at once.
+//   - Webcam: a live preview + manual shutter (MtgCardWebcamCapture),
+//     for anyone at a desktop with a webcam who'd rather not save
+//     photos to disk first.
 
 import { useState } from "react";
 import { recognizeCardText, guessNameCandidates } from "../lib/ocr";
 import { getCardAutocomplete, getCardByName } from "../lib/scryfall";
 import { addToCollection } from "../lib/mtg";
+import MtgCardWebcamCapture from "./MtgCardWebcamCapture";
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function MtgScanPage({ onBack, userId, isLoggedIn, onSignIn, onCreateAccount }) {
-  const [photo, setPhoto] = useState(null);
-  const [status, setStatus] = useState("idle"); // idle | reading | matching | ready | error
-  const [candidates, setCandidates] = useState([]);
-  const [selectedCard, setSelectedCard] = useState(null);
-  const [added, setAdded] = useState(false);
-  const [adding, setAdding] = useState(false);
+  // One entry per photo, processed independently — a bulk upload of
+  // 12 photos means 12 of these, not one shared status.
+  const [jobs, setJobs] = useState([]); // [{ id, photo, status, candidates, selectedCard, added, adding }]
+  const [webcamOpen, setWebcamOpen] = useState(false);
 
-  async function handlePhoto(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  function updateJob(id, patch) {
+    setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...patch } : j)));
+  }
 
-    const dataUrl = await new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.readAsDataURL(file);
-    });
-    setPhoto(dataUrl);
-    setSelectedCard(null);
-    setAdded(false);
-    setAdding(false);
-    setStatus("reading");
-
+  async function processJob(id, dataUrl) {
+    updateJob(id, { status: "reading" });
     try {
       const { lines } = await recognizeCardText(dataUrl);
       const nameGuesses = guessNameCandidates(lines);
 
       if (nameGuesses.length === 0) {
-        setStatus("error");
+        updateJob(id, { status: "error" });
         return;
       }
 
-      setStatus("matching");
+      updateJob(id, { status: "matching" });
       // Try each OCR guess against Scryfall's real autocomplete —
       // collects real card names, not raw unverified OCR text.
       const matchLists = await Promise.all(nameGuesses.map((g) => getCardAutocomplete(g)));
       const uniqueMatches = [...new Set(matchLists.flat())].slice(0, 6);
 
       if (uniqueMatches.length === 0) {
-        setStatus("error");
+        updateJob(id, { status: "error" });
         return;
       }
 
-      setCandidates(uniqueMatches);
-      setStatus("ready");
+      updateJob(id, { status: "ready", candidates: uniqueMatches });
     } catch (err) {
       console.error("Card scan failed:", err);
-      setStatus("error");
+      updateJob(id, { status: "error" });
     }
   }
 
-  async function handleSelectCandidate(name) {
+  function addJob(dataUrl) {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setJobs((prev) => [
+      { id, photo: dataUrl, status: "reading", candidates: [], selectedCard: null, added: false, adding: false },
+      ...prev,
+    ]);
+    processJob(id, dataUrl);
+  }
+
+  async function handleFiles(e) {
+    const files = Array.from(e.target.files || []);
+    e.target.value = ""; // allow re-selecting the same file(s) later
+    for (const file of files) {
+      const dataUrl = await readFileAsDataUrl(file);
+      addJob(dataUrl);
+    }
+  }
+
+  function handleWebcamCapture(dataUrl) {
+    setWebcamOpen(false);
+    addJob(dataUrl);
+  }
+
+  async function handleSelectCandidate(id, name) {
     try {
       const card = await getCardByName(name);
-      setSelectedCard(card);
+      updateJob(id, { selectedCard: card });
     } catch (err) {
       console.error("Failed to load selected card:", err);
     }
   }
 
-  async function handleAdd() {
-    if (!selectedCard || adding || added) return;
-    setAdding(true);
+  async function handleAdd(job) {
+    if (!job.selectedCard || job.adding || job.added) return;
+    updateJob(job.id, { adding: true });
     try {
-      await addToCollection(userId, selectedCard);
-      setAdded(true);
+      await addToCollection(userId, job.selectedCard);
+      updateJob(job.id, { added: true, adding: false });
     } catch (err) {
       console.error("Failed to add scanned card:", err);
-    } finally {
-      setAdding(false);
+      updateJob(job.id, { adding: false });
     }
   }
 
-  function handleScanAnother() {
-    setPhoto(null);
-    setCandidates([]);
-    setSelectedCard(null);
-    setAdded(false);
-    setAdding(false);
-    setStatus("idle");
+  function handleRemoveJob(id) {
+    setJobs((prev) => prev.filter((j) => j.id !== id));
   }
 
   return (
@@ -114,62 +139,80 @@ export default function MtgScanPage({ onBack, userId, isLoggedIn, onSignIn, onCr
           <button type="button" className="linking-row__connect" onClick={onSignIn}>Sign in</button>
           <button type="button" className="linking-row__connect" onClick={onCreateAccount}>Create account</button>
         </div>
+      ) : webcamOpen ? (
+        <MtgCardWebcamCapture onCapture={handleWebcamCapture} onClose={() => setWebcamOpen(false)} />
       ) : (
-        <div className="backlog-add">
-          <label className="settings-avatar__upload">
-            {photo ? "Take another photo" : "Take a photo of a card"}
-            <input type="file" accept="image/*" capture="environment" onChange={handlePhoto} hidden />
-          </label>
+        <>
+          <div className="backlog-add">
+            <label className="settings-avatar__upload">
+              Take a photo of a card
+              <input type="file" accept="image/*" capture="environment" onChange={handleFiles} hidden />
+            </label>
+            <label className="settings-avatar__upload">
+              Upload multiple photos
+              <input type="file" accept="image/*" multiple onChange={handleFiles} hidden />
+            </label>
+            <button type="button" className="settings-avatar__upload" onClick={() => setWebcamOpen(true)}>
+              Use webcam
+            </button>
+          </div>
 
-          {photo && (
-            <img
-              src={photo}
-              alt="Captured card"
-              style={{ width: "160px", borderRadius: "10px", border: "1px solid var(--border)" }}
-            />
+          {jobs.length === 0 && (
+            <p className="panel__status">Nothing scanned yet — take a photo, upload a batch, or use your webcam above.</p>
           )}
 
-          {status === "reading" && <p className="panel__status">Reading the card…</p>}
-          {status === "matching" && <p className="panel__status">Matching against Scryfall…</p>}
-          {status === "error" && (
-            <p className="panel__status panel__status--error">
-              Couldn't get a confident read — try again with better lighting, or search by name instead.
-            </p>
-          )}
+          {jobs.map((job) => (
+            <div key={job.id} className="backlog-card" style={{ flexDirection: "column", alignItems: "stretch", gap: "10px" }}>
+              <div style={{ display: "flex", gap: "12px" }}>
+                <img
+                  src={job.photo}
+                  alt="Captured card"
+                  style={{ width: "100px", borderRadius: "10px", border: "1px solid var(--border)", flexShrink: 0 }}
+                />
+                <div className="backlog-card__info" style={{ flex: 1 }}>
+                  {job.status === "reading" && <p className="panel__status">Reading the card…</p>}
+                  {job.status === "matching" && <p className="panel__status">Matching against Scryfall…</p>}
+                  {job.status === "error" && (
+                    <p className="panel__status panel__status--error">
+                      Couldn't get a confident read — try again with better lighting, or search by name instead.
+                    </p>
+                  )}
 
-          {status === "ready" && !selectedCard && (
-            <div>
-              <p className="panel__status">Which card is this?</p>
-              <ul className="backlog-search-results">
-                {candidates.map((name) => (
-                  <li key={name} className="backlog-search-results__row">
-                    <span>{name}</span>
-                    <button type="button" className="linking-row__connect" onClick={() => handleSelectCandidate(name)}>
-                      This one
-                    </button>
-                  </li>
-                ))}
-              </ul>
+                  {job.status === "ready" && !job.selectedCard && (
+                    <div>
+                      <p className="panel__status">Which card is this?</p>
+                      <ul className="backlog-search-results">
+                        {job.candidates.map((name) => (
+                          <li key={name} className="backlog-search-results__row">
+                            <span>{name}</span>
+                            <button type="button" className="linking-row__connect" onClick={() => handleSelectCandidate(job.id, name)}>
+                              This one
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {job.selectedCard && (
+                    <div className="surprise-me__result">
+                      {job.selectedCard.imageLarge && <img src={job.selectedCard.imageLarge} alt="" style={{ maxWidth: "120px" }} />}
+                      <span className="surprise-me__title">{job.selectedCard.name}</span>
+                      {job.added ? (
+                        <span className="score-badge">Added</span>
+                      ) : (
+                        <button type="button" className="linking-row__connect" onClick={() => handleAdd(job)} disabled={job.adding}>
+                          {job.adding ? "Adding…" : "Add to Collection"}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <button type="button" className="game-popup__close" onClick={() => handleRemoveJob(job.id)} aria-label="Remove">✕</button>
+              </div>
             </div>
-          )}
-
-          {selectedCard && (
-            <div className="surprise-me__result">
-              {selectedCard.imageLarge && <img src={selectedCard.imageLarge} alt="" />}
-              <span className="surprise-me__title">{selectedCard.name}</span>
-              {added ? (
-                <span className="score-badge">Added</span>
-              ) : (
-                <button type="button" className="linking-row__connect" onClick={handleAdd} disabled={adding}>
-                  {adding ? "Adding…" : "Add to Collection"}
-                </button>
-              )}
-              <button type="button" className="quickdash-reset-btn" onClick={handleScanAnother}>
-                Scan another
-              </button>
-            </div>
-          )}
-        </div>
+          ))}
+        </>
       )}
 
       <a href="https://scryfall.com" target="_blank" rel="noopener noreferrer" className="ps-trophy-attribution">
