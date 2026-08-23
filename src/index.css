@@ -7434,6 +7434,22 @@ html[data-mode="light"] .current-rotation {
   .mastery-ps-grid {
     grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
   }
+
+  .backlog-status-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .backlog-status-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .backlog-status-tabs > * {
+    flex: 0 0 auto;
+  }
 }
 
 /* ---------- TCG live visual scanner (real-time card recognition) ---------- */
