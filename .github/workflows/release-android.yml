@@ -62,6 +62,7 @@ jobs:
       - name: Build signed release APK
         working-directory: android
         run: |
+          chmod +x ./gradlew
           ./gradlew assembleRelease \
             "-PlykodexVersionCode=${{ env.ANDROID_VERSION_CODE }}" \
             "-PlykodexVersionName=${{ env.ANDROID_VERSION }}" \
