@@ -7337,6 +7337,18 @@ html[data-mode="light"] .current-rotation {
 }
 
 @media (max-width: 720px) {
+  /* .dash-layout uses align-items: flex-start (see rule above), so its
+     .dash flex child normally shrink-wraps to its content's max-content
+     width instead of stretching to the viewport. A lane with several
+     non-wrapping fixed-width children (flex: 0 0 auto) contributes the
+     *sum* of those widths to that max-content calculation — wide enough
+     to push .dash past the viewport and scroll the whole page
+     horizontally instead of just the lane. Pin .dash to the viewport
+     width here so only .h-lane itself scrolls. */
+  .dash {
+    width: 100%;
+  }
+
   .h-lane-title {
     display: block;
     font-family: var(--font-mono);
@@ -7385,6 +7397,42 @@ html[data-mode="light"] .current-rotation {
   .h-lane.overview-grid > .overview-card {
     width: 132px;
     min-width: 132px;
+  }
+
+  .h-lane > .current-rotation {
+    width: 260px;
+    padding: 14px;
+  }
+
+  .h-lane.gaming-hero-grid > .panel.hero-card,
+  .h-lane.gaming-secondary-grid > .panel.hero-card {
+    width: 220px;
+  }
+
+  .h-lane.gaming-hero-grid > .hero-card--continue-playing {
+    width: 260px;
+  }
+
+  .h-lane.gaming-hero-grid > .hero-card--continue-playing .hero-card__art {
+    height: 120px;
+  }
+
+  .panel--wide,
+  .panel--rose,
+  .steam-link-card {
+    padding: 16px;
+  }
+
+  .feed-layout {
+    flex-direction: column;
+  }
+
+  .library-table {
+    font-size: 12.5px;
+  }
+
+  .mastery-ps-grid {
+    grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
   }
 }
 

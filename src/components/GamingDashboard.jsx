@@ -21,6 +21,7 @@ import GamingMasteryContributionCard from "./GamingMasteryContributionCard";
 import ReleaseCalendarCard from "./ReleaseCalendarCard";
 import NewsAnnouncementsCard from "./NewsAnnouncementsCard";
 import PageLoadingFallback from "./PageLoadingFallback";
+import HorizontalLane from "./mobile/HorizontalLane";
 
 const GridLayout = lazy(() => import("react-grid-layout"));
 
@@ -58,18 +59,19 @@ export default function GamingDashboard({
         onResetLayout={resetLayout}
       />
 
-      {isLoggedIn && <SteamPresenceCard linkedSteamId={linkedSteamId} />}
-
-      <CurrentRotation
-        wishlist={wishlist}
-        linkedSteamId={linkedSteamId}
-        userId={userId}
-        onOpenBacklog={() => goTo("backlog")}
-        onOpenPrices={() => goTo("prices")}
-      />
+      <HorizontalLane label="Right now">
+        {isLoggedIn && <SteamPresenceCard linkedSteamId={linkedSteamId} />}
+        <CurrentRotation
+          wishlist={wishlist}
+          linkedSteamId={linkedSteamId}
+          userId={userId}
+          onOpenBacklog={() => goTo("backlog")}
+          onOpenPrices={() => goTo("prices")}
+        />
+      </HorizontalLane>
 
       {/* Personal row — your own progress, at a glance */}
-      <div className="gaming-hero-grid">
+      <HorizontalLane label="Your progress" className="gaming-hero-grid">
         <ContinuePlayingCard linkedSteamId={linkedSteamId} onOpenLibrary={() => goTo("library")} />
         {isLoggedIn ? (
           <GamingMasteryContributionCard
@@ -85,10 +87,10 @@ export default function GamingDashboard({
           </div>
         )}
         <ReleaseCalendarCard wishlist={wishlist} linkedSteamId={linkedSteamId} onOpenUpcomingReleases={() => goTo("upcoming-releases")} />
-      </div>
+      </HorizontalLane>
 
       {/* Social row — what your Guild and friends are up to, at a glance */}
-      <div className="gaming-secondary-grid">
+      <HorizontalLane label="Social" className="gaming-secondary-grid">
         {isLoggedIn ? (
           <GuildSpotlightCard userId={userId} onOpenGuilds={() => goTo("guilds")} />
         ) : (
@@ -107,7 +109,7 @@ export default function GamingDashboard({
         )}
         <NowTrendingCard onOpenHypeCharts={() => goTo("hype-charts")} />
         <NewsAnnouncementsCard linkedSteamId={linkedSteamId} />
-      </div>
+      </HorizontalLane>
 
       <FriendSection
         isLoggedIn={isLoggedIn}
