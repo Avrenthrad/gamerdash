@@ -7325,6 +7325,48 @@ html[data-mode="light"] .current-rotation {
   }
 }
 
+/* ---------- Horizontal Rhythm: lane primitive for mobile hub pages
+   ---------- see docs/superpowers/specs/2026-08-23-mobile-horizontal-
+   rhythm-design.md. `.h-lane` is a no-op above the breakpoint — the
+   `className` prop on <HorizontalLane> is what carries a container's
+   existing desktop layout (e.g. "gaming-hero-grid" keeps its current
+   grid CSS untouched on desktop). ---------- */
+
+.h-lane-title {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .h-lane-title {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 18px 4px 8px;
+  }
+
+  .h-lane {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding: 2px 2px 6px;
+    scroll-snap-type: x proximity;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .h-lane::-webkit-scrollbar {
+    display: none;
+  }
+
+  .h-lane > * {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+  }
+}
+
 /* ---------- TCG live visual scanner (real-time card recognition) ---------- */
 
 .tcg-visual-scanner {
