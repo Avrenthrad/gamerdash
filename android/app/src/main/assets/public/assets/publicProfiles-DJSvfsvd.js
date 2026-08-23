@@ -1,0 +1,1 @@
+import{t as e}from"./supabaseClient-675mokiZ.js";async function t(t){if(!t||t.length===0)return[];let{data:n,error:r}=await e.rpc(`get_public_profiles`,{p_ids:t});if(r)throw r;return n||[]}export{t};

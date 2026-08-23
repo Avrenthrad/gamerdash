@@ -20,3 +20,10 @@ export function isPackagedApp() {
 export function isTauri() {
   return typeof window !== "undefined" && ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
 }
+
+// The sideloaded Android build specifically — not distributed through
+// Play Store (which would handle updates on its own), so this is what
+// gates the in-app "download the new APK" update check.
+export function isAndroid() {
+  return Capacitor.getPlatform() === "android";
+}

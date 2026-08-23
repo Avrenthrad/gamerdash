@@ -1,0 +1,1 @@
+var e=`https://lykodex.vercel.app`;export{e as t};

@@ -31,3 +31,9 @@ src-tauri/*.key
 # Auto-regenerated on every build (capability/permission JSON schemas
 # for editor validation) — not build input, no need to track.
 src-tauri/gen/
+
+# Android release signing keystore — never commit, same reasoning as
+# the Tauri key above. CI reads it from a base64 GitHub Actions secret
+# instead (see .github/workflows/release-android.yml).
+android/*.keystore
+android-release-keypass.tmp

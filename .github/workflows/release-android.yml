@@ -1,0 +1,79 @@
+name: Release Android app
+
+# Public repo (see .gitignore's keystore note) — GitHub Releases and
+# their asset download URLs need to be reachable anonymously for the
+# in-app update check (src/lib/androidUpdater.js) to work at all; a
+# private repo 404s on exactly that URL shape, confirmed live.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "android/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/release-android.yml"
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: npm run build
+        env:
+          # Packaged builds load from a local file origin, not a live
+          # server — see src/lib/apiBase.js. Not a secret, just a
+          # public URL.
+          VITE_API_BASE_URL: https://lykodex.vercel.app
+
+      - name: Sync Capacitor Android project
+        run: npx cap sync android
+
+      - name: Set Android build version
+        shell: bash
+        run: |
+          VERSION="0.1.${{ github.run_number }}"
+          echo "ANDROID_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "ANDROID_VERSION_CODE=${{ github.run_number }}" >> "$GITHUB_ENV"
+
+      - name: Decode release keystore
+        shell: bash
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/lykodex-release.keystore
+
+      - name: Build signed release APK
+        working-directory: android
+        run: |
+          ./gradlew assembleRelease \
+            "-PlykodexVersionCode=${{ env.ANDROID_VERSION_CODE }}" \
+            "-PlykodexVersionName=${{ env.ANDROID_VERSION }}" \
+            --no-daemon
+        env:
+          LYKODEX_ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/android/lykodex-release.keystore
+          LYKODEX_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-v${{ env.ANDROID_VERSION }}
+          name: Lykodex Android ${{ env.ANDROID_VERSION }}
+          body: Automated Android build from the latest push to main.
+          files: android/app/build/outputs/apk/release/app-release.apk
+          draft: false
+          prerelease: false

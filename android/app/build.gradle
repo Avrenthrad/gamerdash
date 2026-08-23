@@ -7,8 +7,14 @@ android {
         applicationId "com.lykodex.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // Overridable via -PlykodexVersionCode/-PlykodexVersionName (the
+        // release workflow passes the real values so each build reports
+        // a strictly-increasing versionCode — required for Android to
+        // recognize a sideloaded install as "the same app, updated"
+        // rather than a conflicting install). Local `gradlew` builds
+        // with no -P flags just fall back to these placeholders.
+        versionCode (project.hasProperty('lykodexVersionCode') ? project.property('lykodexVersionCode').toInteger() : 1)
+        versionName (project.hasProperty('lykodexVersionName') ? project.property('lykodexVersionName') : "1.0")
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,10 +22,29 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Release signing reads from env vars, never committed — same
+    // pattern as the desktop updater's signing key. Deliberately
+    // conditional: a plain local `gradlew assembleRelease` with none of
+    // these set still works (Android just produces an unsigned APK,
+    // fine for local testing), only CI actually has the real keystore.
+    signingConfigs {
+        release {
+            def ksPath = System.getenv("LYKODEX_ANDROID_KEYSTORE_PATH")
+            if (ksPath != null) {
+                storeFile file(ksPath)
+                storePassword System.getenv("LYKODEX_ANDROID_KEYSTORE_PASSWORD")
+                keyAlias "lykodex"
+                keyPassword System.getenv("LYKODEX_ANDROID_KEYSTORE_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (System.getenv("LYKODEX_ANDROID_KEYSTORE_PATH") != null) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
