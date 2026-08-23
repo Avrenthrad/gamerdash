@@ -2,7 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- maximum-scale=1/user-scalable=no: this is an app shell (also
+         packaged as a native Android/desktop app), not a zoomable
+         document — pinch/double-tap zoom on mobile web was leaving the
+         page visibly shifted with no way back except a manual reset,
+         which read as broken layout even though nothing was actually
+         overflowing (verified: zero real layout overflow at 360/412px,
+         logged in and out). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 
     <title>Lykodex — Your Unified Gaming Hub</title>
     <meta name="description" content="Track prices across every store, your Steam achievements and library, friends' activity, and live service game resets — all in one dashboard." />
