@@ -28,7 +28,7 @@ export function findBestMatches(index, queryHash, { limit = 3, maxDistance = 16 
   const scored = [];
   for (const entry of index) {
     const distance = hammingDistance(queryHash, entry.h);
-    if (distance <= maxDistance) scored.push({ id: entry.id, name: entry.name, set: entry.set, distance });
+    if (distance <= maxDistance) scored.push({ id: entry.id, cardId: entry.cardId, name: entry.name, set: entry.set, distance });
   }
   scored.sort((a, b) => a.distance - b.distance);
   return scored.slice(0, limit);

@@ -31,7 +31,16 @@ export async function* iterateCards() {
       for (const printing of card.printings || []) {
         if (!printing.image_url) continue;
         yield {
+          // The hash-index key stays the PRINTING's id (each printing
+          // gets its own hash — different art/foil genuinely looks
+          // different) — cardId is the separate lookup key
+          // getFabCardById actually needs (confirmed live: goagain's
+          // /v1/cards/{id} takes the card's own unique_id, not a
+          // printing's). Carried as an extra field rather than
+          // replacing `id`, so this stays additive over whatever's
+          // already indexed instead of invalidating it.
           id: printing.unique_id,
+          cardId: card.unique_id,
           name: card.name,
           set: printing.set_id || "",
           imageUrl: printing.image_url,

@@ -46,6 +46,8 @@ const PokemonSearchPage = lazy(() => import("./components/PokemonSearchPage"));
 const PokemonCollectionPage = lazy(() => import("./components/PokemonCollectionPage"));
 const PokemonDeckBuilderPage = lazy(() => import("./components/PokemonDeckBuilderPage"));
 const MtgScanPage = lazy(() => import("./components/MtgScanPage"));
+const PokemonScanPage = lazy(() => import("./components/PokemonScanPage"));
+const FabScanPage = lazy(() => import("./components/FabScanPage"));
 const CsvImportPage = lazy(() => import("./components/CsvImportPage"));
 const GuildsPage = lazy(() => import("./components/GuildsPage"));
 const FriendsPage = lazy(() => import("./components/FriendsPage"));
@@ -468,6 +470,7 @@ export default function App() {
                 onBack={() => goTo("tcg-home")}
                 userId={userId}
                 onGoToSearch={() => goTo("fab-search")}
+                onGoToScan={() => goTo("fab-scan")}
                 onGoToDecks={() => goTo("fab-decks")}
               />
             ) : (
@@ -491,6 +494,17 @@ export default function App() {
             )
           )}
 
+          {view === "fab-scan" && (
+            <FabScanPage
+              onBack={() => goTo("fab-collection")}
+              onGoToSearch={() => goTo("fab-search")}
+              userId={userId}
+              isLoggedIn={isLoggedIn}
+              onSignIn={() => goTo("login", "login")}
+              onCreateAccount={() => goTo("login", "signup")}
+            />
+          )}
+
           {view === "pokemon-search" && (
             <PokemonSearchPage
               onBack={() => goTo("tcg-home")}
@@ -507,6 +521,7 @@ export default function App() {
                 onBack={() => goTo("tcg-home")}
                 userId={userId}
                 onGoToSearch={() => goTo("pokemon-search")}
+                onGoToScan={() => goTo("pokemon-scan")}
                 onGoToDecks={() => goTo("pokemon-decks")}
               />
             ) : (
@@ -516,6 +531,17 @@ export default function App() {
                 onCreateAccount={() => goTo("login", "signup")}
               />
             )
+          )}
+
+          {view === "pokemon-scan" && (
+            <PokemonScanPage
+              onBack={() => goTo("pokemon-collection")}
+              onGoToSearch={() => goTo("pokemon-search")}
+              userId={userId}
+              isLoggedIn={isLoggedIn}
+              onSignIn={() => goTo("login", "login")}
+              onCreateAccount={() => goTo("login", "signup")}
+            />
           )}
 
           {view === "pokemon-decks" && (

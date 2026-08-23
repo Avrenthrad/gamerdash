@@ -24,7 +24,7 @@ function firstPrintingImage(card) {
 // onGoToImport is optional — CSV import for FaB doesn't exist yet
 // (a later phase), so the button only renders once a real handler is
 // passed in, rather than linking to a route that doesn't exist.
-export default function FabCollectionPage({ onBack, userId, onGoToSearch, onGoToImport, onGoToDecks }) {
+export default function FabCollectionPage({ onBack, userId, onGoToSearch, onGoToScan, onGoToImport, onGoToDecks }) {
   const [tab, setTab] = useState("cards");
 
   return (
@@ -49,7 +49,7 @@ export default function FabCollectionPage({ onBack, userId, onGoToSearch, onGoTo
       </div>
 
       {tab === "cards" && (
-        <CardsTab userId={userId} onGoToSearch={onGoToSearch} onGoToImport={onGoToImport} />
+        <CardsTab userId={userId} onGoToSearch={onGoToSearch} onGoToScan={onGoToScan} onGoToImport={onGoToImport} />
       )}
       {tab === "decks" && <DecksTab userId={userId} onGoToDecks={onGoToDecks} />}
       {tab === "binders" && <FabBindersPage userId={userId} />}
@@ -57,7 +57,7 @@ export default function FabCollectionPage({ onBack, userId, onGoToSearch, onGoTo
   );
 }
 
-function CardsTab({ userId, onGoToSearch, onGoToImport }) {
+function CardsTab({ userId, onGoToSearch, onGoToScan, onGoToImport }) {
   const [entries, setEntries] = useState([]);
   const [status, setStatus] = useState("loading");
   const [sortBy, setSortBy] = useState("recent");
@@ -128,6 +128,9 @@ function CardsTab({ userId, onGoToSearch, onGoToImport }) {
 
       <div className="backlog-add">
         <button type="button" className="quickdash-reset-btn" onClick={onGoToSearch}>+ Search &amp; add</button>
+        {onGoToScan && (
+          <button type="button" className="quickdash-reset-btn" onClick={onGoToScan}>Scan a card</button>
+        )}
         {onGoToImport && (
           <button type="button" className="quickdash-reset-btn" onClick={onGoToImport}>⬆️ Import CSV</button>
         )}

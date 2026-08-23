@@ -115,7 +115,10 @@ async function processWithConcurrency(iterator, seenIds, onResult) {
           active++;
           hashImageUrl(card.imageUrl)
             .then((h) => {
-              onResult({ h, id: card.id, name: card.name, set: card.set });
+              // cardId is FAB-specific (see tcg-sources/fab.mjs) — MTG/
+              // Pokemon adapters simply don't yield it, so this stays
+              // undefined and drops out of the JSON for those games.
+              onResult({ h, id: card.id, cardId: card.cardId, name: card.name, set: card.set });
             })
             .catch((err) => {
               console.error(`Skipped ${card.id} (${card.name}): ${err.message}`);

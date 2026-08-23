@@ -28,7 +28,7 @@ function cardPrice(entry) {
   return entry.card ? currentPokemonPrice(entry.card)?.price || 0 : 0;
 }
 
-export default function PokemonCollectionPage({ onBack, userId, onGoToSearch, onGoToDecks }) {
+export default function PokemonCollectionPage({ onBack, userId, onGoToSearch, onGoToScan, onGoToDecks }) {
   const [tab, setTab] = useState("cards");
 
   return (
@@ -53,7 +53,7 @@ export default function PokemonCollectionPage({ onBack, userId, onGoToSearch, on
       </div>
 
       {tab === "cards" && (
-        <CardsTab userId={userId} onGoToSearch={onGoToSearch} />
+        <CardsTab userId={userId} onGoToSearch={onGoToSearch} onGoToScan={onGoToScan} />
       )}
       {tab === "decks" && <DecksTab userId={userId} onGoToDecks={onGoToDecks} />}
       {tab === "binders" && <PokemonBindersPage userId={userId} kind="binder" />}
@@ -62,7 +62,7 @@ export default function PokemonCollectionPage({ onBack, userId, onGoToSearch, on
   );
 }
 
-function CardsTab({ userId, onGoToSearch }) {
+function CardsTab({ userId, onGoToSearch, onGoToScan }) {
   const [entries, setEntries] = useState([]);
   const [status, setStatus] = useState("loading");
   const [sortBy, setSortBy] = useState("recent");
@@ -153,6 +153,9 @@ function CardsTab({ userId, onGoToSearch }) {
         <button type="button" className="quickdash-reset-btn" onClick={onGoToSearch}>
           + Search &amp; add
         </button>
+        {onGoToScan && (
+          <button type="button" className="quickdash-reset-btn" onClick={onGoToScan}>Scan a card</button>
+        )}
       </div>
 
       {status === "ready" && entries.length > 0 && (
