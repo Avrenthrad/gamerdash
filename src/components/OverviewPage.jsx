@@ -204,101 +204,108 @@ export default function OverviewPage({
         </HorizontalLane>
       )}
 
-      <HorizontalLane label="Colleges" className="overview-grid">
-        {showGaming && (
-          <button type="button" className="overview-card" onClick={() => onOpenCollege("gaming")}>
-            <span className="overview-card__icon"><CollegeIcon collegeId="gaming" size={22} /></span>
-            <span className="overview-card__label">Gaming</span>
-            {!linkedSteamId ? (
-              <span className="overview-card__empty">Link Steam to see your library here</span>
-            ) : status === "loading" ? (
-              <span className="overview-card__value">…</span>
-            ) : (
-              <>
-                <span className="overview-card__value">{gameCount ?? 0}</span>
-                <span className="overview-card__unit">games</span>
-              </>
-            )}
-          </button>
-        )}
+      {(showGaming ||
+        showTcg ||
+        selectedColleges.includes("entertainment") ||
+        selectedColleges.includes("collectibles") ||
+        selectedColleges.includes("tabletop") ||
+        NOT_BUILT_COLLEGES.some((c) => selectedColleges.includes(c.id))) && (
+        <HorizontalLane label="Colleges" className="overview-grid">
+          {showGaming && (
+            <button type="button" className="overview-card" onClick={() => onOpenCollege("gaming")}>
+              <span className="overview-card__icon"><CollegeIcon collegeId="gaming" size={22} /></span>
+              <span className="overview-card__label">Gaming</span>
+              {!linkedSteamId ? (
+                <span className="overview-card__empty">Link Steam to see your library here</span>
+              ) : status === "loading" ? (
+                <span className="overview-card__value">…</span>
+              ) : (
+                <>
+                  <span className="overview-card__value">{gameCount ?? 0}</span>
+                  <span className="overview-card__unit">games</span>
+                </>
+              )}
+            </button>
+          )}
 
-        {showTcg && (
-          <button type="button" className="overview-card" onClick={() => onOpenCollege("tcg")}>
-            <span className="overview-card__icon"><CollegeIcon collegeId="tcg" size={22} /></span>
-            <span className="overview-card__label">TCG</span>
-            {status === "loading" ? (
-              <span className="overview-card__value">…</span>
-            ) : cardCount ? (
-              <>
-                <span className="overview-card__value">{cardCount}</span>
-                <span className="overview-card__unit">cards</span>
-              </>
-            ) : (
-              <span className="overview-card__empty">No cards yet — add some in TCG</span>
-            )}
-          </button>
-        )}
+          {showTcg && (
+            <button type="button" className="overview-card" onClick={() => onOpenCollege("tcg")}>
+              <span className="overview-card__icon"><CollegeIcon collegeId="tcg" size={22} /></span>
+              <span className="overview-card__label">TCG</span>
+              {status === "loading" ? (
+                <span className="overview-card__value">…</span>
+              ) : cardCount ? (
+                <>
+                  <span className="overview-card__value">{cardCount}</span>
+                  <span className="overview-card__unit">cards</span>
+                </>
+              ) : (
+                <span className="overview-card__empty">No cards yet — add some in TCG</span>
+              )}
+            </button>
+          )}
 
-        {selectedColleges.includes("entertainment") && (
-          <button type="button" className="overview-card" onClick={() => onOpenCollege("entertainment")}>
-            <span className="overview-card__icon"><CollegeIcon collegeId="entertainment" size={22} /></span>
-            <span className="overview-card__label">Entertainment</span>
-            {status === "loading" ? (
-              <span className="overview-card__value">…</span>
-            ) : entertainmentCount ? (
-              <>
-                <span className="overview-card__value">{entertainmentCount}</span>
-                <span className="overview-card__unit">tracked</span>
-              </>
-            ) : (
-              <span className="overview-card__empty">Nothing tracked yet — add a movie, show, anime, or book</span>
-            )}
-          </button>
-        )}
+          {selectedColleges.includes("entertainment") && (
+            <button type="button" className="overview-card" onClick={() => onOpenCollege("entertainment")}>
+              <span className="overview-card__icon"><CollegeIcon collegeId="entertainment" size={22} /></span>
+              <span className="overview-card__label">Entertainment</span>
+              {status === "loading" ? (
+                <span className="overview-card__value">…</span>
+              ) : entertainmentCount ? (
+                <>
+                  <span className="overview-card__value">{entertainmentCount}</span>
+                  <span className="overview-card__unit">tracked</span>
+                </>
+              ) : (
+                <span className="overview-card__empty">Nothing tracked yet — add a movie, show, anime, or book</span>
+              )}
+            </button>
+          )}
 
-        {selectedColleges.includes("collectibles") && (
-          <button type="button" className="overview-card" onClick={() => onOpenCollege("collectibles")}>
-            <span className="overview-card__icon"><CollegeIcon collegeId="collectibles" size={22} /></span>
-            <span className="overview-card__label">Collectibles</span>
-            {status === "loading" ? (
-              <span className="overview-card__value">…</span>
-            ) : collectiblesCount ? (
-              <>
-                <span className="overview-card__value">{collectiblesCount}</span>
-                <span className="overview-card__unit">on your shelf</span>
-              </>
-            ) : (
-              <span className="overview-card__empty">Nothing on your shelf yet — add an item</span>
-            )}
-          </button>
-        )}
+          {selectedColleges.includes("collectibles") && (
+            <button type="button" className="overview-card" onClick={() => onOpenCollege("collectibles")}>
+              <span className="overview-card__icon"><CollegeIcon collegeId="collectibles" size={22} /></span>
+              <span className="overview-card__label">Collectibles</span>
+              {status === "loading" ? (
+                <span className="overview-card__value">…</span>
+              ) : collectiblesCount ? (
+                <>
+                  <span className="overview-card__value">{collectiblesCount}</span>
+                  <span className="overview-card__unit">on your shelf</span>
+                </>
+              ) : (
+                <span className="overview-card__empty">Nothing on your shelf yet — add an item</span>
+              )}
+            </button>
+          )}
 
-        {selectedColleges.includes("tabletop") && (
-          <button type="button" className="overview-card" onClick={() => onOpenCollege("tabletop")}>
-            <span className="overview-card__icon"><CollegeIcon collegeId="tabletop" size={22} /></span>
-            <span className="overview-card__label">Tabletop</span>
-            {status === "loading" ? (
-              <span className="overview-card__value">…</span>
-            ) : tabletopCount ? (
-              <>
-                <span className="overview-card__value">{tabletopCount}</span>
-                <span className="overview-card__unit">campaigns &amp; armies</span>
-              </>
-            ) : (
-              <span className="overview-card__empty">Nothing yet — start a campaign or army</span>
-            )}
-          </button>
-        )}
+          {selectedColleges.includes("tabletop") && (
+            <button type="button" className="overview-card" onClick={() => onOpenCollege("tabletop")}>
+              <span className="overview-card__icon"><CollegeIcon collegeId="tabletop" size={22} /></span>
+              <span className="overview-card__label">Tabletop</span>
+              {status === "loading" ? (
+                <span className="overview-card__value">…</span>
+              ) : tabletopCount ? (
+                <>
+                  <span className="overview-card__value">{tabletopCount}</span>
+                  <span className="overview-card__unit">campaigns &amp; armies</span>
+                </>
+              ) : (
+                <span className="overview-card__empty">Nothing yet — start a campaign or army</span>
+              )}
+            </button>
+          )}
 
-        {NOT_BUILT_COLLEGES.filter((c) => selectedColleges.includes(c.id)).map((college) => (
-          <div key={college.id} className="overview-card overview-card--disabled">
-            <span className="overview-card__icon">{college.icon}</span>
-            <span className="overview-card__label">{college.label}</span>
-            <span className="overview-card__lock" aria-hidden="true">🔒</span>
-            <span className="overview-card__empty">Coming soon</span>
-          </div>
-        ))}
-      </HorizontalLane>
+          {NOT_BUILT_COLLEGES.filter((c) => selectedColleges.includes(c.id)).map((college) => (
+            <div key={college.id} className="overview-card overview-card--disabled">
+              <span className="overview-card__icon">{college.icon}</span>
+              <span className="overview-card__label">{college.label}</span>
+              <span className="overview-card__lock" aria-hidden="true">🔒</span>
+              <span className="overview-card__empty">Coming soon</span>
+            </div>
+          ))}
+        </HorizontalLane>
+      )}
     </div>
   );
 }

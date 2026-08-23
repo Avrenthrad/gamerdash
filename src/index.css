@@ -7344,7 +7344,11 @@ html[data-mode="light"] .current-rotation {
      *sum* of those widths to that max-content calculation — wide enough
      to push .dash past the viewport and scroll the whole page
      horizontally instead of just the lane. Pin .dash to the viewport
-     width here so only .h-lane itself scrolls. */
+     width here so only .h-lane itself scrolls.
+
+     Global on purpose — .dash's shrink-wrap-to-content sizing bug
+     (see above) affects every page below 720px, not just the ones this
+     plan touched, so the fix is global too. */
   .dash {
     width: 100%;
   }
@@ -7389,11 +7393,6 @@ html[data-mode="light"] .current-rotation {
     font-size: 13px;
   }
 
-  .h-lane > .friends-activity-card {
-    width: 240px;
-    padding: 14px;
-  }
-
   .h-lane.overview-grid > .overview-card {
     width: 132px;
     min-width: 132px;
@@ -7416,7 +7415,8 @@ html[data-mode="light"] .current-rotation {
     width: 260px;
   }
 
-  .h-lane.gaming-hero-grid > .hero-card--continue-playing .hero-card__art {
+  .h-lane.gaming-hero-grid > .hero-card--continue-playing .hero-card__art-btn {
+    aspect-ratio: auto;
     height: 120px;
   }
 
@@ -7426,16 +7426,8 @@ html[data-mode="light"] .current-rotation {
     padding: 16px;
   }
 
-  .feed-layout {
-    flex-direction: column;
-  }
-
   .library-table {
     font-size: 12.5px;
-  }
-
-  .mastery-ps-grid {
-    grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
   }
 
   .backlog-status-tabs {
