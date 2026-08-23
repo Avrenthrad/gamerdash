@@ -67,6 +67,14 @@ jobs:
           # server — see src/lib/apiBase.js. Not a secret, just a
           # public URL, safe to inline here.
           VITE_API_BASE_URL: https://lykodex.vercel.app
+          # Supabase's anon key is meant to be public — RLS protects
+          # the data, not secrecy of this key (see
+          # src/lib/supabaseClient.js). Without these two, the build
+          # silently ships with auth disabled (confirmed live: a CI
+          # build with neither set showed "Accounts aren't set up yet
+          # on this deployment" instead of the real login form).
+          VITE_SUPABASE_URL: https://zcwrlnljtfvslldwyldq.supabase.co
+          VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpjd3JsbmxqdGZ2c2xsZHd5bGRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTc3NTYsImV4cCI6MjEwMTY3Mzc1Nn0.JByUotyDU_QM6KkoPVeGfXxjOOST7b4WSyKMQl-1JmU
         with:
           tagName: desktop-v${{ env.DESKTOP_VERSION }}
           releaseName: "Lykodex Desktop ${{ env.DESKTOP_VERSION }}"
