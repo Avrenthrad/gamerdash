@@ -48,17 +48,30 @@ A live artifact exists showing all three directions (C is the chosen one) at
 real phone-frame proportions with real app data:
 https://claude.ai/code/artifact/34e1e53a-2ec3-4148-8f13-b0b54cf1d93f
 
-## Scope reminder (the spec has the full list — this is the short version)
+## Scope reminder (the spec has the full corrected list — this is the short version)
 
-**Touch:** the 6 hub/dashboard pages (Overview, Gaming, TCG, Entertainment,
-Collectibles, Tabletop home), the ~16 widget cards rendered inside them, and
-filter-chip rows on collection/binder/search pages.
+**Important:** the spec's scope section was corrected after real
+file-by-file research — read that section, not just this summary, before
+starting. The short version:
 
-**Don't touch:** forms/settings pages, item grids themselves (only their
-filter bars change), detail views, deck builders, scanners, or the nav shell
-(`Header.jsx`'s `.mobile-tab-bar`/drawer — already rebuilt this session,
-working correctly, out of scope). Desktop/tablet rendering must stay
-pixel-identical before and after — this is additive mobile-only CSS.
+**Touch:** `OverviewPage` and `GamingDashboard` — the only 2 pages that
+actually stack widgets — get `<HorizontalLane>` wrapping (2 lanes each). 13
+of the 16 widget components get mobile-compacting CSS to fit a lane card; 3
+(`LiveServiceSection`, `LibrarySection`, `GameMasterySection`) are exempted
+from lanes — stay full-width, just get lighter mobile CSS tightening.
+`.backlog-status-tabs` (the section-tab row used on `TcgHomePage`,
+`EntertainmentHomePage`, `CollectiblesHomePage`, `TabletopHomePage`, and
+inside `MarketplaceSection`) gets one shared CSS rule to scroll horizontally
+instead of wrapping.
+
+**Don't touch:** forms/settings pages, item grids themselves, detail views,
+deck builders, scanners, or the nav shell (`Header.jsx`'s
+`.mobile-tab-bar`/drawer — already rebuilt this session, working correctly,
+out of scope). There is no filter-chip UI on the binder/search pages (MTG/
+Pokémon/FaB binders and search) — that was an incorrect assumption in the
+first draft of the spec; nothing to change there. Desktop/tablet rendering
+must stay pixel-identical before and after — this is additive mobile-only
+CSS.
 
 ## Conventions already established in this codebase
 

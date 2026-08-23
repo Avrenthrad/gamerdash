@@ -21,23 +21,63 @@ instead of piling down.
 
 ## Scope
 
+**Corrected after implementation research** (verified against actual file
+contents — see the two threads below for what changed from the first draft
+of this scope):
+
 **In scope** — pages/components that currently stack unlike widgets vertically
 and are the actual source of the "crowded" feeling:
 
-- The 6 hub/dashboard pages: `OverviewPage`, `GamingDashboard`, `TcgHomePage`,
-  `EntertainmentHomePage`, `CollectiblesHomePage`, `TabletopHomePage`
-- The ~16 widget/card components rendered inside those hubs: `CurrentRotation`,
-  `SteamPresenceCard`, `GuildPulseCard`, `GuildSpotlightCard`,
-  `FriendsActivityCard`, `NewsAnnouncementsCard`, `NowTrendingCard`,
-  `ReleaseCalendarCard`, `LiveServiceSection`, `LibrarySection`,
-  `MarketplaceSection`, `PriceSection`, `GameMasterySection`,
-  `GamingMasteryContributionCard`, `RecentActivityCard`,
-  `ContinuePlayingCard` — these need a more compact visual treatment sized to
-  fit inside a lane card, at mobile width only
-- Filter/category chip rows on collection, binder, and search pages (e.g. set
-  filters, rarity filters, college quick-switches) — convert from
-  wrapped/stacked rows to horizontal-scroll lanes for consistency with the
-  hub pages
+- **Widget-stacking lanes**: only `OverviewPage` and `GamingDashboard`
+  actually stack the named widget components vertically. The other 4 hub
+  pages (`TcgHomePage`, `EntertainmentHomePage`, `CollectiblesHomePage`,
+  `TabletopHomePage`) don't use these widgets at all — they render a single
+  active section based on a tab/filter state, not a stack. Those 4 pages'
+  only in-scope change is their tab row (next bullet).
+  - `OverviewPage`: `SteamPresenceCard`, `GuildPulseCard`,
+    `FriendsActivityCard` (currently three bare, unwrapped conditionals in a
+    row — lines 198-200) become one `<HorizontalLane label="Right now">`.
+    The `.overview-grid` college quick-link tiles become a second lane.
+  - `GamingDashboard`: `SteamPresenceCard` + `CurrentRotation` (bare,
+    unwrapped) become one lane. `.gaming-hero-grid`
+    (`ContinuePlayingCard`, `GamingMasteryContributionCard`,
+    `ReleaseCalendarCard`) becomes a lane. `.gaming-secondary-grid`
+    (`GuildSpotlightCard`, `RecentActivityCard`, `NowTrendingCard`,
+    `NewsAnnouncementsCard`) becomes a lane.
+  - **Exempted from lane treatment** (stay full-width, stacked, below the
+    lanes — decided after research showed these don't compact into a narrow
+    card without real usability loss): `LiveServiceSection` (two-column
+    layout), `LibrarySection` (renders a data table), `GameMasterySection`
+    (has two `<details>` forms for manual platform stat entry). These three
+    still get mobile-only CSS tightening (padding, type scale) but keep
+    their current full-width single-column position in the stack.
+  - **Exempted, different reason**: `GamingDashboard`'s drag-to-customize
+    mode (the `react-grid-layout` branch, lines 121-159) stays untouched —
+    it's an interactive rearrange UI, not a static stack, and forcing it
+    into a lane would break the drag/resize interaction. Only the
+    non-customizing `.dash-stack` fallback (lines 161-173, which renders
+    `PriceSection`/`LiveServiceSection`/`LibrarySection` — the same 3
+    exempted widgets above) is affected, and per the exemption above it
+    keeps its current stacked layout, just with tightened mobile CSS.
+
+- **Section-tab lanes** (this replaces the original "filter chip" scope item
+  below — research found no filter-chip UI on any binder/search page; the
+  actual horizontal-row-of-buttons pattern in this codebase is
+  `.backlog-status-tabs`, a section switcher, not a filter): convert
+  `.backlog-status-tabs` to scroll horizontally instead of wrapping, on:
+  `TcgHomePage` (MTG/FaB/Pokémon game switcher), `EntertainmentHomePage`
+  (Movies/TV/Anime/Books search-type tabs), `CollectiblesHomePage`
+  (Shelf/Add/Hardware/Wishlist/Stats/Marketplace), `TabletopHomePage`
+  (RPG/Wargames/Dice/Rules), and the nested tab row inside
+  `MarketplaceSection` (Browse/Post/My Listings/My Offers). This is a
+  single shared CSS rule (one class, five+ call sites), not five separate
+  changes.
+
+~~Filter/category chip rows on collection, binder, and search pages~~ —
+**removed**: `MtgBindersPage`/`PokemonBindersPage`/`FabBindersPage`/
+`BindersPage`/`MtgSearchPage`/`PokemonSearchPage`/`FabSearchPage` were
+checked directly and have no chip-row UI — only text search inputs, a native
+`<select>`, and read-only label tags. Nothing to convert there.
 
 **Out of scope** (stays exactly as-is — vertical is the correct pattern here):
 
@@ -88,16 +128,32 @@ A layout-only wrapper, no data logic:
   gets `flex: 0 0 auto` with a fixed lane-card width via a CSS descendant
   rule — no per-child markup changes required.
 
-**Card compacting**: each of the ~16 widget components gets a mobile-only CSS
-adjustment (same file, gated under the existing mobile media query block at
-the end of `index.css`, matching where the nav shell CSS already lives) —
-tighter padding, smaller type scale, fixed width when inside a lane. This is
-CSS-only; component logic and props are untouched.
+**Card compacting**: the 13 lane-eligible widgets (excludes the 3 exempted
+above) get a mobile-only CSS adjustment — tighter padding, smaller type
+scale, fixed width when inside a lane. Most share the `.panel.hero-card`
+base class (`GuildSpotlightCard`, `NewsAnnouncementsCard`, `NowTrendingCard`,
+`ReleaseCalendarCard`, `GamingMasteryContributionCard`, `RecentActivityCard`,
+`ContinuePlayingCard` — the last needs an extra override for its
+`hero-card--continue-playing` art image), so one shared rule covers most of
+them; `CurrentRotation` (`.current-rotation`), `GuildPulseCard`
+(`.panel.guild-pulse`), and `FriendsActivityCard`
+(`.presence-card.friends-activity-card`) need their own rules since they
+don't share the base class. This is CSS-only; component logic and props are
+untouched.
 
-**Filter chip lanes**: existing filter-chip row markup gets wrapped in the
-same `<HorizontalLane>` primitive (no label, since these are utility rows not
-content sections) — same non-breaking desktop behavior, scrollable lane on
-mobile.
+**CSS location**: the existing mobile media query block lives at
+`src/index.css` lines 7194-7326 (`@media (max-width: 720px) { ... }`,
+preceded by a comment explaining why it's placed late in the file — cascade
+order beats an earlier unconditional base rule of equal specificity). The
+file continues to line 7364 after that block (an unrelated
+`.tcg-visual-scanner` section with no media query). New rules append a
+second `@media (max-width: 720px) { ... }` block immediately after line
+7326 — not literally at end-of-file, just after the existing mobile block.
+
+**Section-tab lanes**: `.backlog-status-tabs` gets a mobile-only rule
+switching it from wrap/flex to `overflow-x: auto` with `flex: 0 0 auto` on
+its button children — no JSX changes needed at any of the 5 call sites,
+since they all already share this one class.
 
 ### Why this approach over alternatives
 
@@ -151,7 +207,11 @@ release):
 
 1. `<HorizontalLane>` primitive + its CSS (desktop no-op + mobile lane
    behavior)
-2. Mobile compacting CSS for the 16 widget components
-3. Wire `<HorizontalLane>` into the 6 hub pages
-4. Filter-chip lane conversion on binder/collection/search pages
-5. Full visual pass at 360px/412px across every touched page
+2. Mobile compacting CSS for the 13 lane-eligible widgets + separate
+   tightening CSS for the 3 exempted (full-width) widgets
+3. Wire `<HorizontalLane>` into `OverviewPage` (2 lanes) and
+   `GamingDashboard` (2 lanes) — the only 2 pages with widget stacks
+4. `.backlog-status-tabs` horizontal-scroll conversion (1 CSS rule, 5 call
+   sites: `TcgHomePage`, `EntertainmentHomePage`, `CollectiblesHomePage`,
+   `TabletopHomePage`, `MarketplaceSection`)
+5. Full visual pass at 360px/412px across all 6 touched pages, both themes
