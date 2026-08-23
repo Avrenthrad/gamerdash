@@ -7409,7 +7409,10 @@ html[data-mode="light"] .current-rotation {
     width: 220px;
   }
 
-  .h-lane.gaming-hero-grid > .hero-card--continue-playing {
+  /* Higher specificity than ".panel.hero-card" above (which this card
+     also matches) — otherwise that 220px rule wins by specificity
+     regardless of source order and this 260px override never applies. */
+  .h-lane.gaming-hero-grid > .panel.hero-card.hero-card--continue-playing {
     width: 260px;
   }
 
