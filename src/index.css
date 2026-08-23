@@ -7365,6 +7365,27 @@ html[data-mode="light"] .current-rotation {
     flex: 0 0 auto;
     scroll-snap-align: start;
   }
+
+  .h-lane > .presence-card,
+  .h-lane > .panel.guild-pulse {
+    width: 240px;
+    padding: 14px;
+  }
+
+  .h-lane > .presence-card .presence-card__title,
+  .h-lane > .panel.guild-pulse .panel__eyebrow {
+    font-size: 13px;
+  }
+
+  .h-lane > .friends-activity-card {
+    width: 240px;
+    padding: 14px;
+  }
+
+  .h-lane.overview-grid > .overview-card {
+    width: 132px;
+    min-width: 132px;
+  }
 }
 
 /* ---------- TCG live visual scanner (real-time card recognition) ---------- */

@@ -18,6 +18,7 @@ import FriendsActivityCard from "./FriendsActivityCard";
 import GuildPulseCard from "./GuildPulseCard";
 import CollegeIcon from "./CollegeIcon";
 import CollegeMorphHero from "./CollegeMorphHero";
+import HorizontalLane from "./mobile/HorizontalLane";
 
 const NOT_BUILT_COLLEGES = [];
 
@@ -195,11 +196,15 @@ export default function OverviewPage({
         </div>
       )}
 
-      {showGaming && isLoggedIn && <SteamPresenceCard linkedSteamId={linkedSteamId} />}
-      {isLoggedIn && <GuildPulseCard userId={userId} onGoToGuilds={onGoToGuilds} />}
-      {isLoggedIn && <FriendsActivityCard userId={userId} onGoToFriends={onGoToFriends} />}
+      {isLoggedIn && (
+        <HorizontalLane label="Right now">
+          {showGaming && <SteamPresenceCard linkedSteamId={linkedSteamId} />}
+          <GuildPulseCard userId={userId} onGoToGuilds={onGoToGuilds} />
+          <FriendsActivityCard userId={userId} onGoToFriends={onGoToFriends} />
+        </HorizontalLane>
+      )}
 
-      <div className="overview-grid">
+      <HorizontalLane label="Colleges" className="overview-grid">
         {showGaming && (
           <button type="button" className="overview-card" onClick={() => onOpenCollege("gaming")}>
             <span className="overview-card__icon"><CollegeIcon collegeId="gaming" size={22} /></span>
@@ -293,7 +298,7 @@ export default function OverviewPage({
             <span className="overview-card__empty">Coming soon</span>
           </div>
         ))}
-      </div>
+      </HorizontalLane>
     </div>
   );
 }
