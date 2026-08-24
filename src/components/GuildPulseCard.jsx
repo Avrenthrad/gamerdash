@@ -8,16 +8,10 @@
 // this end.
 
 import { useEffect, useState } from "react";
-import { fetchGuildPulse, describeActivity, collegeForPulseEvent } from "../lib/guilds";
+import { fetchGuildPulse, describeActivity, collegeForPulseEvent, displayName } from "../lib/guilds";
 import { relativeTime } from "./price/priceUtils";
 import MiniAvatar from "./MiniAvatar";
 import CollegeIcon from "./CollegeIcon";
-
-function displayName(profile) {
-  if (!profile) return "Someone";
-  const full = [profile.first_name, profile.last_name].filter(Boolean).join(" ");
-  return full || profile.username || "Someone";
-}
 
 export default function GuildPulseCard({ userId, onGoToGuilds }) {
   const [status, setStatus] = useState("loading");
@@ -64,7 +58,7 @@ export default function GuildPulseCard({ userId, onGoToGuilds }) {
         <ul className="guild-pulse__list">
           {events.map((entry) => {
             const college = collegeForPulseEvent(entry.event_type);
-            const isCompletion = entry.event_type === "game_completed";
+            const isCompletion = entry.event_type === "game_completed" || entry.event_type === "backlog_completed";
             return (
               <li key={entry.id} className={`guild-pulse__row ${isCompletion ? "guild-pulse__row--special" : ""}`}>
                 <MiniAvatar profile={entry.profile} />

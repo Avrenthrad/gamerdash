@@ -26,6 +26,7 @@ import {
   setHoursEstimate,
   setBacklogStatus,
   enrichBacklogItem,
+  recordBacklogCompletionIfNew,
   STATUSES,
   STATUS_LABELS,
 } from "../lib/backlog";
@@ -191,6 +192,13 @@ export default function BacklogPage({ onBack, userId, linkedSteamId }) {
         logActivityForUser(userId, "backlog_status_change", {
           title: `${item.title} → ${STATUS_LABELS[newStatus]}`,
         });
+        // Separate from the ordinary status-change log above — this is
+        // the celebratory "finished a game" event (see
+        // recordBacklogCompletionIfNew), only fired the first time this
+        // item ever reaches "completed", not on every status change.
+        if (newStatus === "completed") {
+          recordBacklogCompletionIfNew(userId, { backlogItemId: itemId, title: item.title });
+        }
       }
     } catch (err) {
       console.error("Failed to save status:", err);

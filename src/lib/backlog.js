@@ -9,6 +9,7 @@
 
 import { supabase } from "./supabaseClient";
 import { resolveGameName, fetchAchievementSchema, fetchAchievements } from "./steam";
+import { logActivityForUser } from "./guilds";
 
 // Same 4-state model every competitor backlog tracker uses
 // (Backloggd, Grouvee, Playlogged) — real research, not guessed.
@@ -19,6 +20,27 @@ export const STATUS_LABELS = {
   completed: "Completed",
   dropped: "Dropped",
 };
+
+// Records a real backlog completion the first time it's seen for this
+// item, distinct from achievements.js's recordGameCompletionIfNew
+// (100% achievements) — this is "finished a game" as a self-reported
+// backlog status, the celebration the person clearing a backlog
+// status to "completed" is entitled to regardless of whether that
+// game even has achievements. Same pattern: the UNIQUE(user_id,
+// backlog_item_id) constraint on backlog_completions is what actually
+// prevents a duplicate celebration if the status gets toggled away
+// and back, not this function.
+export async function recordBacklogCompletionIfNew(userId, { backlogItemId, title }) {
+  const { error } = await supabase
+    .from("backlog_completions")
+    .insert({ user_id: userId, backlog_item_id: backlogItemId, title });
+  if (error) {
+    if (error.code !== "23505") console.error("Failed to record backlog completion:", error);
+    return false;
+  }
+  await logActivityForUser(userId, "backlog_completed", { title });
+  return true;
+}
 
 export async function fetchBacklog(userId) {
   const { data, error } = await supabase

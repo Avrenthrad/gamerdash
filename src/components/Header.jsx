@@ -16,7 +16,8 @@
 import { useEffect, useRef, useState } from "react";
 import LykodexLogo from "./LykodexLogo";
 import CollegeIcon from "./CollegeIcon";
-import { fetchRecentActivityForUser, describeActivity } from "../lib/guilds";
+import { fetchRecentActivityForUser, describeActivity, displayName } from "../lib/guilds";
+import { fetchMyCelebrations } from "../lib/celebrations";
 import { fetchUnreadCount } from "../lib/messages";
 import { relativeTime } from "./price/priceUtils";
 import MiniAvatar from "./MiniAvatar";
@@ -162,9 +163,16 @@ export default function Header({
     setAvatarBroken(false);
   }, [avatarUrl]);
 
-  // ----- notifications bell (real Guild activity, never fabricated) -----
+  // ----- notifications bell -----
+  // Two genuinely different feeds, never mixed into one list: your own
+  // celebratory milestones (100% achievements, finishing a backlog
+  // game — see CELEBRATORY_EVENT_TYPES), and real activity from
+  // friends/guildmates (never your own routine actions — see
+  // fetchRecentActivityForUser's own comment for why).
   const [activity, setActivity] = useState([]);
   const [activityStatus, setActivityStatus] = useState("idle"); // idle | loading | ready | error
+  const [celebrations, setCelebrations] = useState([]);
+  const [celebrationsStatus, setCelebrationsStatus] = useState("idle");
   const lastSeenRef = useRef(
     typeof window !== "undefined" ? localStorage.getItem("gd-activity-last-seen") : null
   );
@@ -174,6 +182,8 @@ export default function Header({
     if (!isLoggedIn || !userId) {
       setActivity([]);
       setActivityStatus("idle");
+      setCelebrations([]);
+      setCelebrationsStatus("idle");
       return;
     }
     let cancelled = false;
@@ -188,6 +198,19 @@ export default function Header({
         console.error("Failed to load activity for notifications bell:", err);
         if (!cancelled) setActivityStatus("error");
       });
+
+    setCelebrationsStatus("loading");
+    fetchMyCelebrations(userId, 5)
+      .then((rows) => {
+        if (cancelled) return;
+        setCelebrations(rows);
+        setCelebrationsStatus("ready");
+      })
+      .catch((err) => {
+        console.error("Failed to load celebrations for notifications bell:", err);
+        if (!cancelled) setCelebrationsStatus("error");
+      });
+
     return () => {
       cancelled = true;
     };
@@ -222,17 +245,25 @@ export default function Header({
     };
   }, [isLoggedIn, userId]);
 
+  // Latest timestamp across BOTH feeds — celebrations use "completedAt",
+  // guild/friend activity uses "created_at", so this normalizes before
+  // comparing.
+  const latestNotificationAt = [
+    activity[0]?.created_at,
+    celebrations[0]?.completedAt,
+  ].filter(Boolean).sort((a, b) => new Date(b) - new Date(a))[0];
+
   const hasUnseenActivity =
-    activity.length > 0 &&
-    (!lastSeenRef.current || new Date(activity[0].created_at) > new Date(lastSeenRef.current));
+    Boolean(latestNotificationAt) &&
+    (!lastSeenRef.current || new Date(latestNotificationAt) > new Date(lastSeenRef.current));
 
   function toggleMenu(name) {
     const next = openMenu === name ? null : name;
     setOpenMenu(next);
-    if (name === "notifications" && next === "notifications" && activity[0]) {
-      lastSeenRef.current = activity[0].created_at;
+    if (name === "notifications" && next === "notifications" && latestNotificationAt) {
+      lastSeenRef.current = latestNotificationAt;
       try {
-        localStorage.setItem("gd-activity-last-seen", activity[0].created_at);
+        localStorage.setItem("gd-activity-last-seen", latestNotificationAt);
       } catch {
         /* ignore */
       }
@@ -354,7 +385,22 @@ export default function Header({
 
               {openMenu === "notifications" && (
                 <div className="dash-header__popover dash-header__popover--right dash-header__notifications-popover">
-                  <span className="dash-header__notifications-title">Guild activity</span>
+                  {celebrationsStatus === "ready" && celebrations.length > 0 && (
+                    <>
+                      <span className="dash-header__notifications-title">Your celebrations</span>
+                      {celebrations.map((entry) => (
+                        <div key={entry.id} className="dash-header__notification-row">
+                          <span className="dash-header__notification-text" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span aria-hidden="true">🏆</span>
+                            {entry.type === "game_completed" ? `Hit 100% achievements in ${entry.title}` : `Finished ${entry.title}`}
+                          </span>
+                          <span className="dash-header__notification-meta">{relativeTime(entry.completedAt)}</span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  <span className="dash-header__notifications-title">Friends &amp; Guilds</span>
                   {activityStatus === "loading" ? (
                     <p className="dash-header__search-empty">Loading…</p>
                   ) : activity.length > 0 ? (
@@ -362,7 +408,7 @@ export default function Header({
                       <div key={entry.id} className="dash-header__notification-row">
                         <span className="dash-header__notification-text" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                           <MiniAvatar profile={entry.profile} />
-                          {describeActivity(entry)}
+                          <strong>{displayName(entry.profile)}</strong> {describeActivity(entry)}
                         </span>
                         <span className="dash-header__notification-meta">
                           {entry.guilds?.name ? `${entry.guilds.name} · ` : ""}
@@ -375,7 +421,7 @@ export default function Header({
                       <span className="dash-header__empty-state-icon" aria-hidden="true">
                         <BellIcon />
                       </span>
-                      <p>No activity yet — join or create a Guild to see real updates from your crew here.</p>
+                      <p>No activity yet — add a friend or join a Guild to see real updates from your crew here.</p>
                       <button
                         type="button"
                         className="dash-header__popover-item dash-header__empty-state-cta"
@@ -645,14 +691,31 @@ export default function Header({
 
             {isLoggedIn && (
               <>
-                <span className="dash-drawer__section-label drawer-mobile-only">Notifications</span>
+                {celebrations.length > 0 && (
+                  <>
+                    <span className="dash-drawer__section-label drawer-mobile-only">Your celebrations</span>
+                    <div className="dash-drawer__notifications-mobile drawer-mobile-only">
+                      {celebrations.slice(0, 4).map((entry) => (
+                        <div key={entry.id} className="dash-header__notification-row">
+                          <span className="dash-header__notification-text" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span aria-hidden="true">🏆</span>
+                            {entry.type === "game_completed" ? `Hit 100% achievements in ${entry.title}` : `Finished ${entry.title}`}
+                          </span>
+                          <span className="dash-header__notification-meta">{relativeTime(entry.completedAt)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                <span className="dash-drawer__section-label drawer-mobile-only">Friends &amp; Guilds</span>
                 <div className="dash-drawer__notifications-mobile drawer-mobile-only">
                   {activity.length > 0 ? (
                     activity.slice(0, 4).map((entry) => (
                       <div key={entry.id} className="dash-header__notification-row">
                         <span className="dash-header__notification-text" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                           <MiniAvatar profile={entry.profile} />
-                          {describeActivity(entry)}
+                          <strong>{displayName(entry.profile)}</strong> {describeActivity(entry)}
                         </span>
                         <span className="dash-header__notification-meta">
                           {entry.guilds?.name ? `${entry.guilds.name} · ` : ""}
@@ -661,7 +724,7 @@ export default function Header({
                       </div>
                     ))
                   ) : (
-                    <p className="dash-header__search-empty">No activity yet — join or create a Guild to see updates here.</p>
+                    <p className="dash-header__search-empty">No activity yet — add a friend or join a Guild to see updates here.</p>
                   )}
                 </div>
               </>

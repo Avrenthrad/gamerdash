@@ -12,6 +12,7 @@ import { getPublicProfiles } from "./publicProfiles";
 const EVENT_LABELS = {
   achievement_unlocked: "unlocked an achievement in",
   game_completed: "hit 100% achievements in",
+  backlog_completed: "finished",
   gd_score_milestone: "hit a new GD Score high",
   backlog_status_change: "updated their backlog:",
   wishlist_added: "added to their wishlist:",
@@ -23,12 +24,31 @@ const EVENT_LABELS = {
   guild_comment_replied: "replied to a comment:",
 };
 
+// Event types that celebrate something the person themselves achieved
+// — the only kind of activity someone should ever see about their OWN
+// account in a notification/activity surface. Every other event type
+// about your own actions (wishlist adds, card adds, ordinary backlog
+// status changes) is only meant to be seen by your friends/guildmates,
+// not reflected back at you.
+export const CELEBRATORY_EVENT_TYPES = ["game_completed", "backlog_completed"];
+
 // Shared with the header notification bell so both surfaces describe
 // the same real activity rows identically.
 export function describeActivity(entry) {
   const label = EVENT_LABELS[entry.event_type] || entry.event_type;
   const detail = entry.event_data?.title || entry.event_data?.name || "";
   return `${label}${detail ? ` ${detail}` : ""}`;
+}
+
+// Shared everywhere an activity row needs to show whose action it
+// was — the header bell, Guild Pulse, Recent Activity, the mobile
+// drawer's notification list. Previously only existed as a private
+// copy inside GuildPulseCard.jsx, so every other surface silently
+// showed an avatar with no name attached to it.
+export function displayName(profile) {
+  if (!profile) return "Someone";
+  const full = [profile.first_name, profile.last_name].filter(Boolean).join(" ");
+  return full || profile.username || "Someone";
 }
 
 export async function fetchGuilds() {
@@ -268,25 +288,26 @@ async function attachProfiles(rows) {
   return rows.map((r) => ({ ...r, profile: profileById[r.user_id] || null }));
 }
 
-// Powers the header notification bell — real activity across every
-// Guild the user is actually a member of (their own actions plus
-// their guildmates'), never invented counts or placeholder rows.
-// Returns [] for someone in no guilds, which the bell renders as a
-// genuine empty state rather than hiding itself.
+// Powers the header notification bell (and Guild Pulse/Recent
+// Activity) — real activity from friends and guildmates, never
+// invented counts or placeholder rows. No client-side guild_id filter
+// here on purpose: guild_activity's own RLS policy is the actual
+// source of truth for who's allowed to see a row (guildmate OR real
+// friend of whoever did it, respecting their share_activity_with_guilds
+// opt-out) — querying that way instead of pre-filtering by membership
+// means a friend outside any shared guild can still see it, as long as
+// RLS says so.
+//
+// Deliberately excludes the viewer's OWN non-celebratory rows — seeing
+// "you added X to your wishlist" reflected back as if it were a
+// notification doesn't make sense; only CELEBRATORY_EVENT_TYPES about
+// yourself belong here (a 100% completion, finishing a backlog game).
+// Everything else in this feed is about other people, on purpose.
 export async function fetchRecentActivityForUser(userId, limit = 10) {
-  const { data: memberships, error: memberError } = await supabase
-    .from("guild_members")
-    .select("guild_id")
-    .eq("user_id", userId);
-  if (memberError) throw memberError;
-
-  const guildIds = (memberships || []).map((m) => m.guild_id);
-  if (guildIds.length === 0) return [];
-
   const { data, error } = await supabase
     .from("guild_activity")
     .select("*, guilds(name)")
-    .in("guild_id", guildIds)
+    .or(`user_id.neq.${userId},event_type.in.(${CELEBRATORY_EVENT_TYPES.join(",")})`)
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
@@ -310,6 +331,7 @@ const GUILD_PULSE_EVENT_TYPES = [
   "achievement_unlocked",
   "wishlist_added",
   "game_completed",
+  "backlog_completed",
 ];
 
 // Which College a Guild Pulse event belongs to, for the College chip
@@ -323,6 +345,7 @@ const PULSE_EVENT_COLLEGE = {
   achievement_unlocked: "gaming",
   wishlist_added: "gaming",
   game_completed: "gaming",
+  backlog_completed: "gaming",
 };
 
 export function collegeForPulseEvent(eventType) {
@@ -336,22 +359,28 @@ export function collegeForPulseEvent(eventType) {
 // at all, this function doesn't need to filter them out itself) —
 // see the "Guild Pulse" migration in schema.sql.
 export async function fetchGuildPulse(userId, days = 14) {
-  const { data: memberships, error: memberError } = await supabase
-    .from("guild_members")
-    .select("guild_id")
-    .eq("user_id", userId);
+  // "inGuild" here really means "has any social connection at all" —
+  // a guild membership or a real friend — since a guildless person
+  // with friends can still get a real feed via guild_activity's RLS
+  // (friend of the author, not just guildmate). Only the true "no
+  // connections at all yet" case shows the "browse Guilds" empty state.
+  const [{ count: guildCount, error: memberError }, { count: friendCount, error: friendError }] = await Promise.all([
+    supabase.from("guild_members").select("guild_id", { count: "exact", head: true }).eq("user_id", userId),
+    supabase.from("friends").select("id", { count: "exact", head: true }).eq("user_id", userId),
+  ]);
   if (memberError) throw memberError;
+  if (friendError) throw friendError;
 
-  const guildIds = (memberships || []).map((m) => m.guild_id);
-  if (guildIds.length === 0) return { inGuild: false, events: [] };
+  const hasConnections = (guildCount || 0) > 0 || (friendCount || 0) > 0;
+  if (!hasConnections) return { inGuild: false, events: [] };
 
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
   const { data, error } = await supabase
     .from("guild_activity")
     .select("*, guilds(name)")
-    .in("guild_id", guildIds)
     .in("event_type", GUILD_PULSE_EVENT_TYPES)
+    .or(`user_id.neq.${userId},event_type.in.(${CELEBRATORY_EVENT_TYPES.join(",")})`)
     .gte("created_at", since)
     .order("created_at", { ascending: false })
     .limit(40);

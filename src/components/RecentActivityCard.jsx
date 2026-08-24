@@ -4,7 +4,7 @@
 // instead of a dropdown.
 
 import { useEffect, useState } from "react";
-import { fetchRecentActivityForUser, describeActivity } from "../lib/guilds";
+import { fetchRecentActivityForUser, describeActivity, displayName } from "../lib/guilds";
 import { relativeTime } from "./price/priceUtils";
 import MiniAvatar from "./MiniAvatar";
 
@@ -48,7 +48,7 @@ export default function RecentActivityCard({ userId, onOpenGuilds }) {
             <li key={entry.id} className="activity-feed-row">
               <span className="activity-feed-row__text" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                 <MiniAvatar profile={entry.profile} />
-                {describeActivity(entry)}
+                <strong>{displayName(entry.profile)}</strong> {describeActivity(entry)}
               </span>
               <span className="activity-feed-row__meta">
                 {entry.guilds?.name ? `${entry.guilds.name} · ` : ""}
