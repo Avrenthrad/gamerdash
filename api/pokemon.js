@@ -26,6 +26,8 @@
 //   fetch("/api/pokemon?mode=subtypes")
 //   fetch("/api/pokemon?mode=supertypes")
 
+import { allowCors } from "./_cors.js";
+
 const BASE_URL = "https://api.pokemontcg.io/v2";
 const UPSTREAM_TIMEOUT_MS = 8000;
 
@@ -77,6 +79,7 @@ function cleanParam(value) {
 }
 
 export default async function handler(req, res) {
+  allowCors(res);
   const { searchParams } = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const mode = searchParams.get("mode");
 

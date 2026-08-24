@@ -9,9 +9,12 @@
 // Red, wargames) have no equivalent and get honest link-out/notes
 // treatment in the UI instead of a fake lookup.
 
+import { allowCors } from "./_cors.js";
+
 const BASE_URL = "https://api.open5e.com/v1";
 
 export default async function handler(req, res) {
+  allowCors(res);
   const { searchParams } = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const mode = searchParams.get("mode");
 

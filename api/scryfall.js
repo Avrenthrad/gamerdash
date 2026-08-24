@@ -20,6 +20,8 @@
 //   fetch("/api/scryfall?mode=card&id=...")
 //   fetch("/api/scryfall?mode=set&code=...")
 
+import { allowCors } from "./_cors.js";
+
 const BASE_URL = "https://api.scryfall.com";
 
 // Scryfall rejects requests with no User-Agent (or a bare default one
@@ -31,6 +33,7 @@ const SCRYFALL_HEADERS = {
 };
 
 export default async function handler(req, res) {
+  allowCors(res);
   const { searchParams } = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const mode = searchParams.get("mode");
 

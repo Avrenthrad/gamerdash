@@ -10,6 +10,8 @@
 // description) against multiple independent real query examples —
 // not guessed from memory.
 
+import { allowCors } from "./_cors.js";
+
 const ENDPOINT = "https://graphql.anilist.co";
 
 const SEARCH_QUERY = `
@@ -29,6 +31,7 @@ const SEARCH_QUERY = `
 `;
 
 export default async function handler(req, res) {
+  allowCors(res);
   const { searchParams } = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const mode = searchParams.get("mode");
 

@@ -13,10 +13,13 @@
 // per their own performance guidance (unscoped requests can return up
 // to 500kb and contribute to server-side errors on their end).
 
+import { allowCors } from "./_cors.js";
+
 const BASE_URL = "https://openlibrary.org";
 const USER_AGENT = "Lykodex/1.0 (contact: support@lykodex.app)";
 
 export default async function handler(req, res) {
+  allowCors(res);
   const { searchParams } = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const mode = searchParams.get("mode");
 

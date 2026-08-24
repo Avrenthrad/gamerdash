@@ -20,6 +20,8 @@
 //   fetch("/api/pricing?service=rebrickable&mode=set&setNum=...")
 //   fetch("/api/pricing?service=comicvine&q=...")
 
+import { allowCors } from "./_cors.js";
+
 const XBXPRICES_BASE = "https://xbxprices.com/api/v2";
 const CHEAPSHARK_ALLOWED_ENDPOINTS = ["games", "deals", "stores"];
 
@@ -323,6 +325,7 @@ async function handleCurrency(res) {
 }
 
 export default async function handler(req, res) {
+  allowCors(res);
   // Parsing from req.url rather than req.query — cheapshark.js's
   // original comment noted req.query was unreliable under some
   // vercel dev setups, keeping the same safer approach here.

@@ -682,40 +682,62 @@ export default function Header({
               Friends
             </button>
 
-            <span className="dash-drawer__section-label">Account</span>
-            <button
-              type="button"
-              className="dash-drawer__item"
-              onClick={() => handleAccountClick("settings")}
-            >
-              Account Settings
-            </button>
-            <button
-              type="button"
-              className="dash-drawer__item"
-              onClick={() => handleAccountClick("linking")}
-            >
-              Account Linking
-            </button>
-            <button
-              type="button"
-              className="dash-drawer__item"
-              onClick={() => handleAccountClick("dashfeed")}
-            >
-              Dashfeed Settings
-            </button>
+            {isLoggedIn ? (
+              <>
+                <span className="dash-drawer__section-label">Account</span>
+                <button
+                  type="button"
+                  className="dash-drawer__item"
+                  onClick={() => handleAccountClick("settings")}
+                >
+                  Account Settings
+                </button>
+                <button
+                  type="button"
+                  className="dash-drawer__item"
+                  onClick={() => handleAccountClick("linking")}
+                >
+                  Account Linking
+                </button>
+                <button
+                  type="button"
+                  className="dash-drawer__item"
+                  onClick={() => handleAccountClick("dashfeed")}
+                >
+                  Dashfeed Settings
+                </button>
 
-            <div className="dash-drawer__divider" />
-            <button
-              type="button"
-              className="dash-drawer__item dash-drawer__item--danger"
-              onClick={() => {
-                closeMenu();
-                onLogout();
-              }}
-            >
-              Log out
-            </button>
+                <div className="dash-drawer__divider" />
+                <button
+                  type="button"
+                  className="dash-drawer__item dash-drawer__item--danger"
+                  onClick={() => {
+                    closeMenu();
+                    onLogout();
+                  }}
+                >
+                  Log out
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="dash-drawer__section-label">Account</span>
+                <button
+                  type="button"
+                  className="dash-drawer__item"
+                  onClick={() => handleAccountClick("login", "login")}
+                >
+                  Sign in
+                </button>
+                <button
+                  type="button"
+                  className="dash-drawer__item"
+                  onClick={() => handleAccountClick("login", "signup")}
+                >
+                  Create account
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

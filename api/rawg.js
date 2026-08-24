@@ -16,9 +16,12 @@
 //   fetch("/api/rawg?mode=search&q=...")
 //   fetch("/api/rawg?mode=additions&gameId=...")
 
+import { allowCors } from "./_cors.js";
+
 const BASE_URL = "https://api.rawg.io/api";
 
 export default async function handler(req, res) {
+  allowCors(res);
   const apiKey = process.env.RAWG_KEY;
   if (!apiKey) {
     return res.status(200).json({ error: "no_key" });

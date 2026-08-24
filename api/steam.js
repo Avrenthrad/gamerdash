@@ -20,7 +20,10 @@
 //                           fetch("/api/steam?steamids=id1,id2,...&mode=playerSummaries")    -> live online/in-game status for up to 100 people
 //                           fetch("/api/steam?appid=...&mode=news")                          -> real dev-posted announcements/patch notes for one app
 
+import { allowCors } from "./_cors.js";
+
 export default async function handler(req, res) {
+  allowCors(res);
   const apiKey = process.env.STEAM_API_KEY;
   const { steamid, appid, mode } = req.query;
 

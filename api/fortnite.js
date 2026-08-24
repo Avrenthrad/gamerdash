@@ -6,9 +6,12 @@
 // consistent with everything else in this project. No API key is
 // required for the basic shop endpoint as of their current docs.
 
+import { allowCors } from "./_cors.js";
+
 const BASE_URL = "https://fortnite-api.com/v2/shop";
 
 export default async function handler(req, res) {
+  allowCors(res);
   try {
     const fnRes = await fetch(BASE_URL, {
       headers: {

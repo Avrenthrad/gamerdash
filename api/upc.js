@@ -15,10 +15,13 @@
 // Usage from the frontend:
 //   fetch("/api/upc?barcode=012345678905")
 
+import { allowCors } from "./_cors.js";
+
 const TRIAL_URL = "https://api.upcitemdb.com/prod/trial/lookup";
 const V1_URL = "https://api.upcitemdb.com/prod/v1/lookup";
 
 export default async function handler(req, res) {
+  allowCors(res);
   const { searchParams } = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const barcode = searchParams.get("barcode");
   if (!barcode) {

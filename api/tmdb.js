@@ -8,9 +8,12 @@
 // monetizes. Auth is a simple api_key query param (v3), same simple
 // pattern as every other integration in this project.
 
+import { allowCors } from "./_cors.js";
+
 const BASE_URL = "https://api.themoviedb.org/3";
 
 export default async function handler(req, res) {
+  allowCors(res);
   const apiKey = process.env.TMDB_API_KEY;
   if (!apiKey) {
     return res.status(200).json({ error: "no_key" });

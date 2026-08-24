@@ -29,6 +29,8 @@
 //   fetch("/api/fab?mode=keywords")
 //   fetch("/api/fab?mode=keyword&name=...")
 
+import { allowCors } from "./_cors.js";
+
 const BASE_URL = "https://api.goagain.dev";
 const UPSTREAM_TIMEOUT_MS = 8000;
 
@@ -57,6 +59,7 @@ function upstreamUnavailable(res, message) {
 }
 
 export default async function handler(req, res) {
+  allowCors(res);
   const { searchParams } = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const mode = searchParams.get("mode");
 
