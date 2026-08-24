@@ -32,4 +32,16 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Needed for the TCG "Live scan" feature's getUserMedia() camera
+         stream (see TcgVisualScanner.jsx). Capacitor's own
+         BridgeWebChromeClient (wired up automatically by Bridge.java)
+         already handles requesting this at runtime and granting the
+         WebView's video-capture permission once granted — this
+         manifest declaration is the one piece that isn't automatic:
+         without it, Android refuses the runtime permission request
+         outright regardless of what the WebView asks for. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 </manifest>

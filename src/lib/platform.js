@@ -27,3 +27,12 @@ export function isTauri() {
 export function isAndroid() {
   return Capacitor.getPlatform() === "android";
 }
+
+// The installed mobile app specifically (Android or iOS) — as opposed
+// to Tauri desktop or the plain website, both of which count as "PC"
+// for camera-capture UI purposes (a live continuous getUserMedia
+// stream is the natural fit for a phone's camera; a framed webcam
+// preview + manual shutter is the natural fit for a desktop webcam).
+export function isMobileApp() {
+  return Capacitor.isNativePlatform();
+}

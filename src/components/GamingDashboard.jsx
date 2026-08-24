@@ -22,6 +22,7 @@ import ReleaseCalendarCard from "./ReleaseCalendarCard";
 import NewsAnnouncementsCard from "./NewsAnnouncementsCard";
 import PageLoadingFallback from "./PageLoadingFallback";
 import HorizontalLane from "./mobile/HorizontalLane";
+import { isMobileApp } from "../lib/platform";
 
 const GridLayout = lazy(() => import("react-grid-layout"));
 
@@ -55,7 +56,7 @@ export default function GamingDashboard({
         onGoToSettings={() => goTo("settings")}
         onGoToLinking={() => goTo("linking")}
         customizingLayout={customizingLayout}
-        onToggleCustomize={() => setCustomizingLayout((v) => !v)}
+        onToggleCustomize={isMobileApp() ? undefined : () => setCustomizingLayout((v) => !v)}
         onResetLayout={resetLayout}
       />
 

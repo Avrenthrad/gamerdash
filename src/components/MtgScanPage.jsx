@@ -10,20 +10,27 @@
 // silently trusting the first guess and adding it straight to your
 // collection — a wrong silent add would be worse than asking.
 //
-// Four ways to get a card in:
-//   - Live scan (TcgVisualScanner): real-time visual recognition
-//     against a pre-built perceptual-hash index — point the camera,
-//     no manual capture, no OCR ambiguity to confirm since the match
-//     is a direct Scryfall id, not a fuzzy name guess. The other
-//     three all feed the same OCR-then-search job pipeline below:
+// Four ways to get a card in, two of them platform-gated (see
+// isMobileApp() in lib/platform.js) since each is the wrong fit on the
+// other platform — a continuous getUserMedia stream in a phone's own
+// scan page vs. a framed preview + manual shutter for a desktop
+// webcam:
+//   - Live scan (TcgVisualScanner), mobile app only: real-time visual
+//     recognition against a pre-built perceptual-hash index — point
+//     the camera, no manual capture, no OCR ambiguity to confirm
+//     since the match is a direct Scryfall id, not a fuzzy name
+//     guess. The other three all feed the same OCR-then-search job
+//     pipeline below:
 //   - Single photo: <input capture="environment"> — on mobile this
 //     opens the real camera app directly; desktop browsers ignore
-//     `capture` and just show a normal file picker.
+//     `capture` and just show a normal file picker. Shown on every
+//     platform.
 //   - Bulk upload: the same input with `multiple` — desktop's real
-//     equivalent of scanning a whole binder page at once.
-//   - Webcam: a live preview + manual shutter (MtgCardWebcamCapture),
-//     for anyone at a desktop with a webcam who'd rather not save
-//     photos to disk first.
+//     equivalent of scanning a whole binder page at once. Shown on
+//     every platform.
+//   - Webcam (MtgCardWebcamCapture), desktop/web only: a live preview
+//     + manual shutter, for anyone at a desktop with a webcam who'd
+//     rather not save photos to disk first.
 
 import { useState } from "react";
 import { recognizeCardText, guessNameCandidates } from "../lib/ocr";
@@ -31,6 +38,7 @@ import { getCardAutocomplete, getCardByName, getCardById } from "../lib/scryfall
 import { addToCollection } from "../lib/mtg";
 import MtgCardWebcamCapture from "./MtgCardWebcamCapture";
 import TcgVisualScanner from "./TcgVisualScanner";
+import { isMobileApp } from "../lib/platform";
 
 function readFileAsDataUrl(file) {
   return new Promise((resolve) => {
@@ -182,9 +190,11 @@ export default function MtgScanPage({ onBack, userId, isLoggedIn, onSignIn, onCr
       ) : (
         <>
           <div className="backlog-add">
-            <button type="button" className="settings-avatar__upload" onClick={() => setLiveScanOpen(true)}>
-              Live scan
-            </button>
+            {isMobileApp() && (
+              <button type="button" className="settings-avatar__upload" onClick={() => setLiveScanOpen(true)}>
+                Live scan
+              </button>
+            )}
             <label className="settings-avatar__upload">
               Take a photo of a card
               <input type="file" accept="image/*" capture="environment" onChange={handleFiles} hidden />
@@ -193,9 +203,11 @@ export default function MtgScanPage({ onBack, userId, isLoggedIn, onSignIn, onCr
               Upload multiple photos
               <input type="file" accept="image/*" multiple onChange={handleFiles} hidden />
             </label>
-            <button type="button" className="settings-avatar__upload" onClick={() => setWebcamOpen(true)}>
-              Use webcam
-            </button>
+            {!isMobileApp() && (
+              <button type="button" className="settings-avatar__upload" onClick={() => setWebcamOpen(true)}>
+                Use webcam
+              </button>
+            )}
           </div>
 
           {jobs.length === 0 && (
