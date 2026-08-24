@@ -18,6 +18,7 @@ import LykodexLogo from "./LykodexLogo";
 import CollegeIcon from "./CollegeIcon";
 import { fetchRecentActivityForUser, describeActivity, displayName } from "../lib/guilds";
 import { fetchMyCelebrations } from "../lib/celebrations";
+import { fetchFriendRequests, acceptFriendRequest, declineFriendRequest } from "../lib/friends";
 import { fetchUnreadCount } from "../lib/messages";
 import { relativeTime } from "./price/priceUtils";
 import MiniAvatar from "./MiniAvatar";
@@ -173,6 +174,11 @@ export default function Header({
   const [activityStatus, setActivityStatus] = useState("idle"); // idle | loading | ready | error
   const [celebrations, setCelebrations] = useState([]);
   const [celebrationsStatus, setCelebrationsStatus] = useState("idle");
+  // Incoming friend requests — the one notification that needs an
+  // action right in the bell (Accept/Decline), not just something to
+  // read, so it's tracked separately from the passive activity feed.
+  const [friendRequests, setFriendRequests] = useState([]);
+  const [friendRequestsReloadKey, setFriendRequestsReloadKey] = useState(0);
   const lastSeenRef = useRef(
     typeof window !== "undefined" ? localStorage.getItem("gd-activity-last-seen") : null
   );
@@ -184,6 +190,7 @@ export default function Header({
       setActivityStatus("idle");
       setCelebrations([]);
       setCelebrationsStatus("idle");
+      setFriendRequests([]);
       return;
     }
     let cancelled = false;
@@ -211,10 +218,29 @@ export default function Header({
         if (!cancelled) setCelebrationsStatus("error");
       });
 
+    fetchFriendRequests(userId)
+      .then((rows) => {
+        if (cancelled) return;
+        setFriendRequests(rows.filter((r) => r.receiver_id === userId));
+      })
+      .catch((err) => console.error("Failed to load friend requests for notifications bell:", err));
+
     return () => {
       cancelled = true;
     };
-  }, [isLoggedIn, userId, notificationsOpen]);
+  }, [isLoggedIn, userId, notificationsOpen, friendRequestsReloadKey]);
+
+  function handleBellAcceptFriend(requestId) {
+    acceptFriendRequest(requestId)
+      .then(() => setFriendRequestsReloadKey((k) => k + 1))
+      .catch((err) => console.error("Failed to accept friend request:", err));
+  }
+
+  function handleBellDeclineFriend(requestId) {
+    declineFriendRequest(requestId)
+      .then(() => setFriendRequestsReloadKey((k) => k + 1))
+      .catch((err) => console.error("Failed to decline friend request:", err));
+  }
 
   // ----- Inbox unread count — the one interval-polled query in this
   // app. Everything else here is poll-on-mount/on-demand, but DM
@@ -251,6 +277,7 @@ export default function Header({
   const latestNotificationAt = [
     activity[0]?.created_at,
     celebrations[0]?.completedAt,
+    friendRequests[0]?.created_at,
   ].filter(Boolean).sort((a, b) => new Date(b) - new Date(a))[0];
 
   const hasUnseenActivity =
@@ -385,6 +412,28 @@ export default function Header({
 
               {openMenu === "notifications" && (
                 <div className="dash-header__popover dash-header__popover--right dash-header__notifications-popover">
+                  {friendRequests.length > 0 && (
+                    <>
+                      <span className="dash-header__notifications-title">Friend requests</span>
+                      {friendRequests.map((r) => (
+                        <div key={r.id} className="dash-header__notification-row">
+                          <span className="dash-header__notification-text" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <MiniAvatar profile={r.senderProfile} />
+                            <strong>{displayName(r.senderProfile)}</strong> sent you a friend request
+                          </span>
+                          <span className="dash-header__notification-actions" style={{ display: "flex", gap: "6px" }}>
+                            <button type="button" className="linking-row__connect" onClick={() => handleBellAcceptFriend(r.id)}>
+                              Accept
+                            </button>
+                            <button type="button" className="game-popup__close" onClick={() => handleBellDeclineFriend(r.id)} aria-label="Decline">
+                              ✕
+                            </button>
+                          </span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+
                   {celebrationsStatus === "ready" && celebrations.length > 0 && (
                     <>
                       <span className="dash-header__notifications-title">Your celebrations</span>
@@ -691,6 +740,30 @@ export default function Header({
 
             {isLoggedIn && (
               <>
+                {friendRequests.length > 0 && (
+                  <>
+                    <span className="dash-drawer__section-label drawer-mobile-only">Friend requests</span>
+                    <div className="dash-drawer__notifications-mobile drawer-mobile-only">
+                      {friendRequests.map((r) => (
+                        <div key={r.id} className="dash-header__notification-row">
+                          <span className="dash-header__notification-text" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <MiniAvatar profile={r.senderProfile} />
+                            <strong>{displayName(r.senderProfile)}</strong> sent you a friend request
+                          </span>
+                          <span className="dash-header__notification-actions" style={{ display: "flex", gap: "6px" }}>
+                            <button type="button" className="linking-row__connect" onClick={() => handleBellAcceptFriend(r.id)}>
+                              Accept
+                            </button>
+                            <button type="button" className="game-popup__close" onClick={() => handleBellDeclineFriend(r.id)} aria-label="Decline">
+                              ✕
+                            </button>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
                 {celebrations.length > 0 && (
                   <>
                     <span className="dash-drawer__section-label drawer-mobile-only">Your celebrations</span>
