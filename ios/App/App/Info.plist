@@ -26,6 +26,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Lykodex uses your camera for the TCG Live Scan feature, which recognizes Magic/FaB/Pokémon cards in real time as you point your camera at them.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Lykodex may use your location for region-aware features like local pricing and store availability.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -44,4 +44,12 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
+    <!-- Requested upfront alongside Camera (see lib/requestPermissions.js)
+         even though no feature reads real location data yet — same
+         BridgeWebChromeClient plumbing (onGeolocationPermissionsShowPrompt)
+         handles the runtime request when navigator.geolocation is called
+         from JS, same as onPermissionRequest does for the camera. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 </manifest>

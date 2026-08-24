@@ -29,6 +29,7 @@ import {
 import { initialWishlist } from "../data/wishlist";
 import { DEFAULT_DASHBOARD_LAYOUT } from "../data/dashboardLayout";
 import { isPackagedApp } from "../lib/platform";
+import { requestUpfrontPermissions } from "../lib/requestPermissions";
 import { DEFAULT_PLATFORM_ORDER } from "../data/platformOrder";
 import { supabase, supabaseConfigured } from "../lib/supabaseClient";
 import { signOut as supabaseSignOut } from "../lib/auth";
@@ -625,6 +626,8 @@ export function AppProvider({ children }) {
     } else {
       syncFromHash();
     }
+
+    requestUpfrontPermissions();
 
     return () => window.removeEventListener("hashchange", syncFromHash);
   }, []);
