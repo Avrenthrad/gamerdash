@@ -424,7 +424,7 @@ export function AppProvider({ children }) {
       setOverallMasteryBreakdown([]);
       setOverallMasteryComputedAt(null);
       setThemeMode("dark");
-      setAccentColor("red");
+      setAccentColor("gold");
       setWallpaperUrl(null);
       setCurrency("AUD");
       setXbxpricesKey("");

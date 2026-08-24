@@ -7365,6 +7365,7 @@ html[data-mode="light"] .current-rotation {
 
   .h-lane {
     display: flex;
+    align-items: flex-start;
     gap: 10px;
     overflow-x: auto;
     padding: 2px 2px 6px;
