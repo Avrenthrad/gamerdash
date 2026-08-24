@@ -7,16 +7,11 @@
 import { useEffect, useState } from "react";
 import {
   fetchMyFriendCode, fetchFriends, removeFriend,
-  findUserByFriendCode, sendFriendRequest,
+  findUserByFriendCode, searchUsersByUsername, sendFriendRequest,
   fetchFriendRequests, acceptFriendRequest, declineFriendRequest, withdrawFriendRequest,
 } from "../lib/friends";
+import { displayName } from "../lib/guilds";
 import MiniAvatar from "./MiniAvatar";
-
-function displayName(profile) {
-  if (!profile) return "Someone";
-  const full = [profile.first_name, profile.last_name].filter(Boolean).join(" ");
-  return full || profile.username || "Someone";
-}
 
 export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCreateAccount, onGoToInbox }) {
   const [myCode, setMyCode] = useState("");
@@ -27,6 +22,12 @@ export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCr
   const [addCode, setAddCode] = useState("");
   const [addStatus, setAddStatus] = useState("idle");
   const [addMessage, setAddMessage] = useState("");
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchStatus, setSearchStatus] = useState("idle"); // idle | loading | done | error
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchMessage, setSearchMessage] = useState("");
+  const [sentTo, setSentTo] = useState(new Set()); // ids just requested this session, so the row can flip to "Sent" without a full reload
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -86,6 +87,36 @@ export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCr
     }
   }
 
+  async function handleSearch(e) {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    setSearchStatus("loading");
+    setSearchMessage("");
+    try {
+      const results = await searchUsersByUsername(searchQuery.trim());
+      setSearchResults(results.filter((r) => r.id !== userId));
+      setSearchStatus("done");
+      if (results.length === 0) setSearchMessage("No usernames matched that.");
+    } catch (err) {
+      console.error("Failed to search usernames:", err);
+      setSearchStatus("error");
+      setSearchMessage(err.message || "Couldn't search right now.");
+    }
+  }
+
+  async function handleSendFromSearch(found) {
+    try {
+      await sendFriendRequest(userId, found.id);
+      setSentTo((prev) => new Set(prev).add(found.id));
+      load();
+    } catch (err) {
+      console.error("Failed to send friend request:", err);
+      setSearchMessage(
+        err.message?.includes("duplicate") ? "You've already sent a request to this person." : (err.message || "Couldn't send that request.")
+      );
+    }
+  }
+
   async function handleAccept(requestId) {
     try {
       await acceptFriendRequest(requestId);
@@ -140,19 +171,66 @@ export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCr
 
   const incoming = requests.filter((r) => r.receiver_id === userId);
   const outgoing = requests.filter((r) => r.sender_id === userId);
+  const existingFriendIds = new Set(friends.map((f) => f.friend_id));
+  const pendingIds = new Set(outgoing.map((r) => r.receiver_id));
+
+  function searchRowStatus(found) {
+    if (existingFriendIds.has(found.id)) return "friends";
+    if (pendingIds.has(found.id) || sentTo.has(found.id)) return "sent";
+    return "none";
+  }
 
   return (
     <div className="price-page">
       <div className="price-page__head">
         <button type="button" className="back-link" onClick={onBack}>← Back</button>
         <h1 className="price-page__title">Friends</h1>
-        <p className="price-page__subtitle">Real, mutual connections — add someone by their friend code.</p>
+        <p className="price-page__subtitle">Real, mutual connections — add someone by their friend code or Lykodex username.</p>
       </div>
 
       <div className="friend-code-row">
         <span className="friend-code-row__code">{myCode || "…"}</span>
         <span className="panel__status" style={{ margin: 0 }}>This is your code — share it so others can add you.</span>
       </div>
+
+      <form className="price-search" onSubmit={handleSearch}>
+        <input
+          className="price-search__input"
+          type="text"
+          placeholder="Search by Lykodex username…"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+        <button type="submit" className="price-search__button" disabled={searchStatus === "loading"}>
+          {searchStatus === "loading" ? "Searching…" : "Search"}
+        </button>
+      </form>
+      {searchMessage && (
+        <p className={`panel__status ${searchStatus === "error" ? "panel__status--error" : ""}`}>{searchMessage}</p>
+      )}
+      {searchStatus === "done" && searchResults.length > 0 && (
+        <ul className="backlog-list">
+          {searchResults.map((found) => {
+            const rowStatus = searchRowStatus(found);
+            return (
+              <li key={found.id} className="backlog-card">
+                <MiniAvatar profile={found} />
+                <div className="backlog-card__info">
+                  <span className="backlog-card__title">{displayName(found)}</span>
+                  {found.username && <span className="backlog-card__meta">@{found.username}</span>}
+                </div>
+                {rowStatus === "friends" && <span className="score-badge">Already friends</span>}
+                {rowStatus === "sent" && <span className="score-badge">Request sent</span>}
+                {rowStatus === "none" && (
+                  <button type="button" className="linking-row__connect" onClick={() => handleSendFromSearch(found)}>
+                    Add
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
       <form className="price-search" onSubmit={handleAdd}>
         <input

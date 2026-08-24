@@ -13,6 +13,17 @@ export async function findUserByFriendCode(code) {
   return data?.[0] || null;
 }
 
+// Same safe-field RPC pattern as find_user_by_friend_code — profiles'
+// own SELECT policy is strictly self-only, so this needs the same
+// SECURITY DEFINER escape hatch. Server-side enforces a 2-character
+// minimum and a 10-result cap (see the migration), not just this call
+// site, so this can't be used to enumerate every username in the app.
+export async function searchUsersByUsername(query) {
+  const { data, error } = await supabase.rpc("search_users_by_username", { p_query: query });
+  if (error) throw error;
+  return data || [];
+}
+
 export async function fetchMyFriendCode(userId) {
   const { data, error } = await supabase
     .from("profiles")
