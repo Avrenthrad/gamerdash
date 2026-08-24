@@ -20,6 +20,7 @@ import { fetchRecentActivityForUser, describeActivity } from "../lib/guilds";
 import { fetchUnreadCount } from "../lib/messages";
 import { relativeTime } from "./price/priceUtils";
 import MiniAvatar from "./MiniAvatar";
+import UpdateCheckMenuItem from "./UpdateCheckMenuItem";
 
 // Top-level College tabs. Order matters — this is the fixed display
 // order regardless of which ones a person actually selected during
@@ -738,6 +739,8 @@ export default function Header({
                 </button>
               </>
             )}
+
+            <UpdateCheckMenuItem />
           </div>
         </div>
       )}
