@@ -49,13 +49,30 @@ export async function checkForAndroidUpdate() {
   }
   const releases = await res.json();
 
-  const androidRelease = releases.find((r) => r.tag_name.startsWith("android-v") && !r.draft);
-  if (!androidRelease) return null;
+  // GitHub's /releases list is NOT reliably ordered newest-first —
+  // confirmed live: with both this workflow and release-desktop.yml
+  // publishing releases in the same repo, android-v0.1.9's entry
+  // sorted ahead of android-v0.1.10 through .13 in this same array.
+  // The old code took releases.find()'s first match, which silently
+  // locked the update check onto that stale release for hours — every
+  // device already past 0.1.9 (i.e. everyone) saw "no update"
+  // regardless of how many real releases shipped after it. Compare
+  // every android-v release's actual version number instead of
+  // trusting array order.
+  const androidReleases = releases.filter((r) => r.tag_name.startsWith("android-v") && !r.draft);
+  if (androidReleases.length === 0) return null;
 
-  const latestVersion = androidRelease.tag_name.replace("android-v", "");
+  const latestRelease = androidReleases.reduce((best, r) => {
+    if (!best) return r;
+    const candidate = r.tag_name.replace("android-v", "");
+    const bestVersion = best.tag_name.replace("android-v", "");
+    return isNewerVersion(candidate, bestVersion) ? r : best;
+  }, null);
+
+  const latestVersion = latestRelease.tag_name.replace("android-v", "");
   if (!isNewerVersion(latestVersion, currentVersion)) return null;
 
-  const apkAsset = androidRelease.assets.find((a) => a.name.endsWith(".apk"));
+  const apkAsset = latestRelease.assets.find((a) => a.name.endsWith(".apk"));
   if (!apkAsset) return null;
 
   return { version: latestVersion, downloadUrl: apkAsset.browser_download_url };
