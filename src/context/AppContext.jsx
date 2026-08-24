@@ -618,8 +618,11 @@ export function AppProvider({ children }) {
       // desktop/mobile install is opened specifically to use an
       // account, so it boots straight to login instead. If a session
       // is actually already persisted, the auth-session effect below
-      // bounces it on to the dashboard once that resolves.
-      const defaultView = isPackagedApp() ? "login" : "dashboard";
+      // bounces it on to Overview once that resolves. Overview (not
+      // the Gaming dashboard) is the actual default home everywhere —
+      // it's the one page that summarizes across every College instead
+      // of just Gaming's.
+      const defaultView = isPackagedApp() ? "login" : "overview";
       if (defaultView === "login") bootRedirectPendingRef.current = true;
       window.history.replaceState(null, "", hashFor(defaultView));
       setView(defaultView);
@@ -649,11 +652,11 @@ export function AppProvider({ children }) {
 
   // Completes the packaged-app boot redirect above: if a session was
   // already persisted from a previous launch, skip past the login
-  // screen it defaulted to and go straight to the dashboard.
+  // screen it defaulted to and go straight to Overview.
   useEffect(() => {
     if (isLoggedIn && bootRedirectPendingRef.current) {
       bootRedirectPendingRef.current = false;
-      goTo("dashboard");
+      goTo("overview");
     }
   }, [isLoggedIn, goTo]);
 
@@ -699,11 +702,11 @@ export function AppProvider({ children }) {
       // signup form was opened from. A plain sign-in, though, is almost
       // always triggered by an AccountGate on the page the user actually
       // wanted — goBack() returns them there instead of dumping every
-      // successful sign-in on the Gaming dashboard.
+      // successful sign-in on Overview.
       if (mode === "signup") {
         goTo("onboarding");
       } else {
-        goBack("dashboard");
+        goBack("overview");
       }
     },
     [goTo, goBack]
@@ -713,7 +716,7 @@ export function AppProvider({ children }) {
     if (supabaseConfigured) {
       supabaseSignOut().catch((err) => console.error("Sign out failed:", err));
     }
-    goTo("dashboard");
+    goTo("overview");
   }, [goTo]);
 
   const toggleThemeMode = useCallback(() => {
