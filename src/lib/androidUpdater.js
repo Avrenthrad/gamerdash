@@ -34,7 +34,19 @@ export async function checkForAndroidUpdate() {
   const currentVersion = info.version;
 
   const res = await fetch(`https://api.github.com/repos/${REPO}/releases`);
-  if (!res.ok) throw new Error(`GitHub releases check failed: ${res.status}`);
+  if (!res.ok) {
+    // GitHub's unauthenticated REST API allows 60 requests/hour per
+    // source IP — plausible to hit while actively testing (relaunching
+    // the app repeatedly triggers a fresh check each time). Worth
+    // surfacing distinctly from a generic network failure since the
+    // fix ("wait") is different from "check your connection".
+    const rateLimited = res.status === 403 && res.headers.get("x-ratelimit-remaining") === "0";
+    throw new Error(
+      rateLimited
+        ? "GitHub's update check is rate-limited right now — try again in a bit."
+        : `GitHub releases check failed: ${res.status}`
+    );
+  }
   const releases = await res.json();
 
   const androidRelease = releases.find((r) => r.tag_name.startsWith("android-v") && !r.draft);

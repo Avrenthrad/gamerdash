@@ -14,35 +14,72 @@ import { isAndroid } from "../lib/platform";
 
 export default function AndroidUpdateBanner() {
   const [update, setUpdate] = useState(null);
+  const [checkError, setCheckError] = useState(null);
   const [dismissed, setDismissed] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (!isAndroid()) return;
+    let cancelled = false;
+    setCheckError(null);
     checkForAndroidUpdate()
       .then((found) => {
+        if (cancelled) return;
         if (found) setUpdate(found);
       })
-      .catch((err) => console.error("Android update check failed:", err));
-  }, []);
+      .catch((err) => {
+        console.error("Android update check failed:", err);
+        // Previously silent — logged to a console nobody sees on a
+        // real device, so a real failure (rate limit, no connection)
+        // looked identical to "no update available" from the outside.
+        if (!cancelled) setCheckError(err.message || "Couldn't check for updates.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [retryCount]);
 
-  if (!update || dismissed) return null;
+  if (dismissed) return null;
 
-  return (
-    <div className="desktop-update-banner">
-      <div className="desktop-update-banner__body">
-        <span className="desktop-update-banner__title">Update available</span>
-        <span className="desktop-update-banner__desc">
-          Lykodex {update.version} is ready to download. Android will ask you to confirm the install once it's downloaded.
-        </span>
+  if (update) {
+    return (
+      <div className="desktop-update-banner">
+        <div className="desktop-update-banner__body">
+          <span className="desktop-update-banner__title">Update available</span>
+          <span className="desktop-update-banner__desc">
+            Lykodex {update.version} is ready to download. Android will ask you to confirm the install once it's downloaded.
+          </span>
+        </div>
+        <div className="desktop-update-banner__actions">
+          <button type="button" className="quickdash-reset-btn" onClick={() => setDismissed(true)}>
+            Later
+          </button>
+          <button type="button" className="price-search__button" onClick={() => Browser.open({ url: update.downloadUrl })}>
+            Download
+          </button>
+        </div>
       </div>
-      <div className="desktop-update-banner__actions">
-        <button type="button" className="quickdash-reset-btn" onClick={() => setDismissed(true)}>
-          Later
-        </button>
-        <button type="button" className="price-search__button" onClick={() => Browser.open({ url: update.downloadUrl })}>
-          Download
-        </button>
+    );
+  }
+
+  if (checkError) {
+    return (
+      <div className="desktop-update-banner">
+        <div className="desktop-update-banner__body">
+          <span className="desktop-update-banner__title">Update check failed</span>
+          <span className="desktop-update-banner__desc">{checkError}</span>
+        </div>
+        <div className="desktop-update-banner__actions">
+          <button type="button" className="quickdash-reset-btn" onClick={() => setDismissed(true)}>
+            Dismiss
+          </button>
+          <button type="button" className="price-search__button" onClick={() => setRetryCount((c) => c + 1)}>
+            Retry
+          </button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  return null;
 }
