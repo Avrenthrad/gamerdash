@@ -23,6 +23,7 @@ import { fetchUnreadCount } from "../lib/messages";
 import { relativeTime } from "./price/priceUtils";
 import MiniAvatar from "./MiniAvatar";
 import UpdateCheckMenuItem from "./UpdateCheckMenuItem";
+import { GAMING_VIEWS, TCG_VIEWS } from "../lib/navSections";
 
 // Top-level College tabs. Order matters — this is the fixed display
 // order regardless of which ones a person actually selected during
@@ -41,31 +42,6 @@ const COLLEGES = [
 // The 5 real Colleges the Mastery Score dropdown breaks down by —
 // same set as COLLEGES minus the "Overview" pseudo-entry.
 const MASTERY_COLLEGES = COLLEGES.filter((c) => c.id !== "overview");
-
-// Gaming's own sub-pages — shown as a left sidebar only while inside
-// the Gaming College specifically (see App.jsx's GamingSidebar usage).
-// Kept here since it's genuinely Header-adjacent navigation data, not
-// because Header renders it directly.
-export const GAMING_SIDEBAR_ITEMS = [
-  // Labeled "Dashboard" rather than "Overview" — the top College tabs
-  // already have an "Overview" (the cross-College summary page), and
-  // both render at once on every Gaming page, so the two need visibly
-  // different names even though this one still maps to the "dashboard" view.
-  { id: "dashboard", label: "Dashboard" },
-  { id: "backlog", label: "Backlog" },
-  { id: "prices", label: "Market" },
-  { id: "achievements", label: "Achievements" },
-  { id: "library", label: "Library" },
-];
-
-// Views that belong to the Gaming College — used to decide whether
-// the Gaming tab should show as active and whether the sidebar shows.
-export const GAMING_VIEWS = [
-  "dashboard", "library", "prices", "hype-charts", "market", "sales",
-  "backlog", "achievements", "upcoming-releases", "linking", "settings", "dashfeed",
-];
-
-export const TCG_VIEWS = ["tcg-home", "mtg-search", "mtg-collection", "mtg-decks", "mtg-price-watch", "mtg-scan", "mtg-import", "tcg-marketplace", "fab-search", "fab-collection", "fab-decks", "fab-scan", "pokemon-search", "pokemon-collection", "pokemon-decks", "pokemon-scan"];
 
 function DefaultAvatarIcon() {
   return (

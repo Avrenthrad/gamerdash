@@ -18,14 +18,13 @@
  */
 
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
+import { AppContext } from "./appContextInstance";
 import { initialWishlist } from "../data/wishlist";
 import { DEFAULT_DASHBOARD_LAYOUT } from "../data/dashboardLayout";
 import { isPackagedApp } from "../lib/platform";
@@ -161,8 +160,6 @@ function hashFor(view, mode) {
 }
 
 // ---------- context ----------
-
-const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
   // ----- navigation -----
@@ -985,12 +982,4 @@ export function AppProvider({ children }) {
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
-}
-
-export function useApp() {
-  const ctx = useContext(AppContext);
-  if (!ctx) {
-    throw new Error("useApp must be used inside <AppProvider>");
-  }
-  return ctx;
 }

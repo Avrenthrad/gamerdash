@@ -23,14 +23,7 @@
 // second asset or a CSS rule duplicated at every call site.
 
 import { useId } from "react";
-
-export const BADGE_COLOR = {
-  gaming: "var(--sky)",
-  tcg: "var(--violet)",
-  entertainment: "var(--rose)",
-  collectibles: "var(--amber)",
-  tabletop: "var(--lime)",
-};
+import { BADGE_COLOR } from "../lib/collegeColors";
 
 // Glossy-sphere treatment: a soft white highlight toward the upper
 // left (where the light source implicitly sits for every glyph's own

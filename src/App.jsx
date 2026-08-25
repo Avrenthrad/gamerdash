@@ -12,7 +12,8 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
-import Header, { GAMING_VIEWS } from "./components/Header";
+import Header from "./components/Header";
+import { GAMING_VIEWS } from "./lib/navSections";
 import GamingSidebar from "./components/GamingSidebar";
 import OnboardingWelcomeStep from "./components/OnboardingWelcomeStep";
 import OnboardingCollegePicker from "./components/OnboardingCollegePicker";

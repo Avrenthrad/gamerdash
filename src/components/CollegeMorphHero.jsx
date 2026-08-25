@@ -14,7 +14,8 @@
 // behind the icon rather than trying to trace it.
 
 import { useEffect, useRef, useState } from "react";
-import CollegeIcon, { BADGE_COLOR } from "./CollegeIcon";
+import CollegeIcon from "./CollegeIcon";
+import { BADGE_COLOR } from "../lib/collegeColors";
 
 const HOLD_MS = 2400;
 const FADE_MS = 420;

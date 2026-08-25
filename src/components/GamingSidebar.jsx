@@ -1,9 +1,9 @@
 // Left sidebar shown only while inside the Gaming College — real
 // links to Gaming's actual, already-built pages. Not a new nav
 // system, just surfacing existing routes in the new College-shell
-// structure. See Header.jsx for GAMING_SIDEBAR_ITEMS/GAMING_VIEWS.
+// structure. See lib/navSections.js for GAMING_SIDEBAR_ITEMS/GAMING_VIEWS.
 
-import { GAMING_SIDEBAR_ITEMS } from "./Header";
+import { GAMING_SIDEBAR_ITEMS } from "../lib/navSections";
 import CollegeIcon from "./CollegeIcon";
 
 export default function GamingSidebar({ currentView, onNavigate }) {
