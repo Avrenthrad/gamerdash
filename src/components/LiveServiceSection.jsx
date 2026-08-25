@@ -1,4 +1,4 @@
-// Game Services (Dashboard 2) — real countdowns + a real, manually-
+// Game Services — real countdowns + a real, manually-
 // researched calendar (see data/liveServiceCalendar.js for why this
 // has to be manually maintained — no platform publishes a live API
 // for season/act/patch dates).
@@ -83,7 +83,6 @@ export default function LiveServiceSection({ enabledGames }) {
   return (
     <section id="live-service" className="panel panel--sky panel--wide">
       <div className="panel__head">
-        <span className="panel__eyebrow">Dashboard 2</span>
         <h2 className="panel__title">Game Services</h2>
         <p className="panel__subtitle">Real reset timers and upcoming season/patch dates.</p>
       </div>

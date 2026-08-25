@@ -1,4 +1,4 @@
-// Orchestrates real Steam achievement data for Dashboard 2 —
+// Orchestrates real Steam achievement data for Game Services —
 // combines three separate Steam endpoints (owned games, per-game
 // unlocked achievements, achievement schema, global rarity) into one
 // clean "recently unlocked" feed.

@@ -1,4 +1,4 @@
-// Collections (Dashboard 3) — real Steam library.
+// Collections — real Steam library.
 //
 // Honest about what Steam's API can and can't tell us: GetOwnedGames
 // gives real playtime and ownership, but NOT install status (that's
@@ -37,7 +37,6 @@ export default function LibrarySection({ isLoggedIn, onSignIn, onCreateAccount, 
     <section id="library" className="panel panel--rose">
       {(!isLoggedIn || !linkedSteamId) && <UnderConstructionOverlay />}
       <div className="panel__head">
-        <span className="panel__eyebrow">Dashboard 3</span>
         <h2 className="panel__title">Collections</h2>
         <p className="panel__subtitle">Your real Steam library, sorted by playtime.</p>
       </div>

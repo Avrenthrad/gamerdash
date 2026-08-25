@@ -149,7 +149,6 @@ export default function FriendSection({ isLoggedIn, onSignIn, onCreateAccount, l
     <section id="friends" className="panel panel--lime panel--wide">
       {!isLoggedIn && <UnderConstructionOverlay />}
       <div className="panel__head">
-        <span className="panel__eyebrow">Dashboard 4</span>
         <h2 className="panel__title">Friend Details</h2>
         <p className="panel__subtitle">
           Real Steam friends' live activity, plus real Lykodex friends' Xbox/PlayStation activity via Discord.

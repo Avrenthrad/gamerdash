@@ -48,7 +48,6 @@ export default function PriceSection({ wishlist, onOpenFullPage, currency }) {
     <section id="prices" className="panel panel--teal">
       <button type="button" className="panel-preview-trigger" onClick={onOpenFullPage}>
         <div className="panel__head">
-          <span className="panel__eyebrow">Dashboard 1</span>
           <h2 className="panel__title">Store Tracker</h2>
           <p className="panel__subtitle">From your wishlist — tap to see the full picture.</p>
         </div>
