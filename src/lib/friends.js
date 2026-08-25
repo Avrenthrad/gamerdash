@@ -107,3 +107,37 @@ export async function withdrawFriendRequest(requestId) {
   const { error } = await supabase.from("friend_requests").delete().eq("id", requestId);
   if (error) throw error;
 }
+
+// ---------- Blocking — deliberately separate from unfriending ----------
+// Blocking someone also tears down any existing friendship and any
+// pending request between the two of you (see the block_user RPC),
+// and stops them from sending you a new request afterward — none of
+// which plain removeFriend() does.
+
+export async function blockUser(blockedId) {
+  const { error } = await supabase.rpc("block_user", { p_blocked_id: blockedId });
+  if (error) throw error;
+}
+
+export async function unblockUser(blockerId, blockedId) {
+  const { error } = await supabase
+    .from("blocked_users")
+    .delete()
+    .eq("blocker_id", blockerId)
+    .eq("blocked_id", blockedId);
+  if (error) throw error;
+}
+
+export async function fetchBlockedUsers(userId) {
+  const { data, error } = await supabase
+    .from("blocked_users")
+    .select("*")
+    .eq("blocker_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+
+  const ids = data.map((b) => b.blocked_id);
+  const profiles = await getPublicProfiles(ids);
+  const profileById = Object.fromEntries(profiles.map((p) => [p.id, p]));
+  return data.map((b) => ({ ...b, profile: profileById[b.blocked_id] || null }));
+}

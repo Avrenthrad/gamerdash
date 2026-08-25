@@ -9,6 +9,7 @@ import {
   fetchMyFriendCode, fetchFriends, removeFriend,
   findUserByFriendCode, searchUsersByUsername, sendFriendRequest,
   fetchFriendRequests, acceptFriendRequest, declineFriendRequest, withdrawFriendRequest,
+  blockUser, unblockUser, fetchBlockedUsers,
 } from "../lib/friends";
 import { displayName } from "../lib/guilds";
 import MiniAvatar from "./MiniAvatar";
@@ -18,6 +19,7 @@ export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCr
   const [myCode, setMyCode] = useState("");
   const [friends, setFriends] = useState([]);
   const [requests, setRequests] = useState([]);
+  const [blocked, setBlocked] = useState([]);
   const [status, setStatus] = useState("loading");
 
   const [addCode, setAddCode] = useState("");
@@ -34,6 +36,11 @@ export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCr
   // relationship change (not just a UI toggle), so it shouldn't fire
   // from a single accidental tap the way a plain "X" icon invites.
   const [pendingRemove, setPendingRemove] = useState(null);
+  // Holds { id, profile } for whoever is pending a block confirmation
+  // — kept separate from pendingRemove since blocking is a distinct,
+  // more permanent action (it also silently unfriends + wipes any
+  // pending request, and stops them from re-adding you).
+  const [pendingBlock, setPendingBlock] = useState(null);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -47,14 +54,16 @@ export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCr
   async function load() {
     setStatus("loading");
     try {
-      const [code, friendRows, requestRows] = await Promise.all([
+      const [code, friendRows, requestRows, blockedRows] = await Promise.all([
         fetchMyFriendCode(userId),
         fetchFriends(userId),
         fetchFriendRequests(userId),
+        fetchBlockedUsers(userId),
       ]);
       setMyCode(code);
       setFriends(friendRows);
       setRequests(requestRows);
+      setBlocked(blockedRows);
       setStatus("ready");
     } catch (err) {
       console.error("Failed to load friends:", err);
@@ -161,6 +170,29 @@ export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCr
     }
   }
 
+  async function handleBlock(targetId) {
+    try {
+      await blockUser(targetId);
+      // block_user also deletes any friendship/pending request server
+      // side — reload rather than hand-patch every list that could've
+      // changed (friends, incoming/outgoing requests, search results).
+      load();
+    } catch (err) {
+      console.error("Failed to block user:", err);
+    } finally {
+      setPendingBlock(null);
+    }
+  }
+
+  async function handleUnblock(blockedId) {
+    try {
+      await unblockUser(userId, blockedId);
+      setBlocked((prev) => prev.filter((b) => b.blocked_id !== blockedId));
+    } catch (err) {
+      console.error("Failed to unblock user:", err);
+    }
+  }
+
   if (!isLoggedIn) {
     return (
       <div className="price-page">
@@ -234,6 +266,13 @@ export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCr
                     Add
                   </button>
                 )}
+                <button
+                  type="button"
+                  className="quickdash-reset-btn"
+                  onClick={() => setPendingBlock({ id: found.id, profile: found })}
+                >
+                  Block
+                </button>
               </li>
             );
           })}
@@ -315,6 +354,33 @@ export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCr
                 <button type="button" className="linking-row__connect" onClick={onGoToInbox}>Message</button>
               )}
               <button type="button" className="quickdash-reset-btn" onClick={() => setPendingRemove(f)}>Remove</button>
+              <button
+                type="button"
+                className="quickdash-reset-btn"
+                onClick={() => setPendingBlock({ id: f.friend_id, profile: f.profile })}
+              >
+                Block
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="backlog-summary"><span className="feed-col__label">Blocked</span></div>
+      {blocked.length === 0 ? (
+        <p className="panel__status">Nobody's blocked.</p>
+      ) : (
+        <ul className="backlog-list">
+          {blocked.map((b) => (
+            <li key={b.id} className="backlog-card">
+              <MiniAvatar profile={b.profile} />
+              <div className="backlog-card__info">
+                <span className="backlog-card__title">{displayName(b.profile)}</span>
+                {b.profile?.username && <span className="backlog-card__meta">@{b.profile.username}</span>}
+              </div>
+              <button type="button" className="quickdash-reset-btn" onClick={() => handleUnblock(b.blocked_id)}>
+                Unblock
+              </button>
             </li>
           ))}
         </ul>
@@ -331,6 +397,19 @@ export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCr
         confirmLabel="Remove"
         onCancel={() => setPendingRemove(null)}
         onConfirm={() => handleRemove(pendingRemove.friend_id)}
+      />
+
+      <ConfirmDialog
+        open={Boolean(pendingBlock)}
+        title="Block this person?"
+        message={
+          pendingBlock
+            ? `${displayName(pendingBlock.profile)} will be unfriended (if you're currently friends) and won't be able to send you a new friend request. You can unblock them later from this page.`
+            : ""
+        }
+        confirmLabel="Block"
+        onCancel={() => setPendingBlock(null)}
+        onConfirm={() => handleBlock(pendingBlock.id)}
       />
     </div>
   );
