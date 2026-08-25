@@ -391,10 +391,15 @@ function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, o
   async function load() {
     setStatus("loading");
     try {
+      // No client-side owner/admin check on the join-requests fetch —
+      // guild_join_requests' own RLS policy (requester themselves, or
+      // can_manage_guild_members) is what actually decides what comes
+      // back, so a regular member calling this just gets [], same as
+      // if we'd gated it here.
       const [membersData, activityData, requestsData] = await Promise.all([
         fetchGuildMembersWithProfiles(guild.id),
         fetchGuildActivity(guild.id),
-        isOwner ? fetchJoinRequestsForGuild(guild.id) : Promise.resolve([]),
+        fetchJoinRequestsForGuild(guild.id),
       ]);
       setMembers(membersData);
       setActivity(activityData);
@@ -519,20 +524,26 @@ function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, o
         <button type="button" className={`quickdash-reset-btn ${tab === "posts" ? "quickdash-reset-btn--active" : ""}`} onClick={() => setTab("posts")}>Posts</button>
         <button type="button" className={`quickdash-reset-btn ${tab === "members" ? "quickdash-reset-btn--active" : ""}`} onClick={() => setTab("members")}>Members</button>
         <button type="button" className={`quickdash-reset-btn ${tab === "activity" ? "quickdash-reset-btn--active" : ""}`} onClick={() => setTab("activity")}>Activity</button>
-        {isOwner && (
+        {canManage && (
           <button type="button" className={`quickdash-reset-btn ${tab === "settings" ? "quickdash-reset-btn--active" : ""}`} onClick={() => setTab("settings")}>Settings</button>
         )}
       </div>
 
       {tab === "posts" && <PostsTab guildId={guild.id} userId={userId} isMember={isMember} canModerate={canModerate} />}
 
-      {tab === "settings" && isOwner && (
+      {tab === "settings" && canManage && (
         <section className="settings-card">
           <h2 className="settings-card__title">Guild settings</h2>
-          <label className="pref-choice">
-            <input type="checkbox" checked={guild.is_private} onChange={handleTogglePrivacy} />
-            <span>Private (hidden from browsing — joinable by invite or code only)</span>
-          </label>
+          {isOwner ? (
+            <label className="pref-choice">
+              <input type="checkbox" checked={guild.is_private} onChange={handleTogglePrivacy} />
+              <span>Private (hidden from browsing — joinable by invite or code only)</span>
+            </label>
+          ) : (
+            <p className="panel__status">
+              {guild.is_private ? "Private" : "Public"} — only the owner can change this.
+            </p>
+          )}
 
           <div className="settings-avatar-row" style={{ marginTop: "14px" }}>
             {guild.logo_url ? (
