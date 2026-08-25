@@ -51,11 +51,24 @@ function parseCsv(text) {
   return rows;
 }
 
+// This is a real 6MB+ file — on a slow or flaky mobile connection a
+// plain fetch with no timeout can hang for a very long time instead
+// of failing fast, which from the UI just looks like "search does
+// nothing." Same defensive-timeout pattern as lib/fab.js.
+const FETCH_TIMEOUT_MS = 15000;
+
 async function loadCatalog() {
   const cached = getCached(CACHE_KEY, CACHE_TTL.ONE_WEEK);
   if (cached !== undefined) return cached;
 
-  const res = await fetch(CSV_URL);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  let res;
+  try {
+    res = await fetch(CSV_URL, { signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) throw new Error("Failed to load Funko Pop catalog");
   const text = await res.text();
   const rows = parseCsv(text);

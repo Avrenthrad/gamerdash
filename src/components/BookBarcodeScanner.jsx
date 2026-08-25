@@ -1,21 +1,31 @@
-// Real camera barcode decoding via the browser's native
-// BarcodeDetector API (Shape Detection API — ships in Chrome/Edge/
-// most Android browsers; not in Safari/Firefox as of this writing).
+// Real camera barcode decoding via ZXing (@zxing/browser) — a pure
+// JS/canvas decoder, not the browser's native BarcodeDetector (Shape
+// Detection API). Switched away from BarcodeDetector because its
+// support is genuinely inconsistent across Android WebViews: the
+// constructor can exist (so a feature-check passes) while the
+// underlying on-device ML model is missing, so detect() just never
+// finds anything — the camera runs, "point your camera" shows
+// forever, and nothing is ever detected. ZXing decodes frames itself,
+// so it works the same way on every platform this app ships to.
+//
 // ISBN-13 barcodes are encoded as real EAN-13 barcodes with a 978/979
 // prefix — detecting that format and filtering to ISBN-shaped values
 // is the correct, real approach, not OCR.
 //
 // Always offers manual ISBN entry alongside the scanner, per the
-// honest-fallback principle — a browser without BarcodeDetector, a
-// denied camera permission, or a bad-lighting scan all fall back to
-// the same manual path rather than dead-ending.
+// honest-fallback principle — a denied camera permission or a
+// bad-lighting scan both fall back to the same manual path rather
+// than dead-ending.
 
 import { useEffect, useRef, useState } from "react";
+import { BrowserMultiFormatReader } from "@zxing/browser";
+import { BarcodeFormat, DecodeHintType } from "@zxing/library";
+
+const ISBN_PATTERN = /^97[89]\d{10}$/;
 
 export default function BookBarcodeScanner({ onDetected, onManualEntry }) {
   const videoRef = useRef(null);
-  const [supported] = useState(typeof window !== "undefined" && "BarcodeDetector" in window);
-  const [status, setStatus] = useState("idle"); // idle | starting | scanning | error
+  const [status, setStatus] = useState("starting"); // starting | scanning | error
   const [manualValue, setManualValue] = useState("");
   // Holds the latest onDetected without it being a dependency of the
   // camera-setup effect below — the parent passes a new function
@@ -27,57 +37,44 @@ export default function BookBarcodeScanner({ onDetected, onManualEntry }) {
   }, [onDetected]);
 
   useEffect(() => {
-    if (!supported) return;
     let cancelled = false;
-    let rafId = null;
-    let stream = null;
-    let detector = null;
+    let controls = null;
 
-    async function start() {
-      setStatus("starting");
-      try {
-        detector = new window.BarcodeDetector({ formats: ["ean_13"] });
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-        setStatus("scanning");
-        scanLoop();
-      } catch (err) {
-        console.error("Failed to start barcode scanner:", err);
-        if (!cancelled) setStatus("error");
-      }
-    }
+    const hints = new Map();
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13]);
+    const reader = new BrowserMultiFormatReader(hints);
 
-    async function scanLoop() {
-      if (cancelled || !videoRef.current) return;
-      try {
-        const barcodes = await detector.detect(videoRef.current);
+    reader
+      .decodeFromConstraints({ video: { facingMode: "environment" } }, videoRef.current, (result) => {
+        // Called on every scan attempt, successful or not — result is
+        // undefined on the (very common) "no barcode in this frame"
+        // case, which isn't an error, same as the old implementation.
+        if (cancelled || !result) return;
+        const value = result.getText();
         // Real ISBN-13 values always start with 978 or 979 — filters
         // out any other EAN-13 product barcode that isn't a book.
-        const isbnMatch = barcodes.find((b) => /^97[89]\d{10}$/.test(b.rawValue));
-        if (isbnMatch) {
-          onDetectedRef.current(isbnMatch.rawValue);
+        if (!ISBN_PATTERN.test(value)) return;
+        onDetectedRef.current(value);
+        controls?.stop();
+      })
+      .then((c) => {
+        if (cancelled) {
+          c.stop();
           return;
         }
-      } catch {
-        // Transient "no barcode in this frame" — normal, not an error.
-      }
-      rafId = requestAnimationFrame(scanLoop);
-    }
+        controls = c;
+        setStatus("scanning");
+      })
+      .catch((err) => {
+        console.error("Failed to start barcode scanner:", err);
+        if (!cancelled) setStatus("error");
+      });
 
-    start();
     return () => {
       cancelled = true;
-      if (rafId) cancelAnimationFrame(rafId);
-      stream?.getTracks().forEach((t) => t.stop());
+      controls?.stop();
     };
-  }, [supported]);
+  }, []);
 
   function handleManualSubmit(e) {
     e.preventDefault();
@@ -87,21 +84,13 @@ export default function BookBarcodeScanner({ onDetected, onManualEntry }) {
 
   return (
     <div className="barcode-scanner">
-      {supported ? (
-        <>
-          <div className="barcode-scanner__frame">
-            <video ref={videoRef} className="barcode-scanner__video" playsInline muted />
-          </div>
-          {status === "starting" && <p className="panel__status">Starting camera…</p>}
-          {status === "scanning" && <p className="panel__status">Point your camera at a book's barcode.</p>}
-          {status === "error" && (
-            <p className="panel__status panel__status--error">Couldn't access your camera — enter the ISBN manually below.</p>
-          )}
-        </>
-      ) : (
-        <p className="panel__status">
-          Camera barcode scanning isn't supported in this browser — enter the ISBN manually below.
-        </p>
+      <div className="barcode-scanner__frame">
+        <video ref={videoRef} className="barcode-scanner__video" playsInline muted />
+      </div>
+      {status === "starting" && <p className="panel__status">Starting camera…</p>}
+      {status === "scanning" && <p className="panel__status">Point your camera at a book's barcode.</p>}
+      {status === "error" && (
+        <p className="panel__status panel__status--error">Couldn't access your camera — enter the ISBN manually below.</p>
       )}
 
       <form className="price-search" onSubmit={handleManualSubmit}>

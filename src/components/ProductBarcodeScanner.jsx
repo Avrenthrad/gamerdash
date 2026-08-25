@@ -1,21 +1,27 @@
-// Real camera barcode decoding via the browser's native
-// BarcodeDetector API — same mechanism as BookBarcodeScanner.jsx, but
-// for general retail product barcodes (Pop Vinyl, LEGO, etc.) rather
-// than ISBN-shaped EAN-13s specifically. Kept as a sibling component
-// rather than adding a mode prop to BookBarcodeScanner — the ISBN
-// 978/979-prefix filter genuinely doesn't belong in a generic-product
-// scanner, and the two are small enough that branching one component
-// on both is worse than two components sharing the same CSS classes.
+// Real camera barcode decoding via ZXing (@zxing/browser) — a pure
+// JS/canvas decoder, not the browser's native BarcodeDetector (Shape
+// Detection API). Switched away from BarcodeDetector because its
+// support is genuinely inconsistent across Android WebViews: the
+// constructor can exist (so a feature-check passes) while the
+// underlying on-device ML model is missing, so detect() just never
+// finds anything — the camera runs, "point your camera" shows
+// forever, and nothing is ever detected. ZXing decodes frames itself,
+// so it works the same way on every platform this app ships to.
+//
+// Kept as a sibling to BookBarcodeScanner.jsx rather than a shared
+// component with a mode prop — same reasoning as before, the two
+// scanners only differ in which barcode formats they accept.
 //
 // Always offers manual barcode entry alongside the scanner, same
 // honest-fallback principle as the book scanner.
 
 import { useEffect, useRef, useState } from "react";
+import { BrowserMultiFormatReader } from "@zxing/browser";
+import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 
 export default function ProductBarcodeScanner({ onDetected, onManualEntry }) {
   const videoRef = useRef(null);
-  const [supported] = useState(typeof window !== "undefined" && "BarcodeDetector" in window);
-  const [status, setStatus] = useState("idle"); // idle | starting | scanning | error
+  const [status, setStatus] = useState("starting"); // starting | scanning | error
   const [manualValue, setManualValue] = useState("");
   // Holds the latest onDetected without it being a dependency of the
   // camera-setup effect below — the parent passes a new function
@@ -27,54 +33,40 @@ export default function ProductBarcodeScanner({ onDetected, onManualEntry }) {
   }, [onDetected]);
 
   useEffect(() => {
-    if (!supported) return;
     let cancelled = false;
-    let rafId = null;
-    let stream = null;
-    let detector = null;
+    let controls = null;
 
-    async function start() {
-      setStatus("starting");
-      try {
-        detector = new window.BarcodeDetector({ formats: ["ean_13", "upc_a"] });
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+    const hints = new Map();
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.UPC_A]);
+    const reader = new BrowserMultiFormatReader(hints);
+
+    reader
+      .decodeFromConstraints({ video: { facingMode: "environment" } }, videoRef.current, (result) => {
+        // Called on every scan attempt, successful or not — result is
+        // undefined on the (very common) "no barcode in this frame"
+        // case, which isn't an error, same as the old implementation.
+        if (cancelled || !result) return;
+        onDetectedRef.current(result.getText());
+        controls?.stop();
+      })
+      .then((c) => {
         if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
+          c.stop();
           return;
         }
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
+        controls = c;
         setStatus("scanning");
-        scanLoop();
-      } catch (err) {
+      })
+      .catch((err) => {
         console.error("Failed to start barcode scanner:", err);
         if (!cancelled) setStatus("error");
-      }
-    }
+      });
 
-    async function scanLoop() {
-      if (cancelled || !videoRef.current) return;
-      try {
-        const barcodes = await detector.detect(videoRef.current);
-        if (barcodes.length > 0) {
-          onDetectedRef.current(barcodes[0].rawValue);
-          return;
-        }
-      } catch {
-        // Transient "no barcode in this frame" — normal, not an error.
-      }
-      rafId = requestAnimationFrame(scanLoop);
-    }
-
-    start();
     return () => {
       cancelled = true;
-      if (rafId) cancelAnimationFrame(rafId);
-      stream?.getTracks().forEach((t) => t.stop());
+      controls?.stop();
     };
-  }, [supported]);
+  }, []);
 
   function handleManualSubmit(e) {
     e.preventDefault();
@@ -84,21 +76,13 @@ export default function ProductBarcodeScanner({ onDetected, onManualEntry }) {
 
   return (
     <div className="barcode-scanner">
-      {supported ? (
-        <>
-          <div className="barcode-scanner__frame">
-            <video ref={videoRef} className="barcode-scanner__video" playsInline muted />
-          </div>
-          {status === "starting" && <p className="panel__status">Starting camera…</p>}
-          {status === "scanning" && <p className="panel__status">Point your camera at the product's barcode.</p>}
-          {status === "error" && (
-            <p className="panel__status panel__status--error">Couldn't access your camera — enter the barcode manually below.</p>
-          )}
-        </>
-      ) : (
-        <p className="panel__status">
-          Camera barcode scanning isn't supported in this browser — enter the barcode manually below.
-        </p>
+      <div className="barcode-scanner__frame">
+        <video ref={videoRef} className="barcode-scanner__video" playsInline muted />
+      </div>
+      {status === "starting" && <p className="panel__status">Starting camera…</p>}
+      {status === "scanning" && <p className="panel__status">Point your camera at the product's barcode.</p>}
+      {status === "error" && (
+        <p className="panel__status panel__status--error">Couldn't access your camera — enter the barcode manually below.</p>
       )}
 
       <form className="price-search" onSubmit={handleManualSubmit}>
