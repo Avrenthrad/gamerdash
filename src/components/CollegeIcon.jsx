@@ -43,20 +43,31 @@ const GLYPHS = {
       <path d="M14 10.8l1.7 2.4-1.7 2.4-1.7-2.4z" fill={WHITE} />
     </>
   ),
+  // Clapperboard, rebuilt: the old version had the hinge stripes
+  // floating disconnected above the body with a 2-unit gap, which read
+  // as stray off-center marks rather than a clapper. Now a solid top
+  // bar (the clapper) sits flush against the body, with the diagonal
+  // stripes cut into the bar itself instead of hovering above it.
   entertainment: (
     <>
-      <rect x="4" y="8.6" width="16" height="10.8" rx="2.2" fill={WHITE} />
-      <path d="M4.8 8.6l1.7-3.8h3.3l-1.7 3.8zM10.3 8.6l1.7-3.8h3.3l-1.7 3.8z" fill="var(--rose)" />
-      <path d="M10.4 12.1l4.6 2.7-4.6 2.7z" fill="var(--rose)" />
+      <rect x="4.5" y="6" width="15" height="4.6" rx="1" fill={WHITE} />
+      <path d="M4.5 6l3-3h3l-3 3zM11 6l3-3h3l-3 3z" fill="var(--rose)" />
+      <rect x="4.5" y="11.4" width="15" height="8.2" rx="1.8" fill={WHITE} />
+      <path d="M8 15.2l5 2.9-5 2.9z" fill="var(--rose)" />
     </>
   ),
+  // Trophy, rebuilt: the old neck (1.8 wide) and base sat 4 units below
+  // the cup with nothing connecting them, so it read as disconnected
+  // floating pieces rather than one trophy. Cup, neck, and base now
+  // each touch the next with no gap, and the neck is wide enough not
+  // to vanish into a hairline.
   collectibles: (
     <>
-      <path d="M8 4h8v3.6a4 4 0 0 1-8 0V4z" fill={WHITE} />
-      <path d="M8 4.8H6.2a1.8 1.8 0 0 0 1.8 3.5" fill="none" stroke={WHITE} strokeWidth="1.3" strokeLinecap="round" />
-      <path d="M16 4.8h1.8a1.8 1.8 0 0 1-1.8 3.5" fill="none" stroke={WHITE} strokeWidth="1.3" strokeLinecap="round" />
-      <rect x="11.1" y="11.6" width="1.8" height="3" fill="var(--amber)" />
-      <path d="M9 19h6l-.7-3.4H9.7z" fill="var(--amber)" />
+      <path d="M7 4h10l-1.2 5H8.2z" fill={WHITE} />
+      <path d="M7 4.6H5.2a2 2 0 0 0 1.8 3.9" fill="none" stroke={WHITE} strokeWidth="1.3" strokeLinecap="round" />
+      <path d="M17 4.6h1.8a2 2 0 0 1-1.8 3.9" fill="none" stroke={WHITE} strokeWidth="1.3" strokeLinecap="round" />
+      <rect x="10.8" y="9" width="2.4" height="4.5" fill="var(--amber)" />
+      <path d="M8.5 19h7l-1-5.5h-5z" fill="var(--amber)" />
     </>
   ),
   tabletop: (
