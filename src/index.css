@@ -6511,13 +6511,17 @@ html[data-mode="light"] .current-rotation {
   font-size: 11.5px;
 }
 
-/* ---------- College Morph hero (5 College glyphs, liquid-morphing) ---------- */
+/* ---------- College Morph hero ("Constellation Marks" — drifting
+   particles loosely tracing one College's silhouette, cross-fading
+   into the next) ---------- */
 
 .college-morph-hero {
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 18px;
   min-height: 320px;
   background: var(--bg);
   overflow: hidden;
@@ -6529,50 +6533,24 @@ html[data-mode="light"] .current-rotation {
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  opacity: 0.45;
+  opacity: 0.4;
   background-color: transparent;
   box-shadow: 0 0 140px 90px var(--glow-color, var(--sky));
   transition: box-shadow 1.2s ease;
   pointer-events: none;
 }
 
-.college-morph-hero__stage {
+.college-morph-hero__canvas {
   position: relative;
-  width: 220px;
-  height: 220px;
 }
 
-.college-morph-hero__icon {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.college-morph-hero__icon--outgoing {
-  animation: college-morph-out 1.2s ease forwards;
-}
-
-.college-morph-hero__icon--incoming {
-  animation: college-morph-in 1.2s ease forwards;
-}
-
-@keyframes college-morph-out {
-  0% { opacity: 1; transform: scale(1) rotate(0deg); }
-  100% { opacity: 0; transform: scale(0.35) rotate(60deg); }
-}
-
-@keyframes college-morph-in {
-  0% { opacity: 0; transform: scale(0.35) rotate(-60deg); }
-  100% { opacity: 1; transform: scale(1) rotate(0deg); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .college-morph-hero__icon--outgoing,
-  .college-morph-hero__icon--incoming {
-    animation: none;
-  }
+.college-morph-hero__label {
+  position: relative;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
 }
 
 /* ---------- Desktop auto-update banner ---------- */
