@@ -1915,6 +1915,25 @@ button { font-family: inherit; }
   color: var(--text-tertiary);
 }
 
+/* Friend-request rows have their own avatar-beside-content layout,
+   not the plain stacked-text layout every other notification row
+   uses — cramming avatar + bold name + "sent you a friend request"
+   into one inline flex row left almost no width for the text on
+   narrow screens, wrapping it word-by-word. */
+.dash-header__friend-request-row {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.dash-header__friend-request-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
 .dash-header__empty-state {
   display: flex;
   flex-direction: column;
@@ -2013,6 +2032,67 @@ button { font-family: inherit; }
   background: rgba(0, 0, 0, 0.55);
   z-index: 70;
   animation: fadeIn 0.2s ease-out;
+}
+
+/* ---------- Reusable confirmation modal (ConfirmDialog.jsx) ---------- */
+
+.confirm-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 90;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.confirm-dialog {
+  width: 100%;
+  max-width: 360px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 20px;
+}
+
+.confirm-dialog__title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0 0 8px;
+  color: var(--text-primary);
+}
+
+.confirm-dialog__message {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin: 0 0 18px;
+}
+
+.confirm-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.confirm-dialog__confirm {
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 9px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--rose);
+  cursor: pointer;
+  transition: filter var(--duration-fast) var(--ease-standard);
+}
+
+.confirm-dialog__confirm:hover {
+  filter: brightness(1.08);
 }
 
 .dash-drawer {

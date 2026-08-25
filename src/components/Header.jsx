@@ -416,19 +416,23 @@ export default function Header({
                     <>
                       <span className="dash-header__notifications-title">Friend requests</span>
                       {friendRequests.map((r) => (
-                        <div key={r.id} className="dash-header__notification-row">
-                          <span className="dash-header__notification-text" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                            <MiniAvatar profile={r.senderProfile} />
-                            <strong>{displayName(r.senderProfile)}</strong> sent you a friend request
-                          </span>
-                          <span className="dash-header__notification-actions" style={{ display: "flex", gap: "6px" }}>
-                            <button type="button" className="linking-row__connect" onClick={() => handleBellAcceptFriend(r.id)}>
-                              Accept
-                            </button>
-                            <button type="button" className="game-popup__close" onClick={() => handleBellDeclineFriend(r.id)} aria-label="Decline">
-                              ✕
-                            </button>
-                          </span>
+                        <div key={r.id} className="dash-header__notification-row dash-header__friend-request-row">
+                          <MiniAvatar profile={r.senderProfile} />
+                          <div className="dash-header__friend-request-body">
+                            <span className="dash-header__notification-text">
+                              <strong>{displayName(r.senderProfile)}</strong>
+                              <br />
+                              Sent you a friend request.
+                            </span>
+                            <span className="dash-header__notification-actions" style={{ display: "flex", gap: "6px" }}>
+                              <button type="button" className="linking-row__connect" onClick={() => handleBellAcceptFriend(r.id)}>
+                                Accept
+                              </button>
+                              <button type="button" className="quickdash-reset-btn" onClick={() => handleBellDeclineFriend(r.id)}>
+                                Decline
+                              </button>
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </>
@@ -745,19 +749,23 @@ export default function Header({
                     <span className="dash-drawer__section-label drawer-mobile-only">Friend requests</span>
                     <div className="dash-drawer__notifications-mobile drawer-mobile-only">
                       {friendRequests.map((r) => (
-                        <div key={r.id} className="dash-header__notification-row">
-                          <span className="dash-header__notification-text" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                            <MiniAvatar profile={r.senderProfile} />
-                            <strong>{displayName(r.senderProfile)}</strong> sent you a friend request
-                          </span>
-                          <span className="dash-header__notification-actions" style={{ display: "flex", gap: "6px" }}>
-                            <button type="button" className="linking-row__connect" onClick={() => handleBellAcceptFriend(r.id)}>
-                              Accept
-                            </button>
-                            <button type="button" className="game-popup__close" onClick={() => handleBellDeclineFriend(r.id)} aria-label="Decline">
-                              ✕
-                            </button>
-                          </span>
+                        <div key={r.id} className="dash-header__notification-row dash-header__friend-request-row">
+                          <MiniAvatar profile={r.senderProfile} />
+                          <div className="dash-header__friend-request-body">
+                            <span className="dash-header__notification-text">
+                              <strong>{displayName(r.senderProfile)}</strong>
+                              <br />
+                              Sent you a friend request.
+                            </span>
+                            <span className="dash-header__notification-actions" style={{ display: "flex", gap: "6px" }}>
+                              <button type="button" className="linking-row__connect" onClick={() => handleBellAcceptFriend(r.id)}>
+                                Accept
+                              </button>
+                              <button type="button" className="quickdash-reset-btn" onClick={() => handleBellDeclineFriend(r.id)}>
+                                Decline
+                              </button>
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>

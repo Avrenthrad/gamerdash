@@ -12,6 +12,7 @@ import {
 } from "../lib/friends";
 import { displayName } from "../lib/guilds";
 import MiniAvatar from "./MiniAvatar";
+import ConfirmDialog from "./ConfirmDialog";
 
 export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCreateAccount, onGoToInbox }) {
   const [myCode, setMyCode] = useState("");
@@ -28,6 +29,11 @@ export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCr
   const [searchResults, setSearchResults] = useState([]);
   const [searchMessage, setSearchMessage] = useState("");
   const [sentTo, setSentTo] = useState(new Set()); // ids just requested this session, so the row can flip to "Sent" without a full reload
+  // Holds the friend pending removal while the "are you sure?" dialog
+  // is open — null means no dialog. Unfriending is a real, meaningful
+  // relationship change (not just a UI toggle), so it shouldn't fire
+  // from a single accidental tap the way a plain "X" icon invites.
+  const [pendingRemove, setPendingRemove] = useState(null);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -150,6 +156,8 @@ export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCr
       setFriends((prev) => prev.filter((f) => f.friend_id !== friendId));
     } catch (err) {
       console.error("Failed to remove friend:", err);
+    } finally {
+      setPendingRemove(null);
     }
   }
 
@@ -306,11 +314,24 @@ export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCr
               {onGoToInbox && (
                 <button type="button" className="linking-row__connect" onClick={onGoToInbox}>Message</button>
               )}
-              <button type="button" className="game-popup__close" onClick={() => handleRemove(f.friend_id)} aria-label="Remove friend">✕</button>
+              <button type="button" className="quickdash-reset-btn" onClick={() => setPendingRemove(f)}>Remove</button>
             </li>
           ))}
         </ul>
       )}
+
+      <ConfirmDialog
+        open={Boolean(pendingRemove)}
+        title="Remove this friend?"
+        message={
+          pendingRemove
+            ? `${displayName(pendingRemove.profile)} will be removed from your friends list. You can send a new request later, but they'll need to accept it again.`
+            : ""
+        }
+        confirmLabel="Remove"
+        onCancel={() => setPendingRemove(null)}
+        onConfirm={() => handleRemove(pendingRemove.friend_id)}
+      />
     </div>
   );
 }
