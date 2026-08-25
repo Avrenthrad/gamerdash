@@ -25,6 +25,7 @@ import AndroidUpdateBanner from "./components/AndroidUpdateBanner";
 import GamingDashboard from "./components/GamingDashboard";
 
 import { useApp } from "./hooks/useApp";
+import { initOAuthRedirectListener } from "./lib/oauthRedirect";
 
 // Lazy-loaded secondary pages (same rationale as before)
 const AccountLinkingPage = lazy(() => import("./components/AccountLinkingPage"));
@@ -172,6 +173,14 @@ export default function App() {
     }
     window.addEventListener("keydown", handleGlobalKeydown);
     return () => window.removeEventListener("keydown", handleGlobalKeydown);
+  }, []);
+
+  // Google/Discord/etc OAuth sign-in on the packaged apps redirects
+  // back via a custom URL scheme rather than a normal page navigation
+  // — this is what actually applies the resulting session once the OS
+  // hands that URL back to the app. No-ops entirely on plain web.
+  useEffect(() => {
+    initOAuthRedirectListener();
   }, []);
 
   useEffect(() => {

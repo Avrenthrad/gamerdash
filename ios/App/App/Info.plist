@@ -70,5 +70,18 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<!-- Catches the lykodex://auth-callback redirect Supabase OAuth
+	     (Google, etc.) sends the app back to after opening sign-in in
+	     an external browser — see lib/oauthRedirect.js, which reads
+	     this via Capacitor's appUrlOpen event. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>lykodex</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

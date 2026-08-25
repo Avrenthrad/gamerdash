@@ -18,6 +18,18 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Catches the lykodex://auth-callback redirect Supabase
+                 OAuth (Google, etc.) sends the app back to after
+                 opening sign-in in an external browser tab — see
+                 lib/oauthRedirect.js, which reads this via Capacitor's
+                 appUrlOpen event. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="lykodex" android:host="auth-callback" />
+            </intent-filter>
         </activity>
 
         <provider

@@ -1,12 +1,22 @@
-// Real email/password auth via Supabase.
-// Deliberately skipping email confirmation and OAuth providers for
-// the first testing pass — both need real redirect URLs (once
-// deployed) and add friction that isn't worth it for a small trusted
-// test group. Plain email/password gets testers in fastest; harden
-// this later (email confirmation, Google/Discord OAuth) once there's
-// a real deployed URL to register with those providers.
+// Real email/password + OAuth auth via Supabase.
 
 import { supabase } from "./supabaseClient";
+import { isPackagedApp, isTauri } from "./platform";
+import { Browser } from "@capacitor/browser";
+import { open as openInSystemBrowser } from "@tauri-apps/plugin-shell";
+
+// Packaged apps can't complete a same-window redirect back from an
+// external OAuth page the way a normal website tab can — the OAuth
+// provider page opens in a separate system/in-app browser, not the
+// app's own webview. This custom scheme is what that browser redirects
+// back to instead; the native OS hands the URL back to the app (via
+// Capacitor's appUrlOpen / Tauri's deep-link plugin — see
+// oauthRedirect.js), which is why Android/iOS/Tauri each need this
+// scheme registered (AndroidManifest.xml, Info.plist, tauri.conf.json).
+// Must also be added to Supabase's own Authentication > URL
+// Configuration > Redirect URLs allowlist, same one-time dashboard
+// step as enabling the OAuth provider itself.
+export const OAUTH_CALLBACK_URL = "lykodex://auth-callback";
 
 export async function signUp(email, password) {
   const { data, error } = await supabase.auth.signUp({ email, password });
@@ -33,11 +43,52 @@ export async function signIn(email, password) {
 //   there. Apple additionally requires a Services ID + a private key
 //   generated in Apple's developer portal, not just a client secret.
 export async function signInWithOAuth(provider) {
+  if (isPackagedApp()) {
+    // skipBrowserRedirect: get the provider URL back as data instead of
+    // Supabase navigating window.location itself (there's no sensible
+    // "current window" to navigate in a packaged app's webview for an
+    // external auth page — and Google/most providers actively refuse to
+    // sign in at all inside an embedded webview).
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: OAUTH_CALLBACK_URL, skipBrowserRedirect: true },
+    });
+    if (error) throw error;
+
+    if (isTauri()) {
+      await openInSystemBrowser(data.url);
+    } else {
+      await Browser.open({ url: data.url });
+    }
+    return;
+  }
+
   const { error } = await supabase.auth.signInWithOAuth({
     provider,
     options: { redirectTo: `${window.location.origin}${window.location.pathname}#/dashboard` },
   });
   if (error) throw error;
+}
+
+// Called from oauthRedirect.js once the OS hands the app the
+// lykodex://auth-callback URL. Supabase's default (non-PKCE) OAuth
+// flow puts the session tokens in the URL's hash fragment, exactly
+// like the plain-web flow — the only difference is nothing auto-parses
+// that fragment here (there's no real page navigation to trigger
+// Supabase's own detectSessionInUrl), so it's extracted and applied
+// manually via setSession.
+export async function handleOAuthRedirectUrl(url) {
+  const hashIndex = url.indexOf("#");
+  if (hashIndex === -1) return false;
+
+  const params = new URLSearchParams(url.slice(hashIndex + 1));
+  const access_token = params.get("access_token");
+  const refresh_token = params.get("refresh_token");
+  if (!access_token || !refresh_token) return false;
+
+  const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+  if (error) throw error;
+  return true;
 }
 
 export async function signOut() {
