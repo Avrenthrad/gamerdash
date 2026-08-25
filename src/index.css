@@ -6925,6 +6925,104 @@ html[data-mode="light"] .current-rotation {
   gap: 10px;
 }
 
+/* ---------- Sliding banner (auto-rotating single-item display —
+   friends' live status, Guild Pulse) ---------- */
+
+.sliding-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sliding-banner__item {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 380ms ease, transform 380ms ease;
+}
+
+.sliding-banner__item--out {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+.sliding-banner__dots {
+  display: flex;
+  gap: 6px;
+  align-self: center;
+}
+
+.sliding-banner__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  padding: 0;
+  border: none;
+  background: var(--border);
+  cursor: pointer;
+}
+
+.sliding-banner__dot--active {
+  background: var(--accent);
+}
+
+/* ---------- Friend Mastery Score chart (Friends tab) ---------- */
+
+.friend-mastery-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.friend-mastery-chart__body {
+  opacity: 1;
+  transition: opacity 380ms ease;
+}
+
+.friend-mastery-chart__body--out {
+  opacity: 0;
+}
+
+.friend-mastery-chart__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.friend-mastery-chart__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.friend-mastery-chart__name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.friend-mastery-chart__delta {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.friend-mastery-chart__delta--up {
+  color: #22c55e;
+}
+
+.friend-mastery-chart__delta--down {
+  color: #E8283D;
+}
+
+.friend-mastery-chart__canvas {
+  width: 100%;
+}
+
 .friends-activity-card--empty {
   gap: 8px;
 }

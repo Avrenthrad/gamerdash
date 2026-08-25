@@ -198,7 +198,7 @@ export default function OverviewPage({
 
       {isLoggedIn && (
         <HorizontalLane label="Right now">
-          {showGaming && <SteamPresenceCard linkedSteamId={linkedSteamId} />}
+          {showGaming && <SteamPresenceCard userId={userId} />}
           <GuildPulseCard userId={userId} onGoToGuilds={onGoToGuilds} />
           <FriendsActivityCard userId={userId} onGoToFriends={onGoToFriends} />
         </HorizontalLane>

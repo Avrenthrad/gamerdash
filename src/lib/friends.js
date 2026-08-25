@@ -34,6 +34,28 @@ export async function fetchMyFriendCode(userId) {
   return data.friend_code;
 }
 
+// Friend-scoped — server-side verifies a real friendship exists for
+// every id returned (see the get_friends_linked_steam_ids migration),
+// so this can never be used to look up a non-friend's linked account.
+export async function fetchFriendsSteamIds(friendIds) {
+  if (!friendIds || friendIds.length === 0) return [];
+  const { data, error } = await supabase.rpc("get_friends_linked_steam_ids", { p_ids: friendIds });
+  if (error) throw error;
+  return data || [];
+}
+
+// Same friend-scoped guarantee as fetchFriendsSteamIds — see the
+// get_friends_mastery_history migration. Returns raw rows
+// (user_id, overall_mastery_score, recorded_at), ascending by time;
+// callers group by user_id themselves.
+export async function fetchFriendsMasteryHistory(friendIds, sinceDays = 90) {
+  if (!friendIds || friendIds.length === 0) return [];
+  const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase.rpc("get_friends_mastery_history", { p_ids: friendIds, p_since: since });
+  if (error) throw error;
+  return data || [];
+}
+
 export async function fetchFriends(userId) {
   const { data, error } = await supabase
     .from("friends")

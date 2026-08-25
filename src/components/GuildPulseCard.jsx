@@ -12,6 +12,7 @@ import { fetchGuildPulse, describeActivity, collegeForPulseEvent, displayName } 
 import { relativeTime } from "./price/priceUtils";
 import MiniAvatar from "./MiniAvatar";
 import CollegeIcon from "./CollegeIcon";
+import SlidingBanner from "./SlidingBanner";
 
 export default function GuildPulseCard({ userId, onGoToGuilds }) {
   const [status, setStatus] = useState("loading");
@@ -50,17 +51,16 @@ export default function GuildPulseCard({ userId, onGoToGuilds }) {
         </div>
       )}
 
-      {inGuild && events.length === 0 && (
-        <p className="panel__status">Quiet the last two weeks — nothing new from your Guilds yet.</p>
-      )}
-
-      {inGuild && events.length > 0 && (
-        <ul className="guild-pulse__list">
-          {events.map((entry) => {
+      {inGuild && (
+        <SlidingBanner
+          items={events}
+          className="guild-pulse__list"
+          emptyState={<p className="panel__status">Quiet the last two weeks — nothing new from your Guilds yet.</p>}
+          renderItem={(entry) => {
             const college = collegeForPulseEvent(entry.event_type);
             const isCompletion = entry.event_type === "game_completed" || entry.event_type === "backlog_completed";
             return (
-              <li key={entry.id} className={`guild-pulse__row ${isCompletion ? "guild-pulse__row--special" : ""}`}>
+              <div className={`guild-pulse__row ${isCompletion ? "guild-pulse__row--special" : ""}`}>
                 <MiniAvatar profile={entry.profile} />
                 <div className="guild-pulse__row-body">
                   <span className="guild-pulse__row-text">
@@ -77,10 +77,10 @@ export default function GuildPulseCard({ userId, onGoToGuilds }) {
                     <CollegeIcon collegeId={college} size={14} />
                   </span>
                 )}
-              </li>
+              </div>
             );
-          })}
-        </ul>
+          }}
+        />
       )}
     </div>
   );

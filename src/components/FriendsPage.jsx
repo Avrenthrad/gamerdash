@@ -14,6 +14,7 @@ import {
 import { displayName } from "../lib/guilds";
 import MiniAvatar from "./MiniAvatar";
 import ConfirmDialog from "./ConfirmDialog";
+import FriendMasteryChart from "./FriendMasteryChart";
 
 export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCreateAccount, onGoToInbox }) {
   const [myCode, setMyCode] = useState("");
@@ -227,6 +228,8 @@ export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCr
         <h1 className="price-page__title">Friends</h1>
         <p className="price-page__subtitle">Real, mutual connections — add someone by their friend code or Lykodex username.</p>
       </div>
+
+      <FriendMasteryChart userId={userId} />
 
       <div className="friend-code-row">
         <span className="friend-code-row__code">{myCode || "…"}</span>
