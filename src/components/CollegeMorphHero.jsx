@@ -122,6 +122,8 @@ export default function CollegeMorphHero() {
       const colorTo = getCssColor(BADGE_COLOR[nextCollege]);
       const color = mixColor(colorFrom, colorTo, morphT);
 
+      drawGlow(ctx, color);
+
       ctx.strokeStyle = color;
       ctx.lineWidth = 1;
       ctx.globalAlpha = 0.3;
@@ -188,6 +190,7 @@ export default function CollegeMorphHero() {
     const pts = CONSTELLATION_SHAPES[currentCollege];
     const color = getCssColor(BADGE_COLOR[currentCollege]);
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    drawGlow(ctx, color);
     ctx.strokeStyle = color;
     ctx.lineWidth = 1;
     ctx.globalAlpha = 0.3;
@@ -209,11 +212,33 @@ export default function CollegeMorphHero() {
 
   return (
     <div ref={containerRef} className="college-morph-hero">
-      <div className="college-morph-hero__glow" style={{ "--glow-color": BADGE_COLOR[currentCollege] }} />
       <canvas ref={canvasRef} className="college-morph-hero__canvas" style={{ width: CANVAS_SIZE, height: CANVAS_SIZE }} />
       <span className="college-morph-hero__label">{LABELS[morphing ? nextCollege : currentCollege]}</span>
     </div>
   );
+}
+
+// Ambient glow drawn straight into the canvas rather than a separate
+// CSS box-shadow-blurred div — the previous div-based glow rendered as
+// a hard-edged solid black circle instead of a soft colored blur on at
+// least one real device/WebView combination (confirmed via screenshot,
+// never reproduced or explained despite the CSS looking correct), so
+// moving it here trades an unreliable cross-engine CSS blur for a
+// canvas primitive that already proved consistent under manual testing.
+function drawGlow(ctx, color) {
+  const cx = CANVAS_SIZE / 2;
+  const cy = CANVAS_SIZE / 2;
+  const gradient = ctx.createRadialGradient(cx, cy, 10, cx, cy, CANVAS_SIZE / 2);
+  gradient.addColorStop(0, withAlpha(color, 0.35));
+  gradient.addColorStop(1, withAlpha(color, 0));
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+}
+
+function withAlpha(rgbOrHex, alpha) {
+  const rgb = rgbOrHex.startsWith("rgb") ? rgbOrHex.match(/\d+/g).map(Number) : hexToRgb(rgbOrHex);
+  if (!rgb) return rgbOrHex;
+  return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
 }
 
 // BADGE_COLOR entries are CSS custom-property references (e.g.

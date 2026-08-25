@@ -6528,18 +6528,6 @@ html[data-mode="light"] .current-rotation {
   border-radius: var(--radius-xl);
 }
 
-.college-morph-hero__glow {
-  position: absolute;
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  opacity: 0.4;
-  background-color: transparent;
-  box-shadow: 0 0 140px 90px var(--glow-color, var(--sky));
-  transition: box-shadow 1.2s ease;
-  pointer-events: none;
-}
-
 .college-morph-hero__canvas {
   position: relative;
 }
