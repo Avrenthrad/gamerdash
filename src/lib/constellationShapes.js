@@ -28,10 +28,15 @@ export const CONSTELLATION_SHAPES = {
     [32, 58], [46, 40], [58, 50], [70, 36], [82, 48], [96, 38],
     [112, 58], [112, 80], [112, 108], [72, 108], [32, 108], [32, 80],
   ],
-  // Trophy: cup rim, cup body, stem, base.
+  // Trophy: cup rim, down the right side through the neck to the
+  // base, straight across, back up the left side. The two neck/stem
+  // points on each side sit adjacent to their own side's path here
+  // (not both in the middle of the array) — putting them out of
+  // perimeter order self-intersects into an hourglass instead of a
+  // trophy once particles connect point-to-point.
   collectibles: [
-    [52, 35], [75, 28], [98, 35], [94, 55], [80, 68], [80, 80],
-    [95, 100], [105, 112], [45, 112], [55, 100], [70, 80], [56, 55],
+    [52, 35], [75, 28], [98, 35], [96, 52], [84, 64], [88, 90],
+    [102, 104], [102, 112], [48, 112], [48, 104], [66, 90], [54, 64],
   ],
   // d20: rounded dodecagon standing in for a many-sided die.
   tabletop: [
