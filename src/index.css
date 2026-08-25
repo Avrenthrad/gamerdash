@@ -1,56 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
 
-/* Tailwind utilities only — no Preflight, so it doesn't reset/override
-   the hand-built design system below. */
-@import "tailwindcss/theme.css" layer(theme);
-@import "tailwindcss/utilities.css" layer(utilities);
-
-/* Theme tokens aliased from the existing CSS variables (defined below in
-   :root and the data-mode/data-accent overrides). `inline` makes Tailwind
-   substitute the var() reference directly into each generated utility
-   instead of adding its own redirect through a duplicate custom property
-   — so bg-accent, font-display, rounded-lg, shadow-md etc. always track
-   the live theme-switcher value rather than a value frozen at page load. */
-@theme inline {
-  --color-bg: var(--bg);
-  --color-surface: var(--surface);
-  --color-surface-raised: var(--surface-raised);
-  --color-border: var(--border);
-  --color-text: var(--text);
-  --color-text-muted: var(--text-muted);
-  --color-text-tertiary: var(--text-tertiary);
-  --color-text-on-accent: var(--text-on-accent);
-
-  --color-accent: var(--accent);
-  --color-accent-deep: var(--accent-deep);
-  --color-accent-bright: var(--accent-bright);
-
-  --color-amber: var(--amber);
-  --color-teal: var(--teal);
-  --color-violet: var(--violet);
-  --color-rose: var(--rose);
-  --color-sky: var(--sky);
-  --color-lime: var(--lime);
-
-  --font-display: var(--font-display);
-  --font-body: var(--font-body);
-  --font-mono: var(--font-mono);
-
-  --radius-sm: var(--radius-sm);
-  --radius-md: var(--radius-md);
-  --radius-lg: var(--radius-lg);
-  --radius-xl: var(--radius-xl);
-  --radius-pill: var(--radius-pill);
-
-  --shadow-sm: var(--shadow-sm);
-  --shadow-md: var(--shadow-md);
-  --shadow-lg: var(--shadow-lg);
-
-  --ease-standard: var(--ease-standard);
-  --duration-fast: var(--duration-fast);
-  --duration-base: var(--duration-base);
-}
-
 :root {
   /* Base surfaces — vault-black / parchment-gold theme. Warm neutrals
      throughout (not cool grays) so black and white both read as
