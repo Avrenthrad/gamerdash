@@ -4,7 +4,7 @@
 // count, if any) that opens into one thread at a time.
 
 import { useEffect, useState } from "react";
-import { fetchInboxList, fetchThread, sendMessage, markThreadRead } from "../lib/messages";
+import { fetchInboxList, fetchThread, sendMessage, markThreadRead, fetchReadReceiptsEnabled } from "../lib/messages";
 import { relativeTime } from "./price/priceUtils";
 import MiniAvatar from "./MiniAvatar";
 
@@ -14,7 +14,7 @@ function displayName(profile) {
   return full || profile.username || "Someone";
 }
 
-export default function InboxPage({ onBack, userId, isLoggedIn, onSignIn, onCreateAccount }) {
+export default function InboxPage({ onBack, userId, isLoggedIn, onSignIn, onCreateAccount, readReceiptsEnabled }) {
   const [conversations, setConversations] = useState([]);
   const [status, setStatus] = useState("loading");
   const [activeFriend, setActiveFriend] = useState(null);
@@ -56,6 +56,7 @@ export default function InboxPage({ onBack, userId, isLoggedIn, onSignIn, onCrea
         friendId={activeFriend.friend_id}
         friendProfile={activeFriend.profile}
         onBack={closeThread}
+        readReceiptsEnabled={readReceiptsEnabled}
       />
     );
   }
@@ -115,14 +116,20 @@ export default function InboxPage({ onBack, userId, isLoggedIn, onSignIn, onCrea
   );
 }
 
-function ThreadView({ userId, friendId, friendProfile, onBack }) {
+function ThreadView({ userId, friendId, friendProfile, onBack, readReceiptsEnabled }) {
   const [messages, setMessages] = useState([]);
   const [status, setStatus] = useState("loading");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
+  const [friendReadReceiptsEnabled, setFriendReadReceiptsEnabled] = useState(true);
+
+  const canSeeReadReceipts = readReceiptsEnabled && friendReadReceiptsEnabled;
 
   useEffect(() => {
     load();
+    fetchReadReceiptsEnabled(friendId)
+      .then(setFriendReadReceiptsEnabled)
+      .catch((err) => console.error("Failed to load friend's read receipts setting:", err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [friendId]);
 
@@ -171,12 +178,20 @@ function ThreadView({ userId, friendId, friendProfile, onBack }) {
       {status === "ready" && (
         <div className="dm-thread">
           {messages.length === 0 && <p className="panel__status">No messages yet — say hello below.</p>}
-          {messages.map((m) => (
-            <div key={m.id} className={`dm-bubble ${m.sender_id === userId ? "dm-bubble--mine" : ""}`}>
-              <span className="dm-bubble__body">{m.body}</span>
-              <span className="dm-bubble__meta">{relativeTime(m.created_at)}</span>
-            </div>
-          ))}
+          {messages.map((m, i) => {
+            const isMine = m.sender_id === userId;
+            const isLastRead =
+              isMine && !!m.read_at && !messages.slice(i + 1).some((later) => later.sender_id === userId);
+            return (
+              <div key={m.id} className={`dm-bubble ${isMine ? "dm-bubble--mine" : ""}`}>
+                <span className="dm-bubble__body">{m.body}</span>
+                <span className="dm-bubble__meta">
+                  {relativeTime(m.created_at)}
+                  {isLastRead && canSeeReadReceipts && " · Read"}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
 

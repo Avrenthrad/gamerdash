@@ -90,6 +90,8 @@ export default function AccountSettingsPage({
   onSelectedCollegesChange,
   shareActivityWithGuilds,
   onShareActivityWithGuildsChange,
+  readReceiptsEnabled,
+  onReadReceiptsEnabledChange,
   userId,
   onGoToFriends,
 }) {
@@ -388,6 +390,23 @@ export default function AccountSettingsPage({
               type="checkbox"
               checked={shareActivityWithGuilds}
               onChange={(e) => onShareActivityWithGuildsChange(e.target.checked)}
+            />
+            <span className="toggle-switch__track" />
+            <span className="toggle-switch__thumb" />
+          </span>
+        </label>
+
+        <p className="settings-card__note">
+          Mutual — you only see when a friend's read your messages if they also have this on,
+          and turning it off hides your own read status from them too.
+        </p>
+        <label className="toggle-row">
+          <span className="toggle-row__label">Read receipts</span>
+          <span className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={readReceiptsEnabled}
+              onChange={(e) => onReadReceiptsEnabledChange(e.target.checked)}
             />
             <span className="toggle-switch__track" />
             <span className="toggle-switch__thumb" />

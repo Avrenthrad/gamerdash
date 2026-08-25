@@ -10,6 +10,16 @@
 import { supabase } from "./supabaseClient";
 import { fetchFriends } from "./friends";
 
+// Mutual read receipts — see profiles.read_receipts_enabled. The
+// caller combines this with their OWN setting (already held in
+// AppContext, not fetched here) to decide whether to actually render
+// a read indicator: both sides have to have it on.
+export async function fetchReadReceiptsEnabled(friendId) {
+  const { data, error } = await supabase.rpc("get_read_receipts_settings", { p_ids: [friendId] });
+  if (error) throw error;
+  return data?.[0]?.read_receipts_enabled ?? true;
+}
+
 export async function fetchThread(userId, friendId) {
   const { data, error } = await supabase
     .from("direct_messages")

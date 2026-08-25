@@ -113,6 +113,8 @@ export default function App() {
     setCurrency,
     shareActivityWithGuilds,
     setShareActivityWithGuilds,
+    readReceiptsEnabled,
+    setReadReceiptsEnabled,
     xbxpricesKey,
     setXbxpricesKey,
     platpricesKey,
@@ -347,6 +349,8 @@ export default function App() {
                 onSelectedCollegesChange={setSelectedColleges}
                 shareActivityWithGuilds={shareActivityWithGuilds}
                 onShareActivityWithGuildsChange={setShareActivityWithGuilds}
+                readReceiptsEnabled={readReceiptsEnabled}
+                onReadReceiptsEnabledChange={setReadReceiptsEnabled}
                 userId={userId}
                 onGoToFriends={() => goTo("friends")}
               />
@@ -607,6 +611,7 @@ export default function App() {
               isLoggedIn={isLoggedIn}
               onSignIn={() => goTo("login", "login")}
               onCreateAccount={() => goTo("login", "signup")}
+              readReceiptsEnabled={readReceiptsEnabled}
             />
           )}
 

@@ -209,6 +209,11 @@ export function AppProvider({ children }) {
   const [wallpaperUrl, setWallpaperUrl] = useState(null);
   const [currency, setCurrency] = useState("AUD");
   const [shareActivityWithGuilds, setShareActivityWithGuilds] = useState(false);
+  // Mutual: you only see a friend's read receipt if THEY also have
+  // this on; disabling yours hides your own read status from them
+  // too, the same "both sides opted in, or neither sees anything"
+  // model most messaging apps use — see InboxPage.jsx.
+  const [readReceiptsEnabled, setReadReceiptsEnabled] = useState(true);
   const [xbxpricesKey, setXbxpricesKey] = useState("");
   const [platpricesKey, setPlatpricesKey] = useState("");
 
@@ -474,6 +479,7 @@ export function AppProvider({ children }) {
         setWallpaperUrl(profile.wallpaper_url || null);
         setCurrency(profile.currency || "AUD");
         setShareActivityWithGuilds(profile.share_activity_with_guilds || false);
+        setReadReceiptsEnabled(profile.read_receipts_enabled !== false);
         setXbxpricesKey(profile.xbxprices_key || "");
         setPlatpricesKey(profile.platprices_key || "");
         if (profile.dashfeed_games) setGameToggles(profile.dashfeed_games);
@@ -540,6 +546,7 @@ export function AppProvider({ children }) {
         accent_color: accentColor,
         currency,
         share_activity_with_guilds: shareActivityWithGuilds,
+        read_receipts_enabled: readReceiptsEnabled,
         linked_steam_id: linkedSteamId,
         dashboard_layout: dashboardLayout,
         platform_order: platformOrder,
@@ -565,6 +572,7 @@ export function AppProvider({ children }) {
     accentColor,
     currency,
     shareActivityWithGuilds,
+    readReceiptsEnabled,
     linkedSteamId,
     dashboardLayout,
     platformOrder,
@@ -871,6 +879,8 @@ export function AppProvider({ children }) {
       setCurrency,
       shareActivityWithGuilds,
       setShareActivityWithGuilds,
+      readReceiptsEnabled,
+      setReadReceiptsEnabled,
       xbxpricesKey,
       setXbxpricesKey,
       platpricesKey,
@@ -947,6 +957,7 @@ export function AppProvider({ children }) {
       wallpaperUrl,
       currency,
       shareActivityWithGuilds,
+      readReceiptsEnabled,
       xbxpricesKey,
       platpricesKey,
       toggleThemeMode,
