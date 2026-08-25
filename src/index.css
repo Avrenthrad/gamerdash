@@ -5885,10 +5885,10 @@ html[data-mode="light"] .current-rotation {
 
 .college-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 14px 32px;
   border-bottom: 1px solid var(--border);
-  overflow-x: auto;
 }
 
 .college-tabs__item {
@@ -6019,8 +6019,8 @@ html[data-mode="light"] .current-rotation {
     position: static;
     height: auto;
     flex-direction: row;
+    flex-wrap: wrap;
     gap: 8px;
-    overflow-x: auto;
     border-right: none;
     border-bottom: 1px solid var(--border);
     padding: 12px 16px;
@@ -7303,30 +7303,22 @@ html[data-mode="light"] .current-rotation {
   }
 }
 
-/* ---------- Horizontal Rhythm: lane primitive for mobile hub pages
-   ---------- see docs/superpowers/specs/2026-08-23-mobile-horizontal-
-   rhythm-design.md. `.h-lane` is a no-op above the breakpoint — the
-   `className` prop on <HorizontalLane> is what carries a container's
-   existing desktop layout (e.g. "gaming-hero-grid" keeps its current
-   grid CSS untouched on desktop). ---------- */
+/* ---------- Lane primitive for mobile hub pages ----------
+   Was a horizontal-scroll row (see git history for the original
+   "Horizontal Rhythm" design if ever needed) — reworked to a plain
+   vertical stack. Horizontal scrolling for navigation/content lanes
+   reads as dated and hides content behind an undiscoverable swipe, so
+   every page below the breakpoint now just stacks full-width instead.
+   `.h-lane` stays a no-op above the breakpoint — the `className` prop
+   on <HorizontalLane> still carries a container's existing desktop
+   layout (e.g. "gaming-hero-grid" keeps its current grid CSS
+   untouched on desktop). ---------- */
 
 .h-lane-title {
   display: none;
 }
 
 @media (max-width: 720px) {
-  /* .dash-layout uses align-items: flex-start (see rule above), so its
-     .dash flex child normally shrink-wraps to its content's max-content
-     width instead of stretching to the viewport. A lane with several
-     non-wrapping fixed-width children (flex: 0 0 auto) contributes the
-     *sum* of those widths to that max-content calculation — wide enough
-     to push .dash past the viewport and scroll the whole page
-     horizontally instead of just the lane. Pin .dash to the viewport
-     width here so only .h-lane itself scrolls.
-
-     Global on purpose — .dash's shrink-wrap-to-content sizing bug
-     (see above) affects every page below 720px, not just the ones this
-     plan touched, so the fix is global too. */
   .dash {
     width: 100%;
   }
@@ -7343,60 +7335,9 @@ html[data-mode="light"] .current-rotation {
 
   .h-lane {
     display: flex;
-    align-items: flex-start;
+    flex-direction: column;
     gap: 10px;
-    overflow-x: auto;
-    padding: 2px 2px 6px;
-    scroll-snap-type: x proximity;
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-
-  .h-lane::-webkit-scrollbar {
-    display: none;
-  }
-
-  .h-lane > * {
-    flex: 0 0 auto;
-    scroll-snap-align: start;
-  }
-
-  .h-lane > .presence-card,
-  .h-lane > .panel.guild-pulse {
-    width: 240px;
-    padding: 14px;
-  }
-
-  .h-lane > .presence-card .presence-card__title,
-  .h-lane > .panel.guild-pulse .panel__eyebrow {
-    font-size: 13px;
-  }
-
-  .h-lane.overview-grid > .overview-card {
-    width: 132px;
-    min-width: 132px;
-  }
-
-  .h-lane > .current-rotation {
-    width: 260px;
-    padding: 14px;
-  }
-
-  .h-lane.gaming-hero-grid > .panel.hero-card,
-  .h-lane.gaming-secondary-grid > .panel.hero-card {
-    width: 220px;
-  }
-
-  /* Higher specificity than ".panel.hero-card" above (which this card
-     also matches) — otherwise that 220px rule wins by specificity
-     regardless of source order and this 260px override never applies. */
-  .h-lane.gaming-hero-grid > .panel.hero-card.hero-card--continue-playing {
-    width: 260px;
-  }
-
-  .h-lane.gaming-hero-grid > .hero-card--continue-playing .hero-card__art-btn {
-    aspect-ratio: auto;
-    height: 120px;
+    padding: 2px 4px 6px;
   }
 
   .panel--wide,
@@ -7410,19 +7351,7 @@ html[data-mode="light"] .current-rotation {
   }
 
   .backlog-status-tabs {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding-bottom: 4px;
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-
-  .backlog-status-tabs::-webkit-scrollbar {
-    display: none;
-  }
-
-  .backlog-status-tabs > * {
-    flex: 0 0 auto;
+    flex-wrap: wrap;
   }
 }
 
