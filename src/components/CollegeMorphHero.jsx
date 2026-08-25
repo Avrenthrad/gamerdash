@@ -123,10 +123,11 @@ export default function CollegeMorphHero() {
       const color = mixColor(colorFrom, colorTo, morphT);
 
       drawGlow(ctx, color);
+      fillSilhouette(ctx, points, color);
 
       ctx.strokeStyle = color;
-      ctx.lineWidth = 1;
-      ctx.globalAlpha = 0.3;
+      ctx.lineWidth = 1.4;
+      ctx.globalAlpha = 0.55;
       for (let i = 0; i < points.length; i++) {
         const a = points[i];
         const b = points[(i + 1) % points.length];
@@ -191,9 +192,10 @@ export default function CollegeMorphHero() {
     const color = getCssColor(BADGE_COLOR[currentCollege]);
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
     drawGlow(ctx, color);
+    fillSilhouette(ctx, pts, color);
     ctx.strokeStyle = color;
-    ctx.lineWidth = 1;
-    ctx.globalAlpha = 0.3;
+    ctx.lineWidth = 1.4;
+    ctx.globalAlpha = 0.55;
     pts.forEach((p, i) => {
       const next = pts[(i + 1) % pts.length];
       ctx.beginPath();
@@ -233,6 +235,22 @@ function drawGlow(ctx, color) {
   gradient.addColorStop(1, withAlpha(color, 0));
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+}
+
+// The particles-and-faint-lines look alone never reads as a shape at a
+// glance — three rounds of adjusting point coordinates confirmed the
+// problem isn't the geometry, it's that nothing ever fills it. This
+// draws the actual silhouette as a soft translucent fill so the
+// outline registers as a solid recognizable mark, with the sparkle
+// dots/lines layered on top for the constellation texture.
+function fillSilhouette(ctx, points, color) {
+  ctx.beginPath();
+  ctx.moveTo(points[0][0], points[0][1]);
+  for (let i = 1; i < points.length; i++) ctx.lineTo(points[i][0], points[i][1]);
+  ctx.closePath();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = withAlpha(color, 0.22);
+  ctx.fill();
 }
 
 function withAlpha(rgbOrHex, alpha) {
