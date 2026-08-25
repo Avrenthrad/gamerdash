@@ -3517,6 +3517,7 @@ button { font-family: inherit; }
 /* ---------- Account gate: full page (protected views while logged out) ---------- */
 
 .account-gate-page {
+  width: 100%;
   max-width: 420px;
   margin: 60px auto 0;
   background: var(--surface);
@@ -5476,7 +5477,12 @@ html[data-mode="light"] .current-rotation {
   top: -80px;
   left: 50%;
   transform: translateX(-50%);
-  width: 480px;
+  /* Capped relative to the viewport, not just a flat 480px — on any
+     phone-width screen a flat 480px bled ~53px past each edge (since
+     it's centered wider than the container) and made the whole page
+     horizontally scrollable. This can never exceed the viewport
+     itself, so it can never cause that regardless of container width. */
+  width: min(480px, 100vw);
   height: 320px;
   background: radial-gradient(circle, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%);
   pointer-events: none;
