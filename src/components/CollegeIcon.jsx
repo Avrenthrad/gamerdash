@@ -45,21 +45,20 @@ function GlossOverlay({ clipId }) {
   );
 }
 
-function GamingGlyph() {
+// Rebuilt on the original flat design's body shape (a plain rounded
+// rect — already proven legible, never flagged) instead of the
+// freeform silhouette from the first glossy pass, which crammed
+// thumbsticks + D-pad + buttons into one small area and made the
+// D-pad/buttons nearly invisible (dark grey on dark grey). Shading is
+// now just a top-lit gradient on the body, with the D-pad/buttons in
+// a light silver tone for real contrast against the dark body.
+function GamingGlyph({ gradId }) {
   return (
     <>
-      <path
-        d="M4.5 12.6c0-2.6 2-4.4 5.3-4.4h4.4c3.3 0 5.3 1.8 5.3 4.4 0 1.7-.4 3.6-1 5-.6 1.4-1.5 2.2-2.5 2.2-.8 0-1.3-.5-1.9-1.3-.5-.7-.9-1.1-1.6-1.1h-2.4c-.7 0-1.1.4-1.6 1.1-.6.8-1.1 1.3-1.9 1.3-1 0-1.9-.8-2.5-2.2-.6-1.4-1-3.3-1-5z"
-        fill="#2B2F36"
-      />
-      <path d="M5.3 10.3c1-1 2.7-1.6 4.5-1.6h4.4c1.8 0 3.5.6 4.5 1.6-.9-.5-2.3-.8-4-.8h-5.4c-1.7 0-3.1.3-4 .8z" fill="#454B55" />
-      <circle cx="9" cy="9.2" r="1.7" fill="#232629" />
-      <circle cx="15" cy="9.2" r="1.7" fill="#232629" />
-      <circle cx="9" cy="8.9" r="0.8" fill="#565E6B" />
-      <circle cx="15" cy="8.9" r="0.8" fill="#565E6B" />
-      <path d="M8.1 11.8v3.2M6.5 13.4h3.2" stroke="#8B93A1" strokeWidth="1.3" strokeLinecap="round" />
-      <circle cx="15.1" cy="12.5" r="1" fill="#8B93A1" />
-      <circle cx="17.4" cy="14.2" r="1" fill="#8B93A1" />
+      <rect x="4" y="9" width="16" height="8" rx="4" fill={`url(#${gradId})`} />
+      <path d="M7.4 11.6v3.2M5.8 13.2h3.2" stroke="#C7CDD6" strokeWidth="1.4" strokeLinecap="round" />
+      <circle cx="15.1" cy="12.3" r="1" fill="#C7CDD6" />
+      <circle cx="17.6" cy="14.1" r="1" fill="#C7CDD6" />
     </>
   );
 }
@@ -86,20 +85,24 @@ function EntertainmentGlyph() {
   );
 }
 
-// Faceted gem — swapped in for the old trophy per the reference.
-// Facet layout: one bright top facet, two upper side facets, two
-// lower side facets, shaded as if lit from the upper left (same
-// direction as GlossOverlay above) so the whole badge reads as one
-// consistent light source.
+// Faceted gem — swapped in for the old trophy per the reference. The
+// first pass had 5 facet paths built from independent guesses at
+// coordinates, so their edges didn't actually line up — overlaps and
+// gaps between facets made it read as a muddy blob rather than a gem.
+// Rebuilt from ONE shared vertex set (TL, TR, L, R, B, and interior
+// point C — which sits exactly on the L-R line, at their midpoint) so
+// the 5 triangles below tile the outer diamond edge-to-edge with zero
+// overlap and zero gap. Shaded as if lit from the upper left, same
+// direction as GlossOverlay, so the whole badge reads as one light
+// source: brightest at top, darkest at lower-right.
 function CollectiblesGlyph() {
   return (
     <>
-      <path d="M8 6h8l3 3-7 10-7-10z" fill="#B9791F" />
-      <path d="M8 6h8l-4 3z" fill="#FFEFC2" />
-      <path d="M8 6l-3 3 7 10-4-10z" fill="#FCDD8E" />
-      <path d="M16 6l3 3-7 10 4-10z" fill="#E3A93F" />
-      <path d="M5 9h14l-7 10z" fill="#DDA23B" />
-      <path d="M5 9h7l-7 0 3.5 3.5z" fill="#F0BE55" opacity="0.5" />
+      <path d="M8 6 L16 6 L12 9 Z" fill="#FFEFC2" stroke="#8C6015" strokeWidth="0.4" strokeOpacity="0.5" />
+      <path d="M8 6 L12 9 L5 9 Z" fill="#FCDD8E" stroke="#8C6015" strokeWidth="0.4" strokeOpacity="0.5" />
+      <path d="M16 6 L19 9 L12 9 Z" fill="#E3A93F" stroke="#8C6015" strokeWidth="0.4" strokeOpacity="0.5" />
+      <path d="M5 9 L12 9 L12 19 Z" fill="#DDA23B" stroke="#8C6015" strokeWidth="0.4" strokeOpacity="0.5" />
+      <path d="M19 9 L12 9 L12 19 Z" fill="#B9791F" stroke="#8C6015" strokeWidth="0.4" strokeOpacity="0.5" />
     </>
   );
 }
@@ -134,6 +137,7 @@ export default function CollegeIcon({ collegeId, size = 18, active = true, class
   if (!Glyph) return null;
 
   const clipId = `${uid}-clip`;
+  const gradId = `${uid}-gaming-body`;
 
   return (
     <svg
@@ -148,9 +152,13 @@ export default function CollegeIcon({ collegeId, size = 18, active = true, class
         <clipPath id={clipId}>
           <circle cx="12" cy="12" r="11" />
         </clipPath>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#454B55" />
+          <stop offset="1" stopColor="#1D2025" />
+        </linearGradient>
       </defs>
       <circle cx="12" cy="12" r="11" fill={BADGE_COLOR[collegeId]} />
-      <Glyph />
+      <Glyph gradId={gradId} />
       <GlossOverlay clipId={clipId} />
     </svg>
   );
