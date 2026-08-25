@@ -21,3 +21,9 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 export const supabaseConfigured = Boolean(url && anonKey);
 
 export const supabase = supabaseConfigured ? createClient(url, anonKey) : null;
+
+// Both already meant to be public (see file header) — exported so
+// lib/auth.js can hit Supabase's own REST endpoints directly (its own
+// /auth/v1/settings, not the JS client) without duplicating them.
+export const supabaseUrl = url;
+export const supabaseAnonKey = anonKey;

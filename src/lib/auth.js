@@ -1,9 +1,31 @@
 // Real email/password + OAuth auth via Supabase.
 
-import { supabase } from "./supabaseClient";
+import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import { isPackagedApp, isTauri } from "./platform";
 import { Browser } from "@capacitor/browser";
 import { open as openInSystemBrowser } from "@tauri-apps/plugin-shell";
+
+// Which OAuth providers are actually enabled in Supabase right now —
+// checked BEFORE ever attempting a sign-in. Without this, clicking a
+// not-yet-enabled provider (Google, until its dashboard setup is done)
+// navigates the whole page to Supabase's own /authorize endpoint,
+// which 400s with a raw JSON error body — supabase-js's
+// signInWithOAuth() doesn't reject for this case (constructing the
+// redirect URL is a pure client-side operation; it has no idea
+// whether the provider is enabled server-side), so there was never
+// actually a JS exception here to catch and turn into a friendly
+// message. This is Supabase's own public settings endpoint (needs the
+// anon key as a header, not a secret — same key already shipped to
+// every client) rather than anything provider-specific.
+export async function fetchEnabledOAuthProviders() {
+  if (!supabaseUrl || !supabaseAnonKey) return {};
+  const res = await fetch(`${supabaseUrl}/auth/v1/settings`, {
+    headers: { apikey: supabaseAnonKey },
+  });
+  if (!res.ok) return {};
+  const data = await res.json();
+  return data?.external || {};
+}
 
 // Packaged apps can't complete a same-window redirect back from an
 // external OAuth page the way a normal website tab can — the OAuth
