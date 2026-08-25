@@ -6591,17 +6591,14 @@ html[data-mode="light"] .current-rotation {
   font-size: 11.5px;
 }
 
-/* ---------- College Morph hero ("Constellation Marks" — drifting
-   particles loosely tracing one College's silhouette, cross-fading
-   into the next) ---------- */
+/* ---------- College Morph hero — the real College icon crossfading
+   between Colleges, over an ambient drifting-particle field ---------- */
 
 .college-morph-hero {
   position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
   min-height: 320px;
   background: var(--bg);
   overflow: hidden;
@@ -6609,11 +6606,33 @@ html[data-mode="light"] .current-rotation {
 }
 
 .college-morph-hero__canvas {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+}
+
+.college-morph-hero__mark {
   position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 420ms ease, transform 420ms ease;
+}
+
+.college-morph-hero__mark--out {
+  opacity: 0;
+  transform: scale(0.85);
+}
+
+.college-morph-hero__icon {
+  filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.1));
 }
 
 .college-morph-hero__label {
-  position: relative;
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.14em;
