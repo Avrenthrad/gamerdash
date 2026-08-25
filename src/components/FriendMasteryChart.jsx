@@ -101,15 +101,27 @@ export default function FriendMasteryChart({ userId }) {
     const areaSeries = chart.addSeries(AreaSeries, { lineWidth: 2 });
     apiRef.current = { chart, series: areaSeries };
 
-    function handleResize() {
+    // ResizeObserver, not just a window resize listener — this card
+    // sits in a plain page flow, so its width can also change from
+    // sibling content loading in or the panel's own layout settling,
+    // neither of which fires a window resize event.
+    const resizeObserver = new ResizeObserver(() => {
       if (containerRef.current) chart.applyOptions({ width: containerRef.current.clientWidth });
-    }
-    window.addEventListener("resize", handleResize);
+    });
+    resizeObserver.observe(containerRef.current);
+
     return () => {
-      window.removeEventListener("resize", handleResize);
+      resizeObserver.disconnect();
       chart.remove();
     };
   }, []);
+
+  // Clamp whenever the underlying list shrinks (e.g. a refetch after
+  // userId changes returns fewer friends) so index never points past
+  // the end — same safety net as SlidingBanner.jsx.
+  useEffect(() => {
+    if (index >= series.length) setIndex(0);
+  }, [series.length, index]);
 
   const current = series[index] || null;
 
