@@ -180,14 +180,16 @@ function ThreadView({ userId, friendId, friendProfile, onBack, readReceiptsEnabl
           {messages.length === 0 && <p className="panel__status">No messages yet — say hello below.</p>}
           {messages.map((m, i) => {
             const isMine = m.sender_id === userId;
-            const isLastRead =
-              isMine && !!m.read_at && !messages.slice(i + 1).some((later) => later.sender_id === userId);
+            const isLastMine = isMine && !messages.slice(i + 1).some((later) => later.sender_id === userId);
+            const status = isLastMine ? (canSeeReadReceipts && m.read_at ? "Read" : "Delivered") : null;
             return (
-              <div key={m.id} className={`dm-bubble ${isMine ? "dm-bubble--mine" : ""}`}>
-                <span className="dm-bubble__body">{m.body}</span>
+              <div key={m.id} className={`dm-row ${isMine ? "dm-row--mine" : ""}`}>
+                <div className={`dm-bubble ${isMine ? "dm-bubble--mine" : ""}`}>
+                  <span className="dm-bubble__body">{m.body}</span>
+                </div>
                 <span className="dm-bubble__meta">
                   {relativeTime(m.created_at)}
-                  {isLastRead && canSeeReadReceipts && " · Read"}
+                  {status && ` · ${status}`}
                 </span>
               </div>
             );

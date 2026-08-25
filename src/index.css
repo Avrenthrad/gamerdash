@@ -6961,12 +6961,20 @@ html[data-mode="light"] .current-rotation {
   margin: 16px 0;
 }
 
-.dm-bubble {
+.dm-row {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   align-items: flex-start;
   max-width: 70%;
+}
+
+.dm-row--mine {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.dm-bubble {
   padding: 10px 14px;
   border-radius: var(--radius-lg);
   background: var(--surface-raised);
@@ -6974,8 +6982,6 @@ html[data-mode="light"] .current-rotation {
 }
 
 .dm-bubble--mine {
-  align-self: flex-end;
-  align-items: flex-end;
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
@@ -6990,10 +6996,7 @@ html[data-mode="light"] .current-rotation {
 .dm-bubble__meta {
   font-size: 11px;
   color: var(--text-tertiary);
-}
-
-.dm-bubble--mine .dm-bubble__meta {
-  color: rgba(255, 255, 255, 0.75);
+  padding: 0 4px;
 }
 
 .dm-compose {
