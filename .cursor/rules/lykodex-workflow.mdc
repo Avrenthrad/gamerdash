@@ -1,0 +1,15 @@
+---
+description: Lykodex shared workflow — read HANDOFF.md first
+alwaysApply: true
+---
+
+# Lykodex workflow
+
+Read `HANDOFF.md` before starting work. It is the shared source of truth with Claude Code (no live link between agents).
+
+- **`main` is the only stream.** Do not recreate old V0 branches.
+- **V0** designs one screen or component at a time against `DESIGN_TOKENS.md`. Never import or boot this repo in v0 — its preview parses our Tailwind CSS as JavaScript (`SyntaxError: Unexpected token '*'`).
+- **Cursor** wires V0 output into the real Vite app.
+- **Claude Code** handles troubleshooting, verification, and some backend/native work, per task.
+
+Before committing: `git diff` any file you did not fully author this session, then `npx oxlint <files>` and `npm run build` (both clean). Live-check visual changes. Match on-disk import casing for Linux CI.

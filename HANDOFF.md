@@ -7,13 +7,21 @@ is how context actually crosses over. Keep it current: whoever picks up a
 thread the other one dropped should be able to read this and know what's
 going on without re-deriving it.
 
-**Division of labor (as of 2026-08-26):** V0 generates UI designs, which
-get imported into Cursor. Cursor owns wiring that UI up and general
-feature build-out. Claude Code owns troubleshooting, testing/verification,
-and some feature builds of its own (backend/Supabase work, native
-platform plumbing, bug fixes) — delegated by the user per-task, not a
-fixed split. If you're picking up a task the other agent started, check
-the "In progress / recently touched" section below first.
+**Starting point (2026-08-27):** `main` is the only stream. Old V0 chats
+were archived; the stalled `v0/runtime-error-resolution-baf343a0` branch
+(Commander View / social analytics / college-hero rewrite) was deleted
+unmerged — do not recreate it or port from memory. New UI starts from
+isolated V0 screens against `DESIGN_TOKENS.md`, wired into this repo on
+`main`.
+
+**Division of labor (as of 2026-08-27):** V0 generates isolated UI
+screens/components from `DESIGN_TOKENS.md` — never the full app. Cursor
+owns wiring that UI into the real Vite app and general feature build-out.
+Claude Code owns troubleshooting, testing/verification, and some feature
+builds of its own (backend/Supabase work, native platform plumbing, bug
+fixes) — delegated by the user per-task, not a fixed split. If you're
+picking up a task the other agent started, check the "In progress /
+recently touched" section below first.
 
 **If you're V0:** design ONE screen/component at a time against
 `DESIGN_TOKENS.md`, in isolation — do not try to import or boot this
@@ -110,25 +118,14 @@ builds and runs clean everywhere else it's been tested).
 
 ## Open branches
 
-- `v0/runtime-error-resolution-baf343a0` — V0's active branch, forked
-  from `main` at `840e9eb`. Deliberately NOT merged into `main` (user's
-  call, 2026-08-26) — this is meant to flow V0 → Cursor next, not get
-  merged in directly. Contains real, substantive UI work: renames
-  Overview to "Commander View" with a new landing layout
-  (`.commander-landing`), adds a social analytics section (KPIs +
-  charts), and a from-scratch redesign of `CollegeMorphHero` (orbit
-  ring / topline status bar / rail indicator — structurally different
-  from the glossy-badge hero currently on `main`, not just restyled —
-  matching JSX changes went with it, not just CSS). Also has its own
-  copies of the Tailwind-integration and this-file commits
-  (content-identical to `main`'s `f07d642`/`afdabcd`, just different
-  hashes — confirmed via diff, not a conflict). If picking this branch
-  up: it was 2 ahead / 11 behind its own remote as of the last check
-  (2026-08-26) due to a V0 sandbox mount corruption that got re-synced
-  mid-session — re-verify that gap before assuming it's current.
+None. `main` / `origin/main` is the only stream.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-27 — Reset to a single starting point: V0 chats archived, stalled
+  `v0/runtime-error-resolution-baf343a0` branch deleted unmerged (Commander
+  View work is gone — next UI pass is a fresh isolated V0 screen, not a
+  port of that branch). `DESIGN_TOKENS.md` is what V0 should be given.
 - 2026-08-26 — Finished the Tailwind integration properly (packages +
   vite.config.js + CSS all in one commit, `f07d642`) after the earlier
   accidental partial-commit broke CI. Confirmed working on both release

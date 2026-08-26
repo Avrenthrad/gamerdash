@@ -24,6 +24,9 @@ npm-debug.log*
 
 .vercel
 
+# Claude Code local launch/debug config and agent worktrees
+.claude/
+
 # Tauri updater signing key — never commit. The .pub key (safe, public)
 # is embedded directly in tauri.conf.json instead of read from a file.
 src-tauri/*.key
