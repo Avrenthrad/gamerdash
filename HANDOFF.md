@@ -15,6 +15,14 @@ platform plumbing, bug fixes) — delegated by the user per-task, not a
 fixed split. If you're picking up a task the other agent started, check
 the "In progress / recently touched" section below first.
 
+**If you're V0:** design ONE screen/component at a time against
+`DESIGN_TOKENS.md`, in isolation — do not try to import or boot this
+full repo in your own preview. See the gotchas below for why that
+reliably breaks (your embedded preview pane parses this project's
+Tailwind CSS `@import`s as JavaScript and throws `SyntaxError:
+Unexpected token '*'` — confirmed not a bug in the actual code, which
+builds and runs clean everywhere else it's been tested).
+
 ## Project shape
 
 - React 19 + Vite, hash-based custom routing (no react-router) — see
