@@ -100,6 +100,25 @@ the "In progress / recently touched" section below first.
   pixel-level review, publish a small standalone HTML preview as an
   Artifact instead and have the user look at that.
 
+## Open branches
+
+- `v0/runtime-error-resolution-baf343a0` — V0's active branch, forked
+  from `main` at `840e9eb`. Deliberately NOT merged into `main` (user's
+  call, 2026-08-26) — this is meant to flow V0 → Cursor next, not get
+  merged in directly. Contains real, substantive UI work: renames
+  Overview to "Commander View" with a new landing layout
+  (`.commander-landing`), adds a social analytics section (KPIs +
+  charts), and a from-scratch redesign of `CollegeMorphHero` (orbit
+  ring / topline status bar / rail indicator — structurally different
+  from the glossy-badge hero currently on `main`, not just restyled —
+  matching JSX changes went with it, not just CSS). Also has its own
+  copies of the Tailwind-integration and this-file commits
+  (content-identical to `main`'s `f07d642`/`afdabcd`, just different
+  hashes — confirmed via diff, not a conflict). If picking this branch
+  up: it was 2 ahead / 11 behind its own remote as of the last check
+  (2026-08-26) due to a V0 sandbox mount corruption that got re-synced
+  mid-session — re-verify that gap before assuming it's current.
+
 ## In progress / recently touched (most recent first)
 
 - 2026-08-26 — Finished the Tailwind integration properly (packages +
