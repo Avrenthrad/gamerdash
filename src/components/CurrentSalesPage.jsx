@@ -66,7 +66,7 @@ export default function CurrentSalesPage({ onBack, currency }) {
               <li key={`${deal.title}-${i}`} className="wishlist-card">
                 <div className="wishlist-card__main">
                   {deal.thumb ? (
-                    <img src={deal.thumb} alt="" className="wishlist-card__thumb" />
+                    <img src={deal.thumb} alt="" className="wishlist-card__thumb" loading="lazy" decoding="async" />
                   ) : (
                     <div className="wishlist-card__thumb wishlist-card__thumb--placeholder" />
                   )}

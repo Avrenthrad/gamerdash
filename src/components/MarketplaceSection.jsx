@@ -155,7 +155,7 @@ function BrowseTab({ category, game, userId, isLoggedIn, rates, currency }) {
         <div key={listing.id} className="wishlist-card">
           <div className="wishlist-card__thumb-wrap">
             {listing.photo_url ? (
-              <img src={listing.photo_url} alt="" className="wishlist-card__thumb" />
+              <img src={listing.photo_url} alt="" className="wishlist-card__thumb" loading="lazy" decoding="async" />
             ) : (
               <div className="wishlist-card__thumb wishlist-card__thumb--placeholder" />
             )}
@@ -326,7 +326,7 @@ function PostTab({ category, game, userId, onPosted }) {
         {photoFile ? "Change photo" : "Add a photo"}
         <input type="file" accept="image/*" onChange={handlePhotoChange} hidden />
       </label>
-      {photoPreview && <img src={photoPreview} alt="" className="search-result-card__thumb" style={{ width: "160px", height: "90px" }} />}
+      {photoPreview && <img src={photoPreview} alt="" className="search-result-card__thumb" style={{ width: "160px", height: "90px" }} decoding="async" />}
       <button type="submit" className="price-search__button" disabled={status === "saving"} style={{ alignSelf: "flex-start" }}>
         {status === "saving" ? "Posting…" : "Post listing"}
       </button>
@@ -383,7 +383,7 @@ function MyListingsTab({ category, game, userId, rates, currency }) {
         <li key={listing.id} className="backlog-card" style={{ flexDirection: "column", alignItems: "stretch" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
             {listing.photo_url ? (
-              <img src={listing.photo_url} alt="" className="backlog-card__thumb" />
+              <img src={listing.photo_url} alt="" className="backlog-card__thumb" loading="lazy" decoding="async" />
             ) : (
               <div className="backlog-card__thumb backlog-card__thumb--placeholder" />
             )}
@@ -590,7 +590,7 @@ function MyOffersTab({ userId, rates, currency }) {
       {offers.map((offer) => (
         <li key={offer.id} className="backlog-card">
           {offer.listing?.photo_url ? (
-            <img src={offer.listing.photo_url} alt="" className="backlog-card__thumb" />
+            <img src={offer.listing.photo_url} alt="" className="backlog-card__thumb" loading="lazy" decoding="async" />
           ) : (
             <div className="backlog-card__thumb backlog-card__thumb--placeholder" />
           )}

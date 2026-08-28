@@ -5,7 +5,7 @@
 export const COLLEGES = [
   { id: "gaming", label: "Gaming", tagline: "Prices, library, backlog, and friends.", built: true },
   { id: "tcg", label: "TCG", tagline: "Magic the Gathering — search, collect, build decks.", built: true },
-  { id: "entertainment", label: "Entertainment", tagline: "Movies, TV, anime, and books.", built: true },
-  { id: "collectibles", label: "Collectibles", tagline: "Your real shelf — Pops, statues, LEGO, and more.", built: true },
-  { id: "tabletop", label: "Tabletop / RP", tagline: "Real campaigns, armies, and D&D 5e rules search.", built: true },
+  { id: "entertainment", label: "Library", tagline: "Movies, TV, anime, and books.", built: true },
+  { id: "collectibles", label: "Loot", tagline: "Your real shelf — Pops, statues, LEGO, and more.", built: true },
+  { id: "tabletop", label: "Wartable", tagline: "Real campaigns, armies, and D&D 5e rules search.", built: true },
 ];

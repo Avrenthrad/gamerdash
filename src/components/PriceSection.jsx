@@ -63,7 +63,7 @@ export default function PriceSection({ wishlist, onOpenFullPage, currency }) {
               return (
                 <li key={entry.id} className="wishlist-preview-row">
                   {deal?.thumb ? (
-                    <img src={deal.thumb} alt="" className="wishlist-preview-row__thumb" />
+                    <img src={deal.thumb} alt="" className="wishlist-preview-row__thumb" decoding="async" />
                   ) : (
                     <div className="wishlist-preview-row__thumb wishlist-preview-row__thumb--placeholder" />
                   )}

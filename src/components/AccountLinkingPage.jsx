@@ -196,6 +196,8 @@ function OAuthProviderCard({ label, provider, linkedProviders, onChanged }) {
 }
 
 export default function AccountLinkingPage({
+  variant = "settings",
+  onFinishOnboarding,
   userId,
   linkedSteamId,
   onLinkSteam,
@@ -285,12 +287,18 @@ export default function AccountLinkingPage({
     }
   }
 
+  const isOnboarding = variant === "onboarding";
+
   return (
-    <div className="linking-page">
+    <div className={`linking-page${isOnboarding ? " linking-page--onboarding" : ""}`}>
       <div className="linking-page__head">
-        <h1 className="linking-page__title">Connect your accounts</h1>
+        <h1 className="linking-page__title">
+          {isOnboarding ? "Connect your accounts (optional)" : "Connect your accounts"}
+        </h1>
         <p className="linking-page__subtitle">
-          Link the platforms you play and stream on so Lykodex can pull in your library, achievements, and friends.
+          {isOnboarding
+            ? "Link Steam, Discord, or Twitch now — or skip and finish this later in Account Settings."
+            : "Link the platforms you play and stream on so Lykodex can pull in your library, achievements, and friends."}
         </p>
       </div>
 
@@ -361,7 +369,7 @@ export default function AccountLinkingPage({
         </>
       )}
 
-      {HANDLE_PLATFORMS.map((platform) => (
+      {!isOnboarding && HANDLE_PLATFORMS.map((platform) => (
         <PlatformHandleCard
           key={platform.id}
           platform={platform}
@@ -370,6 +378,17 @@ export default function AccountLinkingPage({
           onRecomputeMastery={onRecomputeMastery}
         />
       ))}
+
+      {isOnboarding && (
+        <div className="onboarding-actions">
+          <button type="button" className="auth-form__submit" onClick={onFinishOnboarding}>
+            Continue to Lykodex
+          </button>
+          <button type="button" className="auth-form__secondary" onClick={onFinishOnboarding}>
+            Skip for now
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -174,7 +174,7 @@ export default function MtgPriceWatchPage({ onBack, userId, onGoToSearch }) {
             {rows.map(({ entry, price, history, pct }) => (
               <li key={entry.id} className="backlog-card price-watch-row" onClick={() => setDetailCard(entry.card)}>
                 {entry.card.imageSmall ? (
-                  <img src={entry.card.imageSmall} alt="" className="backlog-card__thumb" />
+                  <img src={entry.card.imageSmall} alt="" className="backlog-card__thumb" loading="lazy" decoding="async" />
                 ) : (
                   <div className="backlog-card__thumb backlog-card__thumb--placeholder" />
                 )}

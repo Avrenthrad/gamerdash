@@ -280,7 +280,7 @@ function GuildRow({ guild, userId, isMember, onView, onRequestJoin }) {
   return (
     <li className="backlog-card">
       {guild.logo_url ? (
-        <img src={guild.logo_url} alt="" className="guild-row__logo" />
+        <img src={guild.logo_url} alt="" className="guild-row__logo" loading="lazy" decoding="async" />
       ) : (
         <div className="guild-row__logo guild-row__logo--placeholder" aria-hidden="true">
           {guild.name.slice(0, 1).toUpperCase()}
@@ -482,13 +482,13 @@ function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, o
 
   return (
     <div className="price-page">
-      {guild.banner_url && <img src={guild.banner_url} alt="" className="guild-detail__banner" />}
+      {guild.banner_url && <img src={guild.banner_url} alt="" className="guild-detail__banner" decoding="async" />}
 
       <div className="price-page__head">
         <button type="button" className="back-link" onClick={onBack}>← Back to Guilds</button>
         <div className="guild-detail__identity">
           {guild.logo_url ? (
-            <img src={guild.logo_url} alt="" className="guild-detail__logo" />
+            <img src={guild.logo_url} alt="" className="guild-detail__logo" decoding="async" />
           ) : (
             <div className="guild-detail__logo guild-detail__logo--placeholder" aria-hidden="true">
               {guild.name.slice(0, 1).toUpperCase()}
@@ -547,7 +547,7 @@ function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, o
 
           <div className="settings-avatar-row" style={{ marginTop: "14px" }}>
             {guild.logo_url ? (
-              <img src={guild.logo_url} alt="" className="settings-avatar" style={{ objectFit: "cover" }} />
+              <img src={guild.logo_url} alt="" className="settings-avatar" style={{ objectFit: "cover" }} decoding="async" />
             ) : (
               <div className="settings-avatar">
                 <span className="settings-avatar__placeholder">{guild.name.slice(0, 1).toUpperCase()}</span>
@@ -568,7 +568,7 @@ function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, o
             <span className="settings-card__note" style={{ marginTop: 0 }}>Banner (optional)</span>
             <div className="settings-wallpaper__row">
               {guild.banner_url ? (
-                <img src={guild.banner_url} alt="" className="settings-wallpaper__preview" />
+                <img src={guild.banner_url} alt="" className="settings-wallpaper__preview" decoding="async" />
               ) : (
                 <span className="settings-wallpaper__placeholder">No banner set</span>
               )}
@@ -811,7 +811,7 @@ function PostsTab({ guildId, userId, isMember, canModerate }) {
             {imageFile ? "Change image" : "Add an image"}
             <input type="file" accept="image/*" onChange={handleImageChange} hidden />
           </label>
-          {imagePreview && <img src={imagePreview} alt="" className="search-result-card__thumb" style={{ width: "160px", height: "90px" }} />}
+          {imagePreview && <img src={imagePreview} alt="" className="search-result-card__thumb" style={{ width: "160px", height: "90px" }} decoding="async" />}
           <button type="submit" className="price-search__button" disabled={postStatus === "saving"} style={{ alignSelf: "flex-start" }}>
             {postStatus === "saving" ? "Posting…" : "Post"}
           </button>
@@ -852,7 +852,7 @@ function PostsTab({ guildId, userId, isMember, canModerate }) {
                     {displayName(post.author)} · {new Date(post.created_at).toLocaleDateString()}
                   </span>
                   {post.body && <p className="settings-card__note" style={{ margin: "6px 0" }}>{post.body}</p>}
-                  {post.image_url && <img src={post.image_url} alt="" style={{ maxWidth: "320px", borderRadius: "8px", marginTop: "6px" }} />}
+                  {post.image_url && <img src={post.image_url} alt="" decoding="async" style={{ maxWidth: "320px", borderRadius: "8px", marginTop: "6px" }} />}
                   <button
                     type="button"
                     className="store-row-toggle"

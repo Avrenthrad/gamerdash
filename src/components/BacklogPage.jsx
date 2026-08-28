@@ -267,7 +267,7 @@ export default function BacklogPage({ onBack, userId, linkedSteamId }) {
           </button>
           {surpriseItem && (
             <div className="surprise-me__result">
-              {surpriseItem.thumb && <img src={surpriseItem.thumb} alt="" />}
+              {surpriseItem.thumb && <img src={surpriseItem.thumb} alt="" decoding="async" />}
               <span className="surprise-me__title">{surpriseItem.title}</span>
               <button
                 type="button"
@@ -305,7 +305,7 @@ export default function BacklogPage({ onBack, userId, linkedSteamId }) {
           <ul className="backlog-search-results">
             {searchResults.map((r) => (
               <li key={r.id} className="backlog-search-results__row">
-                {r.backgroundImage && <img src={r.backgroundImage} alt="" />}
+                {r.backgroundImage && <img src={r.backgroundImage} alt="" loading="lazy" decoding="async" />}
                 <span>{r.name}</span>
                 {r.platforms.length > 0 ? (
                   <label className="currency-picker" style={{ flexShrink: 0 }}>
@@ -402,7 +402,7 @@ export default function BacklogPage({ onBack, userId, linkedSteamId }) {
           {sortedItems.map((item) => (
             <li key={item.id} className="backlog-card">
               {item.thumb ? (
-                <img src={item.thumb} alt="" className="backlog-card__thumb" />
+                <img src={item.thumb} alt="" className="backlog-card__thumb" loading="lazy" decoding="async" />
               ) : (
                 <div className="backlog-card__thumb backlog-card__thumb--placeholder" />
               )}

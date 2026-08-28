@@ -201,6 +201,7 @@ export default function AccountSettingsPage({
               <img
                 src={avatarUrl}
                 alt="Profile avatar preview"
+                decoding="async"
                 onError={() => setAvatarBroken(true)}
               />
             ) : (
@@ -469,7 +470,7 @@ export default function AccountSettingsPage({
           <span className="settings-card__note" style={{ marginTop: 0 }}>Site wallpaper (optional)</span>
           <div className="settings-wallpaper__row">
             {wallpaperUrl ? (
-              <img src={wallpaperUrl} alt="" className="settings-wallpaper__preview" />
+              <img src={wallpaperUrl} alt="" className="settings-wallpaper__preview" decoding="async" />
             ) : (
               <span className="settings-wallpaper__placeholder">No wallpaper set</span>
             )}
@@ -546,7 +547,7 @@ export default function AccountSettingsPage({
             const favicon = faviconFor(storeName);
             return (
               <>
-                {favicon && <img src={favicon} alt="" />}
+                {favicon && <img src={favicon} alt="" decoding="async" />}
                 {shortStoreName(storeName)}
               </>
             );

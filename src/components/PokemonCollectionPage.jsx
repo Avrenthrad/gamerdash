@@ -184,7 +184,7 @@ function CardsTab({ userId, onGoToSearch, onGoToScan }) {
             return (
               <li key={entry.id} className="backlog-card">
                 {entry.card?.imageSmall ? (
-                  <img src={entry.card.imageSmall} alt="" className="backlog-card__thumb" style={{ width: "56px", height: "78px" }} />
+                  <img src={entry.card.imageSmall} alt="" className="backlog-card__thumb" style={{ width: "56px", height: "78px" }} loading="lazy" decoding="async" />
                 ) : (
                   <div className="backlog-card__thumb backlog-card__thumb--placeholder" style={{ width: "56px", height: "78px" }} />
                 )}
@@ -261,7 +261,7 @@ function DecksTab({ userId, onGoToDecks }) {
             <button key={deck.id} type="button" className="binder-card binder-card--plain" onClick={onGoToDecks}>
               <span className="binder-card__cover">
                 {deck.cover_image_url ? (
-                  <img src={deck.cover_image_url} alt="" />
+                  <img src={deck.cover_image_url} alt="" loading="lazy" decoding="async" />
                 ) : (
                   <span className="binder-card__cover-fallback" aria-hidden="true">🛠️</span>
                 )}

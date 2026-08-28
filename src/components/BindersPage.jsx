@@ -193,12 +193,12 @@ export default function BindersPage({ userId, kind, adapter }) {
               <button type="button" className="binder-card__open" onClick={() => setActiveBinderId(b.id)}>
                 <span className="binder-card__cover">
                   {b.cover_image_url ? (
-                    <img src={b.cover_image_url} alt="" />
+                    <img src={b.cover_image_url} alt="" loading="lazy" decoding="async" />
                   ) : (
                     <span className="binder-card__cover-fallback" aria-hidden="true">{isSetList ? "🗂️" : "📁"}</span>
                   )}
                   {isSetList && adapter.setLists.binderSetIconUrl(b) && (
-                    <img src={adapter.setLists.binderSetIconUrl(b)} alt="" className="binder-card__set-icon" />
+                    <img src={adapter.setLists.binderSetIconUrl(b)} alt="" className="binder-card__set-icon" loading="lazy" decoding="async" />
                   )}
                 </span>
                 <span className="binder-card__name">{b.name}</span>
@@ -323,7 +323,7 @@ function BinderDetail({ binder, userId, onBack, onUpdated, adapter }) {
         <div className="binder-detail__head">
           <div className="binder-detail__cover">
             {binder.cover_image_url ? (
-              <img src={binder.cover_image_url} alt="" />
+              <img src={binder.cover_image_url} alt="" decoding="async" />
             ) : (
               <span className="binder-card__cover-fallback" aria-hidden="true">{isSetList ? "🗂️" : "📁"}</span>
             )}
@@ -331,7 +331,7 @@ function BinderDetail({ binder, userId, onBack, onUpdated, adapter }) {
           <div className="binder-detail__info">
             <h1 className="price-page__title">
               {isSetList && adapter.setLists.binderSetIconUrl(binder) && (
-                <img src={adapter.setLists.binderSetIconUrl(binder)} alt="" className="binder-detail__set-icon" />
+                <img src={adapter.setLists.binderSetIconUrl(binder)} alt="" className="binder-detail__set-icon" decoding="async" />
               )}
               {binder.name}
             </h1>
@@ -398,7 +398,7 @@ function BinderDetail({ binder, userId, onBack, onUpdated, adapter }) {
                 return (
                   <li key={card.id} className={`backlog-card ${qty > 0 ? "backlog-card--owned" : ""}`}>
                     {card.imageSmall ? (
-                      <img src={card.imageSmall} alt="" className="backlog-card__thumb" style={{ width: "56px", height: "78px" }} />
+                      <img src={card.imageSmall} alt="" className="backlog-card__thumb" style={{ width: "56px", height: "78px" }} loading="lazy" decoding="async" />
                     ) : (
                       <div className="backlog-card__thumb backlog-card__thumb--placeholder" style={{ width: "56px", height: "78px" }} />
                     )}

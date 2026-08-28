@@ -191,7 +191,7 @@ export default function BooksPage({ onBack, userId, isLoggedIn, onSignIn, onCrea
 
       {pendingBook && lookupStatus === "ready" && (
         <div className="backlog-card" style={{ alignItems: "flex-start" }}>
-          {pendingBook.coverUrl && <img src={pendingBook.coverUrl} alt="" className="backlog-card__thumb" style={{ width: "56px", height: "84px" }} />}
+          {pendingBook.coverUrl && <img src={pendingBook.coverUrl} alt="" className="backlog-card__thumb" style={{ width: "56px", height: "84px" }} decoding="async" />}
           <div className="backlog-card__info">
             <span className="backlog-card__title">{pendingBook.title}</span>
             <span className="backlog-card__meta">{pendingBook.author}{pendingBook.publisher ? ` · ${pendingBook.publisher}` : ""}</span>
@@ -234,7 +234,7 @@ export default function BooksPage({ onBack, userId, isLoggedIn, onSignIn, onCrea
           {filteredBooks.map((book) => (
             <li key={book.id} className="backlog-card">
               {book.cover_url ? (
-                <img src={book.cover_url} alt="" className="backlog-card__thumb" style={{ width: "48px", height: "72px" }} />
+                <img src={book.cover_url} alt="" className="backlog-card__thumb" style={{ width: "48px", height: "72px" }} loading="lazy" decoding="async" />
               ) : (
                 <div className="backlog-card__thumb backlog-card__thumb--placeholder" style={{ width: "48px", height: "72px" }} />
               )}

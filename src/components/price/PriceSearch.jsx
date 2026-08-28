@@ -116,6 +116,7 @@ export default function PriceSearch({
                         src={s.tiny_image}
                         alt=""
                         className="search-suggestions__thumb"
+                        decoding="async"
                       />
                     ) : (
                       <div className="search-suggestions__thumb search-suggestions__thumb--placeholder" />
@@ -164,7 +165,7 @@ export default function PriceSearch({
               <li key={result.game} className="search-result-card">
                 <div className="search-result-card__row">
                   {result.thumb ? (
-                    <img src={result.thumb} alt="" className="search-result-card__thumb" />
+                    <img src={result.thumb} alt="" className="search-result-card__thumb" loading="lazy" decoding="async" />
                   ) : (
                     <div className="search-result-card__thumb search-result-card__thumb--placeholder" />
                   )}

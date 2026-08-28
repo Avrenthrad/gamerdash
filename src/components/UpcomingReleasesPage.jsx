@@ -199,7 +199,7 @@ export default function UpcomingReleasesPage({ onBack, isLoggedIn, userId, wishl
           {releases.map((r) => (
             <li key={r.id} className="backlog-card">
               {r.backgroundImage ? (
-                <img src={r.backgroundImage} alt="" className="backlog-card__thumb" />
+                <img src={r.backgroundImage} alt="" className="backlog-card__thumb" loading="lazy" decoding="async" />
               ) : (
                 <div className="backlog-card__thumb backlog-card__thumb--placeholder" />
               )}

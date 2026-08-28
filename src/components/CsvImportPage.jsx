@@ -173,7 +173,7 @@ export default function CsvImportPage({ onBack, userId }) {
             {matched.map((r) => (
               <li key={r.id} className="backlog-card">
                 {r.card.imageSmall ? (
-                  <img src={r.card.imageSmall} alt="" className="backlog-card__thumb" style={{ width: "48px", height: "67px" }} />
+                  <img src={r.card.imageSmall} alt="" className="backlog-card__thumb" style={{ width: "48px", height: "67px" }} loading="lazy" decoding="async" />
                 ) : (
                   <div className="backlog-card__thumb backlog-card__thumb--placeholder" style={{ width: "48px", height: "67px" }} />
                 )}

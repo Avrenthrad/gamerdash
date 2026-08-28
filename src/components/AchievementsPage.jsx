@@ -234,7 +234,7 @@ function SteamAchievements({ linkedSteamId, userId }) {
         <div className="live-achievement">
           <span className="panel__eyebrow">● Live Achievement</span>
           <div className="live-achievement__body">
-            <img src={liveAchievement.icon} alt="" className="live-achievement__icon" />
+            <img src={liveAchievement.icon} alt="" className="live-achievement__icon" decoding="async" />
             <div>
               <span className="achievement-row__name">{liveAchievement.displayName}</span>
               <span className="achievement-row__desc">
@@ -291,7 +291,7 @@ function SteamAchievements({ linkedSteamId, userId }) {
             return (
               <div key={g.appid} className="achievement-group">
                 <h3 className="achievement-group__title">
-                  <img src={steamHeaderArt(g.appid)} alt="" className="achievement-group__thumb" />
+                  <img src={steamHeaderArt(g.appid)} alt="" className="achievement-group__thumb" loading="lazy" decoding="async" />
                   {g.name}
                   {rows && rows.length > 0 && (
                     <span className="score-badge">{unlockedCount}/{rows.length}</span>
@@ -310,6 +310,8 @@ function SteamAchievements({ linkedSteamId, userId }) {
                           src={row.unlocked ? row.icon : row.icongray || row.icon}
                           alt=""
                           className="achievement-row__icon"
+                          loading="lazy"
+                          decoding="async"
                         />
                         <div className="achievement-row__body">
                           <span className="achievement-row__name">{row.displayName}</span>

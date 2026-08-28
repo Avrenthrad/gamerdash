@@ -181,7 +181,7 @@ export default function FriendSection({ isLoggedIn, onSignIn, onCreateAccount, l
               {lykodexFriends.map((f) => (
                 <li key={f.friend_id} className="friend-row">
                   {f.profile?.avatar_url ? (
-                    <img src={f.profile.avatar_url} alt="" className="friend-row__avatar friend-row__avatar--img" />
+                    <img src={f.profile.avatar_url} alt="" className="friend-row__avatar friend-row__avatar--img" loading="lazy" decoding="async" />
                   ) : (
                     <div className="friend-row__avatar" aria-hidden="true">{initials(displayName(f.profile))}</div>
                   )}
@@ -266,7 +266,7 @@ export default function FriendSection({ isLoggedIn, onSignIn, onCreateAccount, l
               {friends.map((f) => (
                 <li key={f.steamid} className="friend-row">
                   {f.avatar ? (
-                    <img src={f.avatar} alt="" className="friend-row__avatar friend-row__avatar--img" />
+                    <img src={f.avatar} alt="" className="friend-row__avatar friend-row__avatar--img" loading="lazy" decoding="async" />
                   ) : (
                     <div className="friend-row__avatar" aria-hidden="true">{initials(f.name)}</div>
                   )}

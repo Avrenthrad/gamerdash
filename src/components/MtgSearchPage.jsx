@@ -119,7 +119,7 @@ export default function MtgSearchPage({ onBack, userId, isLoggedIn, onSignIn, on
           {results.slice(0, 30).map((card) => (
             <li key={card.id} className="backlog-card">
               {card.imageSmall ? (
-                <img src={card.imageSmall} alt="" className="backlog-card__thumb" style={{ width: "56px", height: "78px" }} />
+                <img src={card.imageSmall} alt="" className="backlog-card__thumb" style={{ width: "56px", height: "78px" }} loading="lazy" decoding="async" />
               ) : (
                 <div className="backlog-card__thumb backlog-card__thumb--placeholder" style={{ width: "56px", height: "78px" }} />
               )}

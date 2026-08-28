@@ -96,7 +96,7 @@ export default function MtgPriceHistoryModal({ card, onClose }) {
     <div className="cmdk-backdrop" onClick={onClose}>
       <div className="price-history-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={`Price history for ${card.name}`}>
         <div className="price-history-modal__head">
-          {card.imageSmall && <img src={card.imageSmall} alt="" className="price-history-modal__thumb" />}
+          {card.imageSmall && <img src={card.imageSmall} alt="" className="price-history-modal__thumb" decoding="async" />}
           <div>
             <h2 className="price-history-modal__title">{card.name}</h2>
             <p className="price-history-modal__meta">{card.setName} · {card.setCode?.toUpperCase()}</p>

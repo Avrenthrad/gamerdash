@@ -69,6 +69,10 @@ const DASHFEED_PLATFORMS = [
 ];
 
 const KNOWN_VIEWS = [
+  // Dev-only visual gallery of the auth/onboarding screens — see
+  // components/dev/PreviewGallery.jsx. Unknown in production, so a
+  // built app falls through to Overview like any other bad hash.
+  ...(import.meta.env.DEV ? ["preview"] : []),
   "dashboard",
   "linking",
   "settings",
@@ -269,12 +273,11 @@ export function AppProvider({ children }) {
   });
   const [customizingLayout, setCustomizingLayout] = useState(false);
 
-  // Post-signup onboarding sequence: welcome -> preferences (reuses
-  // the real Dashfeed Settings page) -> linking (reuses the real
-  // Account Linking page, skippable) -> dashboard. Purely local,
-  // ephemeral state — this is a one-time first-run flow, nothing here
-  // needs to survive a refresh or be written to Supabase.
-  const [onboardingStep, setOnboardingStep] = useState("welcome");
+  // Post-signup onboarding: college-picker -> optional account
+  // linking -> overview. Purely local, ephemeral state — this is a
+  // one-time first-run flow, nothing here needs to survive a refresh
+  // or be written to Supabase.
+  const [onboardingStep, setOnboardingStep] = useState("college-picker");
 
   // Which of the 5 Colleges someone actually cares about — captured
   // during onboarding, used later to filter the top-level nav so

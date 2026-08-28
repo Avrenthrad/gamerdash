@@ -218,7 +218,7 @@ function CardsTab({ userId, onGoToSearch, onGoToScan, onGoToImport }) {
           {sortedEntries.map((entry) => (
             <div key={entry.id} className="mtg-card-grid__item">
               {entry.card?.image ? (
-                <img src={entry.card.image} alt="" className="mtg-card-grid__img" />
+                <img src={entry.card.image} alt="" className="mtg-card-grid__img" loading="lazy" decoding="async" />
               ) : (
                 <div className="mtg-card-grid__img mtg-card-grid__img--placeholder" />
               )}
@@ -262,7 +262,7 @@ function CardsTab({ userId, onGoToSearch, onGoToScan, onGoToImport }) {
           {sortedEntries.map((entry) => (
             <li key={entry.id} className="backlog-card">
               {entry.card?.imageSmall ? (
-                <img src={entry.card.imageSmall} alt="" className="backlog-card__thumb" style={{ width: "56px", height: "78px" }} />
+                <img src={entry.card.imageSmall} alt="" className="backlog-card__thumb" style={{ width: "56px", height: "78px" }} loading="lazy" decoding="async" />
               ) : (
                 <div className="backlog-card__thumb backlog-card__thumb--placeholder" style={{ width: "56px", height: "78px" }} />
               )}
@@ -364,7 +364,7 @@ function DecksTab({ userId, onGoToDecks }) {
             <button key={deck.id} type="button" className="binder-card binder-card--plain" onClick={onGoToDecks}>
               <span className="binder-card__cover">
                 {deck.cover_image_url ? (
-                  <img src={deck.cover_image_url} alt="" />
+                  <img src={deck.cover_image_url} alt="" loading="lazy" decoding="async" />
                 ) : (
                   <span className="binder-card__cover-fallback" aria-hidden="true">🛠️</span>
                 )}

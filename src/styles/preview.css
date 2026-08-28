@@ -1,0 +1,149 @@
+/* Dev-only styling for the #/preview gallery (see
+   components/dev/PreviewGallery.jsx). Deliberately a separate
+   stylesheet rather than additions to index.css: this never ships,
+   and index.css is edited concurrently by other work. Only frames
+   and labels live here — the screens inside each frame keep their
+   real .auth-* / .onboarding-* styling untouched. */
+
+.preview-root {
+  min-height: 100vh;
+  background: var(--bg, #0b0d12);
+  color: var(--text, #e8eaf0);
+  padding-bottom: 6rem;
+}
+
+.preview-bar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  background: rgba(10, 12, 18, 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+html[data-mode="light"] .preview-bar {
+  background: rgba(250, 250, 252, 0.92);
+  border-bottom-color: rgba(0, 0, 0, 0.14);
+}
+
+.preview-bar__title {
+  font-weight: 700;
+  margin-right: 0.5rem;
+}
+
+.preview-bar__note {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.preview-btn {
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 6px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.preview-btn--on {
+  background: currentColor;
+}
+
+.preview-btn--on > span {
+  mix-blend-mode: difference;
+  filter: invert(1);
+}
+
+.preview-index {
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  font-size: 0.85rem;
+}
+
+.preview-index a {
+  color: inherit;
+}
+
+.preview-section {
+  padding: 1.5rem 1.25rem 0;
+}
+
+.preview-section__title {
+  font-size: 1.05rem;
+  margin: 0 0 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.75;
+}
+
+.preview-frame {
+  margin: 1rem 0 2rem;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.preview-frame__head {
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.28);
+  background: rgba(128, 128, 128, 0.1);
+}
+
+.preview-frame__label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.preview-frame__caption {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  opacity: 0.72;
+}
+
+.preview-frame__body {
+  overflow: auto;
+  resize: vertical;
+}
+
+/* Narrow mode renders the frame contents in a phone-width column so
+   mobile layout can be compared without resizing the window. The
+   inner wrapper is what the screen sees as its available width. */
+.preview-frame__body--narrow {
+  max-width: 360px;
+  border-right: 1px dashed rgba(128, 128, 128, 0.5);
+}
+
+.preview-frame__body--tall {
+  max-height: 720px;
+}
+
+.preview-note {
+  margin: 0 0 1rem;
+  padding: 0.7rem 0.9rem;
+  border-left: 3px solid rgba(200, 160, 60, 0.8);
+  background: rgba(200, 160, 60, 0.08);
+  font-size: 0.85rem;
+}
+
+.preview-fragment {
+  padding: 1.25rem;
+  max-width: 460px;
+}
+
+/* The popover positions itself absolutely against its anchor (right: 0),
+   so it needs a bounded positioned parent here or it lands off-screen. */
+.preview-popover-stage {
+  position: relative;
+  width: 420px;
+  min-height: 220px;
+  padding: 2rem;
+}

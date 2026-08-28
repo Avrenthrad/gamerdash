@@ -17,7 +17,7 @@ export default function LoadingSplash({ fadingOut }) {
   return (
     <div className={`loading-splash ${fadingOut ? "loading-splash--fade" : ""}`} aria-hidden="true">
       <div className="loading-splash__glow">
-        <img src={loadingGif} alt="" className="loading-splash__logo" />
+        <img src={loadingGif} alt="" className="loading-splash__logo" decoding="async" />
       </div>
     </div>
   );

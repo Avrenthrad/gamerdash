@@ -73,7 +73,7 @@ export default function ContinuePlayingCard({ linkedSteamId, onOpenLibrary }) {
 
       {linkedSteamId && status === "ready" && slide && (
         <button type="button" className="hero-card__art-btn" onClick={onOpenLibrary} key={slide.label}>
-          <img src={steamHeaderArt(slide.appid)} alt="" className="hero-card__art" />
+          <img src={steamHeaderArt(slide.appid)} alt="" className="hero-card__art" decoding="async" />
           <div className="hero-card__art-overlay">
             <span className="hero-card__title">{slide.gameName}</span>
             {slide.isCurrentlyPlaying && (

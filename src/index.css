@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Bricolage+Grotesque:wght@500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
 
 /* Tailwind utilities only — no Preflight, so it doesn't reset/override
    the hand-built design system below. */
@@ -137,6 +137,11 @@
   --text-on-accent: #16130D;
 
   --font-display: 'Bricolage Grotesque', sans-serif;
+  /* Hero moments only (the login stage headline). Bricolage stays the
+     display face for every other heading in the app — this exists so a
+     single full-bleed headline can hit the extreme scale contrast that
+     look needs without a condensed face leaking into ordinary UI. */
+  --font-display-condensed: 'Barlow Condensed', 'Bricolage Grotesque', sans-serif;
   --font-body: 'Hanken Grotesk', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
@@ -1253,20 +1258,229 @@ button { font-family: inherit; }
 .auth-page {
   position: relative;
   min-height: 100vh;
+  padding: 20px;
+  background: var(--bg);
+  box-sizing: border-box;
+}
+
+/* Fine scanline/grain, scoped to the auth + onboarding shells only —
+   deliberately not a global body overlay, which would put a texture
+   over every page in the app. pointer-events:none is load-bearing:
+   this sits above the form, so without it the whole card is dead. */
+.auth-page::after,
+.onboarding-shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    color-mix(in srgb, #000 6%, transparent) 3px,
+    color-mix(in srgb, #000 6%, transparent) 4px
+  );
+}
+
+.auth-stage {
+  display: grid;
+  grid-template-columns: minmax(360px, 42%) 1fr;
+  min-height: calc(100vh - 40px);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.auth-panel {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 48px 16px;
-  overflow: hidden;
+  padding: 48px 40px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(22px);
+  border-right: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
 }
 
-/* ---------- Collection constellation (login screen background) ----------
+.auth-hero {
+  position: relative;
+  min-height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* 80px square grid riding --border so it stays warm rather than the
+   cool gray a flat rgba(255,255,255,x) would give. Sits at z-index 0,
+   under the constellation canvas. */
+.auth-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--border) 45%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--border) 45%, transparent) 1px, transparent 1px);
+  background-size: 80px 80px;
+}
+
+.auth-hero .constellation-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: auto;
+}
+
+/* The warm centre glow was reading as a smudge over the old sparse
+   field. Now that the mesh carries the depth it only needs to be a
+   hint of light, lifted to sit inside the ring of College nodes
+   instead of behind the caption. */
+.auth-hero .constellation-bg__scrim {
+  background:
+    radial-gradient(ellipse 55% 40% at 50% 32%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 70%),
+    radial-gradient(circle at center, transparent 30%, var(--bg) 96%);
+}
+
+.auth-hero .constellation-bg__node {
+  display: flex;
+  opacity: 0.85;
+}
+
+/* Not a plate. An opaque rounded card here punched a hole in the
+   constellation and buried two of the five Colleges the headline is
+   naming — this is a scrim that fades upward into the field instead,
+   so the caption sits in the star map rather than on top of it. No
+   backdrop-filter: a blurred band over a full-size animated canvas is
+   the first thing to stutter in the Android WebView. */
+.auth-hero__overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  padding: 96px 40px 34px;
+  background: linear-gradient(
+    to top,
+    var(--bg) 0%,
+    color-mix(in srgb, var(--bg) 92%, transparent) 34%,
+    color-mix(in srgb, var(--bg) 62%, transparent) 62%,
+    transparent 100%
+  );
+}
+
+.auth-hero__eyebrow {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.19em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+
+/* Extreme scale contrast is the whole move here: one huge condensed
+   headline against 13px body copy in a narrow measure, with nothing
+   sized in between. Clamped against the viewport because this panel is
+   ~58% of it, not full-bleed. */
+.auth-hero__title {
+  font-family: var(--font-display-condensed);
+  font-size: clamp(44px, 6.4vw, 96px);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.025em;
+  line-height: 0.88;
+  color: var(--text);
+  margin: 0 0 14px;
+}
+
+.auth-hero__title-line {
+  display: block;
+}
+
+/* Line two is hollow. Kept as real, selectable text — the fill only
+   goes transparent inside the @supports below, so a browser without
+   -webkit-text-stroke renders it as ordinary muted text rather than
+   an invisible line. */
+.auth-hero__title-line--ghost {
+  color: var(--text-muted);
+}
+
+@supports (-webkit-text-stroke: 1px currentColor) {
+  .auth-hero__title-line--ghost {
+    -webkit-text-fill-color: transparent;
+    -webkit-text-stroke: 1px color-mix(in srgb, var(--text-muted) 55%, transparent);
+  }
+}
+
+/* Cycling College name. All five words are rendered stacked in one
+   grid cell so the box is always as wide/tall as the longest one —
+   the word can change length without shifting anything below it. */
+.auth-hero__cycler {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.auth-hero__cycler-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.19em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.auth-hero__cycler-stack {
+  display: inline-grid;
+  align-items: baseline;
+}
+
+.auth-hero__cycler-word {
+  grid-area: 1 / 1;
+  font-family: var(--font-display-condensed);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--ease-standard);
+}
+
+.auth-hero__cycler-word--active {
+  opacity: 1;
+}
+
+/* Per-College hue. Gold --accent is interactive-only, so the cycling
+   word borrows the categorical section accents instead. */
+.auth-hero__cycler-word--gaming { color: var(--sky); }
+.auth-hero__cycler-word--tcg { color: var(--violet); }
+.auth-hero__cycler-word--entertainment { color: var(--rose); }
+.auth-hero__cycler-word--collectibles { color: var(--amber); }
+.auth-hero__cycler-word--tabletop { color: var(--lime); }
+
+.auth-hero__body {
+  margin: 0;
+  max-width: 34ch;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-hero__cycler-word {
+    transition: none;
+  }
+}
+
+/* ---------- Collection constellation (login hero) ----------
    A slow particle field with the 5 real Colleges anchored as nodes —
-   framed as "your collection's universe", not market data. Sits behind
-   the auth card via explicit z-index (both this and .auth-card are
-   positioned, so stacking is deterministic rather than relying on DOM
-   order — an absolutely-positioned sibling would otherwise paint above
-   plain in-flow content regardless of source order). */
+   framed as "your collection's universe", not market data. On desktop
+   it fills the right-hand hero; on a phone it sits behind the form. */
 .constellation-bg {
   position: absolute;
   inset: 0;
@@ -1313,29 +1527,23 @@ button { font-family: inherit; }
 
 .auth-card {
   width: 100%;
-  max-width: 380px;
+  max-width: 400px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 32px 28px;
+  align-items: stretch;
+  gap: 16px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
   position: relative;
   z-index: 1;
-  overflow: hidden;
+  overflow: visible;
+  box-shadow: none;
 }
 
 .auth-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--grad-red);
-  opacity: 0.75;
+  display: none;
 }
 
 .auth-card__logo {
@@ -1345,19 +1553,51 @@ button { font-family: inherit; }
   filter: drop-shadow(0 0 10px color-mix(in srgb, var(--red) 35%, transparent));
 }
 
+.auth-tabs {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+}
+
+.auth-tabs__btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 10px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+.auth-tabs__btn--active {
+  background: var(--grad-red);
+  color: var(--text-on-accent);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
 .auth-card__title {
   font-family: var(--font-display);
-  font-size: 20px;
-  font-weight: 600;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   margin: 0;
-  text-align: center;
+  text-align: left;
 }
 
 .auth-card__subtitle {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-muted);
-  text-align: center;
-  margin: 0 0 8px;
+  text-align: left;
+  margin: 0;
+  line-height: 1.5;
 }
 
 .auth-form {
@@ -1375,17 +1615,28 @@ button { font-family: inherit; }
   color: var(--text-muted);
 }
 
+.auth-form__field > span {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .auth-form__field input {
+  width: 100%;
+  box-sizing: border-box;
   background: var(--surface-raised);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  padding: 11px 12px;
   color: var(--text);
   font-size: 14px;
 }
 
 .auth-form__field input:focus-visible {
   border-color: var(--accent);
+  box-shadow: var(--ring-focus);
+  outline: none;
 }
 
 .auth-form__submit {
@@ -1430,19 +1681,25 @@ button { font-family: inherit; }
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+}
+
+.auth-oauth-row--soon {
+  margin-top: 4px;
 }
 
 .auth-oauth-btn {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
+  width: 100%;
   background: var(--surface-raised);
   border: 1px solid var(--border);
   color: var(--text);
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 500;
-  padding: 9px 14px;
+  padding: 10px 14px;
   border-radius: var(--radius-md);
   cursor: pointer;
 }
@@ -1460,24 +1717,33 @@ button { font-family: inherit; }
   border-color: var(--border);
 }
 
-.auth-oauth-btn__mark {
-  width: 20px;
-  height: 20px;
-  border-radius: 5px;
-  display: grid;
-  place-items: center;
-  background: color-mix(in srgb, var(--red) 15%, transparent);
-  color: var(--red);
-  font-family: var(--font-display);
-  font-size: 11px;
-  font-weight: 700;
+.auth-oauth-btn--soon {
+  opacity: 0.55;
 }
 
-.auth-card__mfa-note {
-  font-size: 11px;
-  color: var(--text-muted);
-  text-align: center;
-  margin: 0;
+.auth-oauth-btn__mark {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  color: var(--text);
+  flex-shrink: 0;
+}
+
+.auth-form__secondary {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-weight: 500;
+  font-size: 14px;
+  padding: 10px 18px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+.auth-form__secondary:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: var(--surface-raised);
 }
 
 .auth-card__switch {
@@ -1487,6 +1753,39 @@ button { font-family: inherit; }
   font-size: 13px;
   cursor: pointer;
   margin-top: 4px;
+}
+
+@media (max-width: 860px) {
+  .auth-page {
+    padding: 16px;
+  }
+
+  .auth-stage {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 32px);
+    position: relative;
+    border-radius: 18px;
+  }
+
+  .auth-hero {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+
+  .auth-hero .constellation-bg__node,
+  .auth-hero__overlay {
+    display: none;
+  }
+
+  .auth-panel {
+    position: relative;
+    z-index: 1;
+    border-right: none;
+    padding: 32px 20px;
+    background: color-mix(in srgb, var(--surface) 90%, transparent);
+  }
 }
 
 .auth-oauth-waiting {
@@ -3522,15 +3821,16 @@ button { font-family: inherit; }
   margin: 60px auto 0;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 32px;
+  border-radius: var(--radius-xl);
+  padding: 36px 32px;
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   position: relative;
   overflow: hidden;
+  box-shadow: var(--shadow-md);
 }
 
 .account-gate-page::before {
@@ -3568,10 +3868,12 @@ button { font-family: inherit; }
 .account-gate-page__actions {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .account-gate-page__actions .auth-form__submit,
-.account-gate-page__actions .dash-header__login-btn {
+.account-gate-page__actions .auth-form__secondary {
   margin-top: 0;
   padding: 10px 22px;
   font-size: 13.5px;
@@ -3606,6 +3908,14 @@ button { font-family: inherit; }
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.account-gate-popover__actions .auth-form__submit,
+.account-gate-popover__actions .auth-form__secondary {
+  margin-top: 0;
+  width: 100%;
+  font-size: 12.5px;
+  padding: 8px 16px;
 }
 
 .account-gate-popover__primary {
@@ -3690,7 +4000,7 @@ button { font-family: inherit; }
 }
 
 .account-gate-panel__actions .auth-form__submit,
-.account-gate-panel__actions .dash-header__login-btn {
+.account-gate-panel__actions .auth-form__secondary {
   padding: 7px 16px;
   font-size: 12.5px;
   min-width: 118px;
@@ -5442,9 +5752,53 @@ html[data-mode="light"] .current-rotation {
 
 /* ---------- Onboarding: Welcome step ---------- */
 
+.onboarding-shell {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px 48px;
+}
+
+.onboarding-shell__bar {
+  width: 100%;
+  max-width: 560px;
+  display: grid;
+  grid-template-columns: 72px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.onboarding-shell__label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.onboarding-back {
+  justify-self: start;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 6px 0;
+}
+
+.onboarding-back--spacer {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .onboarding-welcome {
-  max-width: 460px;
-  margin: 90px auto;
+  max-width: 520px;
+  width: 100%;
+  margin: 24px auto 0;
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -5460,15 +5814,17 @@ html[data-mode="light"] .current-rotation {
   margin-bottom: 8px;
 }
 
-/* Applied only at the two real onboarding steps (welcome + College
-   picker) -- CollegeComingSoonPage.jsx reuses the base shell above but
-   deliberately skips this modifier, since a premium glow doesn't suit
-   an honest "not built yet" placeholder. */
+/* College picker in onboarding — card surface lives on --hero so this
+   glow sits behind the card without making the page horizontally
+   scroll (width is capped to 100vw). */
 .onboarding-welcome--hero {
   position: relative;
-  margin: 64px auto 40px;
-  padding-top: 56px;
-  padding-bottom: 8px;
+  margin: 16px auto 0;
+  padding: 36px 32px 32px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
 }
 
 .onboarding-welcome--hero::before {
@@ -5497,7 +5853,12 @@ html[data-mode="light"] .current-rotation {
 }
 
 .onboarding-welcome--hero .onboarding-welcome__title {
-  font-size: 34px;
+  font-size: 28px;
+}
+
+.onboarding-welcome--hero .auth-form__submit {
+  width: 100%;
+  max-width: 280px;
 }
 
 .onboarding-welcome__title {
@@ -5518,9 +5879,9 @@ html[data-mode="light"] .current-rotation {
 
 .onboarding-progress {
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
   gap: 8px;
-  padding: 20px 0 0;
+  padding: 0;
 }
 
 .onboarding-progress__dot {
@@ -5550,6 +5911,22 @@ html[data-mode="light"] .current-rotation {
   font-size: 13px;
   text-decoration: underline;
   cursor: pointer;
+}
+
+.linking-page--onboarding {
+  padding-top: 12px;
+}
+
+.linking-page--onboarding .onboarding-actions {
+  margin-top: 28px;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.linking-page--onboarding .onboarding-actions .auth-form__submit,
+.linking-page--onboarding .onboarding-actions .auth-form__secondary {
+  margin-top: 0;
+  width: 100%;
 }
 
 /* ---------- Onboarding: College picker ---------- */
@@ -7644,4 +8021,25 @@ html[data-mode="light"] .current-rotation {
   border-radius: 10px;
   box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.45);
   pointer-events: none;
+}
+
+/* ---------- Auth / onboarding phone tightening ----------
+   Lives at the very end on purpose: these selectors are all defined
+   further up the file, so a max-width block placed next to them would
+   lose the cascade to their own later base rules. ---------- */
+
+@media (max-width: 480px) {
+  .onboarding-welcome--hero,
+  .account-gate-page {
+    padding: 28px 20px;
+  }
+
+  .onboarding-shell__bar {
+    grid-template-columns: 56px 1fr auto;
+  }
+
+  .account-gate-page__actions .auth-form__submit,
+  .account-gate-page__actions .auth-form__secondary {
+    width: 100%;
+  }
 }

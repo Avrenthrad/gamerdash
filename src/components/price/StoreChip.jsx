@@ -5,7 +5,7 @@ function StoreChipLabel({ name }) {
   const favicon = faviconFor(name);
   return (
     <span className="store-chip__label">
-      {favicon && <img src={favicon} alt="" className="store-chip__favicon" />}
+      {favicon && <img src={favicon} alt="" className="store-chip__favicon" decoding="async" />}
       <span className="store-chip__name">{shortStoreName(name)}</span>
     </span>
   );

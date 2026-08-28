@@ -76,7 +76,7 @@ export default function WishlistCard({
     <li className="wishlist-card">
       <div className="wishlist-card__thumb-wrap">
         {deal.thumb ? (
-          <img src={deal.thumb} alt="" className="wishlist-card__thumb" />
+          <img src={deal.thumb} alt="" className="wishlist-card__thumb" loading="lazy" decoding="async" />
         ) : (
           <div className="wishlist-card__thumb wishlist-card__thumb--placeholder" />
         )}
@@ -87,7 +87,7 @@ export default function WishlistCard({
           className="hltb-badge"
           title="How long to beat this — opens HowLongToBeat"
         >
-          <img src={hltbLogo} alt="HowLongToBeat" className="hltb-badge__icon" />
+          <img src={hltbLogo} alt="HowLongToBeat" className="hltb-badge__icon" decoding="async" />
         </a>
         <div className="wishlist-card__toggle-overlay">
           <WishlistToggle

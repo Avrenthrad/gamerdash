@@ -68,7 +68,7 @@ export default function FriendsActivityCard({ userId, onGoToFriends }) {
           {friends.slice(0, 10).map((f) => (
             <div key={f.friend_id} className="friends-activity-card__avatar" title={displayName(f.profile)}>
               {f.profile?.avatar_url ? (
-                <img src={f.profile.avatar_url} alt="" />
+                <img src={f.profile.avatar_url} alt="" decoding="async" />
               ) : (
                 <span>{displayName(f.profile)[0]}</span>
               )}

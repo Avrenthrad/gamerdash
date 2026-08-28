@@ -167,7 +167,7 @@ export default function MtgDeckBuilderPage({ onBack, userId }) {
           <div className="binder-detail__head">
             <div className="binder-detail__cover">
               {activeDeck.cover_image_url ? (
-                <img src={activeDeck.cover_image_url} alt="" />
+                <img src={activeDeck.cover_image_url} alt="" decoding="async" />
               ) : (
                 <span className="binder-card__cover-fallback" aria-hidden="true">🛠️</span>
               )}

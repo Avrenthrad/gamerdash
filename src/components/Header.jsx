@@ -34,9 +34,9 @@ const COLLEGES = [
   { id: "overview", label: "Overview", view: "overview", alwaysShown: true },
   { id: "gaming", label: "Gaming", view: "dashboard" },
   { id: "tcg", label: "TCG", view: "tcg-home" },
-  { id: "entertainment", label: "Entertainment", view: "college-entertainment" },
-  { id: "collectibles", label: "Collectibles", view: "college-collectibles" },
-  { id: "tabletop", label: "Tabletop", view: "college-tabletop" },
+  { id: "entertainment", label: "Library", view: "college-entertainment" },
+  { id: "collectibles", label: "Loot", view: "college-collectibles" },
+  { id: "tabletop", label: "Wartable", view: "college-tabletop" },
 ];
 
 // The 5 real Colleges the Mastery Score dropdown breaks down by —
@@ -553,6 +553,7 @@ export default function Header({
                     src={avatarUrl}
                     alt=""
                     className="dash-header__avatar-img"
+                    decoding="async"
                     onError={() => setAvatarBroken(true)}
                   />
                 ) : (
@@ -670,7 +671,7 @@ export default function Header({
         >
           <span className="mobile-tab-bar__icon-wrap">
             {isLoggedIn && avatarUrl && !avatarBroken ? (
-              <img src={avatarUrl} alt="" className="mobile-tab-bar__avatar" onError={() => setAvatarBroken(true)} />
+              <img src={avatarUrl} alt="" className="mobile-tab-bar__avatar" decoding="async" onError={() => setAvatarBroken(true)} />
             ) : (
               <DefaultAvatarIcon />
             )}

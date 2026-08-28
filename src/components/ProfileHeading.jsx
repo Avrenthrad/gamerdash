@@ -44,7 +44,7 @@ export default function ProfileHeading({
       <div className="profile-heading__left">
         <div className="profile-heading__avatar">
           {avatarUrl && !avatarBroken ? (
-            <img src={avatarUrl} alt="" onError={() => setAvatarBroken(true)} />
+            <img src={avatarUrl} alt="" decoding="async" onError={() => setAvatarBroken(true)} />
           ) : (
             <span className="profile-heading__avatar-default">
               <DefaultAvatarIcon />

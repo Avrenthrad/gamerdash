@@ -118,9 +118,9 @@ export default function OverviewPage({
     { key: "total", label: "Your collection", value: totalCollected, unit: "pieces collected across your Colleges" },
     showGaming && gameCount !== null && { key: "gaming", label: "Gaming library", value: gameCount, unit: "games in your library" },
     showTcg && cardCount !== null && { key: "tcg", label: "TCG collection", value: cardCount, unit: "cards collected" },
-    selectedColleges.includes("entertainment") && entertainmentCount !== null && { key: "entertainment", label: "Entertainment", value: entertainmentCount, unit: "movies, shows, anime & books tracked" },
-    selectedColleges.includes("collectibles") && collectiblesCount !== null && { key: "collectibles", label: "Collectibles", value: collectiblesCount, unit: "items on your shelf" },
-    selectedColleges.includes("tabletop") && tabletopCount !== null && { key: "tabletop", label: "Tabletop", value: tabletopCount, unit: "campaigns & armies" },
+    selectedColleges.includes("entertainment") && entertainmentCount !== null && { key: "entertainment", label: "Library", value: entertainmentCount, unit: "movies, shows, anime & books tracked" },
+    selectedColleges.includes("collectibles") && collectiblesCount !== null && { key: "collectibles", label: "Loot", value: collectiblesCount, unit: "items on your shelf" },
+    selectedColleges.includes("tabletop") && tabletopCount !== null && { key: "tabletop", label: "Wartable", value: tabletopCount, unit: "campaigns & armies" },
   ].filter(Boolean);
 
   const [slideIndex, setSlideIndex] = useState(0);
@@ -248,7 +248,7 @@ export default function OverviewPage({
           {selectedColleges.includes("entertainment") && (
             <button type="button" className="overview-card" onClick={() => onOpenCollege("entertainment")}>
               <span className="overview-card__icon"><CollegeIcon collegeId="entertainment" size={22} /></span>
-              <span className="overview-card__label">Entertainment</span>
+              <span className="overview-card__label">Library</span>
               {status === "loading" ? (
                 <span className="overview-card__value">…</span>
               ) : entertainmentCount ? (
@@ -265,7 +265,7 @@ export default function OverviewPage({
           {selectedColleges.includes("collectibles") && (
             <button type="button" className="overview-card" onClick={() => onOpenCollege("collectibles")}>
               <span className="overview-card__icon"><CollegeIcon collegeId="collectibles" size={22} /></span>
-              <span className="overview-card__label">Collectibles</span>
+              <span className="overview-card__label">Loot</span>
               {status === "loading" ? (
                 <span className="overview-card__value">…</span>
               ) : collectiblesCount ? (
@@ -282,7 +282,7 @@ export default function OverviewPage({
           {selectedColleges.includes("tabletop") && (
             <button type="button" className="overview-card" onClick={() => onOpenCollege("tabletop")}>
               <span className="overview-card__icon"><CollegeIcon collegeId="tabletop" size={22} /></span>
-              <span className="overview-card__label">Tabletop</span>
+              <span className="overview-card__label">Wartable</span>
               {status === "loading" ? (
                 <span className="overview-card__value">…</span>
               ) : tabletopCount ? (

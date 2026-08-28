@@ -12,5 +12,5 @@
 import logo from "../assets/logo.png";
 
 export default function LykodexLogo({ className = "", alt = "Lykodex" }) {
-  return <img src={logo} alt={alt} className={className} />;
+  return <img src={logo} alt={alt} className={className} decoding="async" />;
 }

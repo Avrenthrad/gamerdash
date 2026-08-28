@@ -86,7 +86,7 @@ export default function PokemonScanPage({ onBack, onGoToSearch, userId, isLogged
 
           {status === "ready" && card && (
             <div className="surprise-me__result">
-              {card.imageLarge && <img src={card.imageLarge} alt="" style={{ maxWidth: "220px" }} />}
+              {card.imageLarge && <img src={card.imageLarge} alt="" decoding="async" style={{ maxWidth: "220px" }} />}
               <span className="surprise-me__title">{card.name}</span>
               {added ? (
                 <span className="score-badge">Added</span>

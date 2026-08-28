@@ -221,6 +221,7 @@ export default function MtgScanPage({ onBack, userId, isLoggedIn, onSignIn, onCr
                   <img
                     src={job.photo}
                     alt="Captured card"
+                    decoding="async"
                     style={{ width: "100px", borderRadius: "10px", border: "1px solid var(--border)", flexShrink: 0 }}
                   />
                 )}
@@ -251,7 +252,7 @@ export default function MtgScanPage({ onBack, userId, isLoggedIn, onSignIn, onCr
 
                   {job.selectedCard && (
                     <div className="surprise-me__result">
-                      {job.selectedCard.imageLarge && <img src={job.selectedCard.imageLarge} alt="" style={{ maxWidth: "120px" }} />}
+                      {job.selectedCard.imageLarge && <img src={job.selectedCard.imageLarge} alt="" decoding="async" style={{ maxWidth: "120px" }} />}
                       <span className="surprise-me__title">{job.selectedCard.name}</span>
                       {job.added ? (
                         <span className="score-badge">Added</span>

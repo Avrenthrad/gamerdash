@@ -102,7 +102,7 @@ export default function FabScanPage({ onBack, onGoToSearch, userId, isLoggedIn, 
 
           {status === "ready" && card && (
             <div className="surprise-me__result">
-              {matchedPrinting?.imageUrl && <img src={matchedPrinting.imageUrl} alt="" style={{ maxWidth: "220px" }} />}
+              {matchedPrinting?.imageUrl && <img src={matchedPrinting.imageUrl} alt="" decoding="async" style={{ maxWidth: "220px" }} />}
               <span className="surprise-me__title">{card.name}</span>
               {added ? (
                 <span className="score-badge">Added</span>

@@ -109,6 +109,14 @@ builds and runs clean everywhere else it's been tested).
   `only-export-components` catches this). Established fix pattern in this
   repo: move the non-component export to its own file in `lib/` or
   `hooks/`, not into the same file with a re-export.
+- **`src/index.css` is one long flat file with no layers, so `@media`
+  blocks lose to any same-specificity base rule declared later.** Hit
+  again on 2026-08-27: a `@media (max-width: 480px)` block sat next to
+  the `.auth-*` rules around line 1660 but also targeted
+  `.account-gate-page` and `.onboarding-*`, which define their own
+  padding ~2000-4000 lines further down — so the phone padding silently
+  never applied. Put responsive overrides at the very end of the file
+  (or verify every selector in the block is defined above it).
 - **The `Browser pane` local preview tool can't take real screenshots** in
   this environment (times out — "pane not displayed"). Structural
   verification (console errors, `read_page`/`get_page_text`, computed
@@ -122,6 +130,177 @@ None. `main` / `origin/main` is the only stream.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-29 — **Strategic direction: hub-first, mobile paused; College
+  renames (labels only).** All development focus is on the hub (web +
+  desktop/Tauri) until it hits the quality bar Joshua wants. Capacitor
+  iOS/Android work is paused — no new mobile feature work. The product
+  name stays **Lykodex** for now; a future hub rebrand (Citadel, Hub,
+  Nexus, Relay, or keep Lykodex) is **not decided** — do not rename the
+  product to any of those.
+
+  **Future mobile strategy (document only — do not build yet):** not one
+  monolithic Lykodex mobile app. Instead, separate siloed apps per
+  College (better on-the-go UX), same account/login across all apps,
+  each flavoured for its College, data still flowing back to the hub.
+  First mobile app likely TCG (later). Keep APIs/data model ready for
+  external per-College apps to sync into the hub — no separate repos or
+  sub-projects yet.
+
+  **College user-facing renames (implemented 2026-08-29):**
+
+  | Internal ID (`selected_colleges`, routes, DB) | New label | Future app name |
+  |---|---|---|
+  | `gaming` | Gaming | Lykodex Gaming |
+  | `tcg` | TCG | Lykodex TCG |
+  | `entertainment` | Library | Lykodex Library |
+  | `collectibles` | Loot | Lykodex Loot |
+  | `tabletop` | Wartable | Lykodex Wartable |
+
+  **IDs stayed stable** — only `label` / display copy changed in
+  `src/data/colleges.js`, nav, headers, overview tiles, auth hero
+  cycler/constellation nodes, command palette sublabels, and college
+  home page titles. Hash routes (`college-entertainment`, etc.), file
+  names (`EntertainmentHomePage.jsx`, `lib/entertainment.js`), component
+  names, and Supabase table/column names were **not** renamed.
+
+- 2026-08-27 — Auth + setup walkthrough: login/signup is a split stage
+  (glass form left, CollectionConstellationBackground as the right-hand
+  hero; on phones the constellation sits behind the form). Sign in /
+  Create account tabs, Discord/Twitch first, Google/Apple/Microsoft as
+  "soon". Post-signup onboarding is two steps (Colleges, then optional
+  Steam/Discord/Twitch linking) — Dashfeed toggles and the welcome
+  splash are out of that path. Skip/Continue both land on Overview.
+  `OnboardingWelcomeStep.jsx` is deleted; `onboardingStep` now starts at
+  `"college-picker"`. `src/lib/auth.js` / `oauthRedirect.js` were not
+  touched — the disable-if-not-enabled check still gates the buttons.
+  All four gate surfaces (page, panel, popover, and the one-off
+  signed-out block in `FriendsPage.jsx`) now share
+  `.auth-form__submit` + `.auth-form__secondary`, so
+  `dash-header__login-btn` / `linking-row__connect` are no longer used
+  as gate buttons. The auth/onboarding phone rules had to move to the
+  very end of `src/index.css` — see the flat-file `@media` cascade gotcha
+  above; they were silently losing to their own later base rules.
+  Verified live at desktop and 360px: tab toggle, signup confirm-password
+  field, both onboarding steps, Skip/Continue to Overview. Lint + build
+  clean. Not yet verified: a real signup round-trip through Supabase
+  (needs credentials), and packaged-app OAuth wait state.
+
+  **Cinematic pass (same day, on top of the above).** The hero caption
+  is now the loud element: `.auth-hero__title` is `clamp(44px, 6.4vw,
+  96px)` uppercase condensed at 700 / `line-height: 0.88` /
+  `letter-spacing: -0.025em`, split into a solid line ("Five Colleges.")
+  and a hollow one ("One vault.") via `.auth-hero__title-line--ghost`.
+  Body copy stays 13px in a 34ch measure — the extreme scale contrast
+  with nothing sized in between is the whole point, so don't "balance"
+  those two later. Also added: an 80px `--border`-tinted square grid on
+  `.auth-hero::before` (z-index 0, under the constellation, which moved
+  to z-index 1 and the overlay to 2); a fine scanline on
+  `.auth-page::after` / `.onboarding-shell::after`; the mono eyebrow
+  tightened from 10.5px/0.12em to 11px/0.19em; and `HeroCycler` in
+  `LoginPage.jsx`, a crossfading College name.
+
+  Two brand decisions worth not re-litigating:
+  - **Condensed face is hero-only.** New `--font-display-condensed`
+    (Barlow Condensed, added to the existing Google Fonts `@import`, not
+    a second one). Bricolage stays the display face for every other
+    heading — the condensed face exists so one headline can hit that
+    scale without leaking into ordinary UI. Radii were deliberately left
+    alone; the reference this came from is `border-radius: 0` throughout
+    and we are not copying that.
+  - **The cycling word uses the categorical section accents, not gold.**
+    Gold `--accent` is interactive-only per `DESIGN_TOKENS.md` and can't
+    be display text, and gold-on-near-black is a weaker contrast than
+    the reference's blue-on-navy anyway. So each College gets a hue:
+    gaming→`--sky`, tcg→`--violet`, entertainment→`--rose`,
+    collectibles→`--amber`, tabletop→`--lime`. **No canonical
+    per-College colour mapping existed anywhere in the repo before
+    this** — `data/colleges.js` and `CollegeIcon.jsx` carry no hue — so
+    this is the first one. If a real mapping gets defined later, make
+    these `.auth-hero__cycler-word--*` rules follow it rather than
+    inventing a second scheme.
+
+  The cycler renders all 5 words stacked in one `inline-grid` cell, so
+  the box is always as wide as the longest label and the word can change
+  length without shifting anything. Under `prefers-reduced-motion:
+  reduce` it clears its interval and freezes on the first College (it
+  listens for `change`, so it reacts live, not just at mount). Verified
+  frozen for 12s under CDP `Emulation.setEmulatedMedia`, and cycling
+  again once cleared. The scanline sits above the form at z-index 3 with
+  `pointer-events: none` — `document.elementFromPoint` on every control
+  (inputs, submit, OAuth buttons, tabs) returns the control itself, and
+  typing/clicking were exercised live. Nothing global was added: no
+  `body::before`, and `.auth-page` / `.onboarding-shell` don't exist on
+  `#/overview`. Scoping note: the `@media` for the reduced-motion
+  transition sits next to its base rule mid-file, which is safe because
+  it's not a width override and nothing later redeclares it — the phone
+  block at the end of the file was not touched.
+
+  Not verified in this pass: light theme (`html[data-mode="light"]`) —
+  the ghost stroke and scanline are token-driven but were only looked at
+  in dark; the non-`-webkit-text-stroke` fallback path (guarded by
+  `@supports`, but every engine tested supports the property, so the
+  fallback branch was never actually rendered); and packaged-app
+  (Capacitor/Tauri) rendering.
+
+  **Composition pass (same day, on top of the cinematic pass).** Two
+  things were fighting: the caption plate was an opaque rounded card
+  pinned to the bottom of the hero, which buried Entertainment and
+  Collectibles behind it while the headline said "Five Colleges."; and
+  the field was sparse enough that the upper 60% read as empty black
+  rather than deep space. Fixed together:
+  - `NODE_POSITIONS` in `CollectionConstellationBackground.jsx` is no
+    longer a generated centred pentagon — it's five explicit fractional
+    points squashed into the upper ~55% of the hero (`y` 0.12–0.53), so
+    all five sit clear of the caption. If the caption ever gets taller,
+    re-check these; the lowest node centre lands ~75px above the top of
+    the caption gradient at 1920×1080.
+  - `.auth-hero__overlay` is now a full-bleed bottom gradient scrim
+    (`--bg` fading to transparent over ~190px) instead of a bordered,
+    shadowed, `backdrop-filter`-blurred card. The blur was deliberately
+    dropped, not merely not-added: a blurred band over a full-size
+    animated canvas is the classic Android WebView stutter.
+  - The field is now a triangulated mesh. Particles are seeded on a
+    **jittered grid** (not pure random — random left bald patches) from
+    a fixed-seed `mulberry32`, so the composition is identical every
+    load, which is what makes the `prefers-reduced-motion` single frame
+    a deliberate layout rather than a lucky roll. Each particle carries
+    a `depth` driving size, alpha and speed together, so the near layer
+    drifts visibly faster than the far one — that differential *is* the
+    parallax; there is no separate parallax transform.
+  - Node spokes are drawn in each College's own categorical accent
+    (same `--sky`/`--violet`/`--rose`/`--amber`/`--lime` mapping as the
+    cycler, now also held on the `COLLEGES` array in the component as
+    `cssVar`). No new hue was introduced.
+
+  Performance shape matters more than the raw counts here. Counts:
+  ~`(w*h)/8200` particles clamped to 40–150 (138 at a 1089×1038 hero),
+  `LINK_DISTANCE` 118 with `MAX_EDGES_PER_PARTICLE` 3,
+  `NODE_LINK_DISTANCE` 190 with `MAX_EDGES_PER_NODE` 6. The old O(n²)
+  double loop is gone: particles are bucketed into a uniform spatial
+  hash sized to the link radius and only checked against the 9
+  surrounding cells, and particle links are accumulated into 4 alpha
+  buckets so the whole mesh costs 4 `stroke()` calls per frame rather
+  than one per segment. **Don't "simplify" that back into per-segment
+  strokes** — it's the reason the count could go up at all. Measured
+  ~82fps sustained on desktop; not profiled on a real Android device.
+
+  The centre glow on `.auth-hero .constellation-bg__scrim` dropped from
+  `--accent` 14% to 7% and moved to `50% 32%`; at the old strength it
+  read as a smudge once the mesh was carrying the depth.
+
+  Verified live at 1920×1080 in both Sign in and Create account modes:
+  all five nodes visible and unoccluded, `elementFromPoint` still
+  returns the real control for tabs/inputs/submit/OAuth, typing works,
+  and the canvas is pixel-identical across 4 samples over 2.1s when
+  the page is loaded under CDP `Emulation.setEmulatedMedia`
+  `prefers-reduced-motion: reduce`. Note the component listens for
+  `change` on the media query too, but **that live flip could not be
+  verified** — `setEmulatedMedia` on an already-loaded page doesn't
+  fire the `change` event in this Chromium, so only the on-load path is
+  proven. The `@media (max-width: 860px)` rule hiding
+  `.auth-hero__overlay` and the nodes on phones was left exactly as is
+  (a decision on that is still pending); 360px was re-checked and is
+  unchanged. Lint + build clean.
 - 2026-08-27 — Reset to a single starting point: V0 chats archived, stalled
   `v0/runtime-error-resolution-baf343a0` branch deleted unmerged (Commander
   View work is gone — next UI pass is a fresh isolated V0 screen, not a

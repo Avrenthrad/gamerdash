@@ -170,6 +170,7 @@ export default function LibraryPage({
                     src={steamHeaderArt(g.appid)}
                     alt=""
                     className="backlog-card__thumb"
+                    decoding="async"
                     onError={(e) => {
                       e.target.onerror = null;
                       if (g.img_icon_url) {
@@ -211,6 +212,8 @@ export default function LibraryPage({
                               src={`https://media.steampowered.com/steamcommunity/public/images/apps/${g.appid}/${g.img_icon_url}.jpg`}
                               alt=""
                               className="library-table__icon"
+                              loading="lazy"
+                              decoding="async"
                             />
                           )}
                           {g.name}

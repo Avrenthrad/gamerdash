@@ -26,7 +26,7 @@ export default function MiniAvatar({ profile }) {
   return (
     <span className="mini-avatar">
       {profile?.avatar_url && !broken ? (
-        <img src={profile.avatar_url} alt="" onError={() => setBroken(true)} />
+        <img src={profile.avatar_url} alt="" decoding="async" onError={() => setBroken(true)} />
       ) : (
         <span aria-hidden="true">{initial(profile)}</span>
       )}

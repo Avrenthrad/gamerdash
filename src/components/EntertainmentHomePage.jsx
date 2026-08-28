@@ -111,7 +111,7 @@ export default function EntertainmentHomePage({ onBack, isLoggedIn, userId, onSi
     <div className="price-page">
       <div className="price-page__head">
         <button type="button" className="back-link" onClick={onBack}>← Back to Overview</button>
-        <h1 className="price-page__title">Entertainment</h1>
+        <h1 className="price-page__title">Library</h1>
         <p className="price-page__subtitle">
           Real movies, TV, anime, and books — via TMDB, AniList, and Open Library.
         </p>
@@ -188,7 +188,7 @@ export default function EntertainmentHomePage({ onBack, isLoggedIn, userId, onSi
       </div>
 
       {searchStatus === "no_key" && (
-        <p className="panel__status">Entertainment isn't available right now.</p>
+        <p className="panel__status">Library isn't available right now.</p>
       )}
       {searchStatus === "error" && <p className="panel__status panel__status--error">Couldn't search right now.</p>}
 
@@ -197,7 +197,7 @@ export default function EntertainmentHomePage({ onBack, isLoggedIn, userId, onSi
           {searchResults.map((r) => (
             <li key={r.id} className="backlog-card">
               {r.posterUrl ? (
-                <img src={r.posterUrl} alt="" className="backlog-card__thumb" />
+                <img src={r.posterUrl} alt="" className="backlog-card__thumb" loading="lazy" decoding="async" />
               ) : (
                 <div className="backlog-card__thumb backlog-card__thumb--placeholder" />
               )}
@@ -241,7 +241,7 @@ export default function EntertainmentHomePage({ onBack, isLoggedIn, userId, onSi
               {entries.map((entry) => (
                 <li key={entry.id} className="backlog-card">
                   {entry.cover_url ? (
-                    <img src={entry.cover_url} alt="" className="backlog-card__thumb" />
+                    <img src={entry.cover_url} alt="" className="backlog-card__thumb" loading="lazy" decoding="async" />
                   ) : (
                     <div className="backlog-card__thumb backlog-card__thumb--placeholder" />
                   )}

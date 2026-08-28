@@ -84,7 +84,7 @@ function FortniteSection() {
               {preview.map((item, i) => (
                 <div key={`${item.name}-${i}`} className="fortnite-shop-item">
                   {item.image ? (
-                    <img src={item.image} alt="" className="fortnite-shop-item__image" />
+                    <img src={item.image} alt="" className="fortnite-shop-item__image" loading="lazy" decoding="async" />
                   ) : (
                     <div className="fortnite-shop-item__image fortnite-shop-item__image--placeholder" />
                   )}

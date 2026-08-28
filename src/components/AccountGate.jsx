@@ -24,7 +24,7 @@ export function AccountGatePage({ title, onSignIn, onCreateAccount }) {
           <button type="button" className="auth-form__submit" onClick={onCreateAccount}>
             Create account
           </button>
-          <button type="button" className="dash-header__login-btn" onClick={onSignIn}>
+          <button type="button" className="auth-form__secondary" onClick={onSignIn}>
             Sign in
           </button>
         </div>
@@ -38,10 +38,10 @@ export function AccountGatePopover({ message, onSignIn, onCreateAccount, onDismi
     <div className="account-gate-popover" role="dialog">
       <p className="account-gate-popover__message">{message}</p>
       <div className="account-gate-popover__actions">
-        <button type="button" className="account-gate-popover__primary" onClick={onCreateAccount}>
+        <button type="button" className="auth-form__submit" onClick={onCreateAccount}>
           Create account
         </button>
-        <button type="button" className="account-gate-popover__secondary" onClick={onSignIn}>
+        <button type="button" className="auth-form__secondary" onClick={onSignIn}>
           Sign in
         </button>
       </div>
@@ -63,7 +63,7 @@ export function AccountGatePanel({ message, onSignIn, onCreateAccount }) {
         <button type="button" className="auth-form__submit" onClick={onCreateAccount}>
           Create account
         </button>
-        <button type="button" className="dash-header__login-btn" onClick={onSignIn}>
+        <button type="button" className="auth-form__secondary" onClick={onSignIn}>
           Sign in
         </button>
       </div>

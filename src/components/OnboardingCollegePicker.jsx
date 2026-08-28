@@ -1,13 +1,13 @@
-// Second step of onboarding — which of the 5 Colleges someone
-// actually cares about. All 5 are real and built; picking one just
-// controls what shows up in their nav and Overview, not what's
+// First (and only required) onboarding step — which of the 5 Colleges
+// someone actually cares about. All 5 are real and built; picking one
+// just controls what shows up in their nav and Overview, not what's
 // unlocked (data/colleges.js's `built` flag drives the "Coming soon"
 // badge below if a College is ever added ahead of its data layer).
 
 import { COLLEGES } from "../data/colleges";
 import CollegeIcon from "./CollegeIcon";
 
-export default function OnboardingCollegePicker({ selected, onChange, onContinue }) {
+export default function OnboardingCollegePicker({ firstName, selected, onChange, onContinue }) {
   function toggle(id) {
     if (selected.includes(id)) {
       onChange(selected.filter((s) => s !== id));
@@ -18,9 +18,11 @@ export default function OnboardingCollegePicker({ selected, onChange, onContinue
 
   return (
     <div className="onboarding-welcome onboarding-welcome--hero">
-      <h1 className="onboarding-welcome__title">What are you into?</h1>
+      <h1 className="onboarding-welcome__title">
+        {firstName ? `Welcome to Lykodex, ${firstName}` : "Welcome to Lykodex"}
+      </h1>
       <p className="onboarding-welcome__body">
-        Pick what you want to see — you can change this any time in Account Settings.
+        Pick the Colleges you want in your nav — you can change this any time in Account Settings.
       </p>
 
       <div className="college-picker-grid">

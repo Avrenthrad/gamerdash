@@ -15,7 +15,6 @@ import "react-resizable/css/styles.css";
 import Header from "./components/Header";
 import { GAMING_VIEWS } from "./lib/navSections";
 import GamingSidebar from "./components/GamingSidebar";
-import OnboardingWelcomeStep from "./components/OnboardingWelcomeStep";
 import OnboardingCollegePicker from "./components/OnboardingCollegePicker";
 import LoginPage from "./components/LoginPage";
 import { AccountGatePage } from "./components/AccountGate";
@@ -66,6 +65,13 @@ const CollectiblesHomePage = lazy(() => import("./components/CollectiblesHomePag
 const TabletopHomePage = lazy(() => import("./components/TabletopHomePage"));
 const CurrentSalesPage = lazy(() => import("./components/CurrentSalesPage"));
 const CommandPalette = lazy(() => import("./components/CommandPalette"));
+
+// Dev-only auth/onboarding preview gallery (#/preview). import.meta.env.DEV
+// is a build-time literal, so this whole binding and its dynamic import
+// are dropped from production bundles.
+const PreviewGallery = import.meta.env.DEV
+  ? lazy(() => import("./components/dev/PreviewGallery"))
+  : null;
 
 export default function App() {
   const {
@@ -199,79 +205,67 @@ export default function App() {
   // ---------- view content ----------
   let content;
 
-  if (view === "login") {
+  if (import.meta.env.DEV && view === "preview") {
+    content = <PreviewGallery />;
+  } else if (view === "login") {
     content = (
       <LoginPage onLoginSuccess={handleLoginSuccess} initialMode={loginMode} />
     );
   } else if (view === "onboarding") {
-    const steps = ["welcome", "college-picker", "preferences", "linking"];
-    const stepIndex = steps.indexOf(onboardingStep);
+    const steps = ["college-picker", "linking"];
+    const step = onboardingStep === "linking" ? "linking" : "college-picker";
+    const stepIndex = steps.indexOf(step);
+    const finishOnboarding = () => goTo("overview");
 
-    const progressDots = (
-      <div className="onboarding-progress">
-        {steps.map((s, i) => (
-          <span
-            key={s}
-            className={`onboarding-progress__dot ${
-              i === stepIndex ? "onboarding-progress__dot--active" : i < stepIndex ? "onboarding-progress__dot--done" : ""
-            }`}
-          />
-        ))}
-      </div>
-    );
+    content = (
+      <div className="onboarding-shell">
+        <div className="onboarding-shell__bar">
+          {step === "linking" ? (
+            <button
+              type="button"
+              className="onboarding-back"
+              onClick={() => setOnboardingStep("college-picker")}
+            >
+              Back
+            </button>
+          ) : (
+            <span className="onboarding-back onboarding-back--spacer" />
+          )}
+          <span className="onboarding-shell__label">
+            {step === "college-picker" ? "Your Colleges" : "Connect accounts"}
+          </span>
+          <div className="onboarding-progress">
+            {steps.map((s, i) => (
+              <span
+                key={s}
+                className={`onboarding-progress__dot ${
+                  i === stepIndex ? "onboarding-progress__dot--active" : i < stepIndex ? "onboarding-progress__dot--done" : ""
+                }`}
+              />
+            ))}
+          </div>
+        </div>
 
-    if (onboardingStep === "welcome") {
-      content = (
-        <>
-          <OnboardingWelcomeStep firstName={firstName} onContinue={() => setOnboardingStep("college-picker")} />
-          {progressDots}
-        </>
-      );
-    } else if (onboardingStep === "college-picker") {
-      content = (
-        <>
+        {step === "college-picker" ? (
           <OnboardingCollegePicker
+            firstName={firstName}
             selected={selectedColleges}
             onChange={setSelectedColleges}
-            onContinue={() => setOnboardingStep("preferences")}
+            onContinue={() => setOnboardingStep("linking")}
           />
-          {progressDots}
-        </>
-      );
-    } else if (onboardingStep === "preferences") {
-      content = (
-        <>
-          <DashfeedSettingsPage
-            variant="onboarding"
-            onFinishOnboarding={() => setOnboardingStep("linking")}
-            gameToggles={gameToggles}
-            onGameTogglesChange={setGameToggles}
-            storeToggles={storeToggles}
-            onStoreTogglesChange={setStoreToggles}
-            platformToggles={platformToggles}
-            onPlatformTogglesChange={setPlatformToggles}
-          />
-          {progressDots}
-        </>
-      );
-    } else {
-      // linking — real Account Linking page, wrapped with a skip
-      // option since linking any account is genuinely optional.
-      content = (
-        <>
+        ) : (
           <AccountLinkingPage
+            variant="onboarding"
+            userId={userId}
             linkedSteamId={linkedSteamId}
             onLinkSteam={setLinkedSteamId}
             onUnlinkSteam={() => setLinkedSteamId(null)}
             onAddToWishlist={addToWishlist}
+            onFinishOnboarding={finishOnboarding}
           />
-          <button type="button" className="onboarding-skip" onClick={() => goTo("dashboard")}>
-            Skip for now — you can link accounts any time in Account Settings
-          </button>
-          {progressDots}
-        </>
-      );
-    }
+        )}
+      </div>
+    );
   } else {
     content = (
       <>

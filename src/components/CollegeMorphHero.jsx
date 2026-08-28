@@ -27,9 +27,9 @@ const COLLEGE_ORDER = ["gaming", "tcg", "entertainment", "collectibles", "tablet
 const LABELS = {
   gaming: "Gaming",
   tcg: "TCG",
-  entertainment: "Entertainment",
-  collectibles: "Collectibles",
-  tabletop: "Tabletop",
+  entertainment: "Library",
+  collectibles: "Loot",
+  tabletop: "Wartable",
 };
 
 export default function CollegeMorphHero() {

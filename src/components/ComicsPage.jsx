@@ -199,7 +199,7 @@ export default function ComicsPage({ onBack, userId, isLoggedIn, onSignIn, onCre
               <ul className="backlog-search-results">
                 {comicVineResults.map((issue) => (
                   <li key={issue.id} className="backlog-search-results__row">
-                    {issue.imageUrl && <img src={issue.imageUrl} alt="" />}
+                    {issue.imageUrl && <img src={issue.imageUrl} alt="" loading="lazy" decoding="async" />}
                     <span>{issue.volumeName || issue.name}{issue.issueNumber ? ` #${issue.issueNumber}` : ""}</span>
                     <button type="button" className="linking-row__connect" onClick={() => handlePickComicVineIssue(issue)}>
                       Use this
@@ -212,7 +212,7 @@ export default function ComicsPage({ onBack, userId, isLoggedIn, onSignIn, onCre
         )}
 
         {catalogCoverUrl && !coverFile && (
-          <img src={catalogCoverUrl} alt="" className="backlog-card__thumb" style={{ alignSelf: "flex-start" }} />
+          <img src={catalogCoverUrl} alt="" className="backlog-card__thumb" style={{ alignSelf: "flex-start" }} decoding="async" />
         )}
 
         <div className="settings-form-row">
@@ -283,7 +283,7 @@ export default function ComicsPage({ onBack, userId, isLoggedIn, onSignIn, onCre
           {filtered.map((issue) => (
             <li key={issue.id} className="backlog-card">
               {issue.cover_url ? (
-                <img src={issue.cover_url} alt="" className="backlog-card__thumb" style={{ width: "48px", height: "72px" }} />
+                <img src={issue.cover_url} alt="" className="backlog-card__thumb" style={{ width: "48px", height: "72px" }} loading="lazy" decoding="async" />
               ) : (
                 <div className="backlog-card__thumb backlog-card__thumb--placeholder" style={{ width: "48px", height: "72px" }} />
               )}

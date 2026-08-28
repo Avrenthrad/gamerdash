@@ -93,19 +93,19 @@ async function loadPaletteData(userId, linkedSteamId) {
     items.push({
       type: e.media_kind === "movie" ? "movie" : e.media_kind === "tv" ? "tv" : e.media_kind === "anime" ? "anime" : "book",
       label: e.title,
-      sublabel: `Entertainment · ${e.media_kind}`,
+      sublabel: `Library · ${e.media_kind}`,
       view: "college-entertainment",
       key: `ent-${e.id}`,
     });
   }
   for (const c of collectibles) {
-    items.push({ type: "collectible", label: c.title, sublabel: `Collectibles · ${c.type?.replace(/_/g, " ") || ""}`, view: "college-collectibles", key: `col-${c.id}` });
+    items.push({ type: "collectible", label: c.title, sublabel: `Loot · ${c.type?.replace(/_/g, " ") || ""}`, view: "college-collectibles", key: `col-${c.id}` });
   }
   for (const c of campaigns) {
-    items.push({ type: "campaign", label: c.name, sublabel: "Tabletop · Campaign", view: "college-tabletop", key: `camp-${c.id}` });
+    items.push({ type: "campaign", label: c.name, sublabel: "Wartable · Campaign", view: "college-tabletop", key: `camp-${c.id}` });
   }
   for (const a of armies) {
-    items.push({ type: "army", label: a.name, sublabel: `Tabletop · ${a.faction || "Army"}`, view: "college-tabletop", key: `army-${a.id}` });
+    items.push({ type: "army", label: a.name, sublabel: `Wartable · ${a.faction || "Army"}`, view: "college-tabletop", key: `army-${a.id}` });
   }
 
   return items;

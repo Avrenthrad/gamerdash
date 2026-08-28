@@ -1,27 +1,83 @@
 // Auth screen — real email/password via Supabase, plus real OAuth
-// sign-in (Google/Apple/Microsoft/Discord) via Supabase's own
-// signInWithOAuth. This app now has a real deployed URL, so OAuth is
-// no longer blocked the way it was pre-deployment — but each provider
-// still needs to be enabled in Supabase's dashboard with real
-// credentials from that provider's own developer console before a
-// click here does anything but error. See lib/auth.js for the exact
-// setup steps per provider. Email confirmation is still deliberately
-// off for this early testing pass (see lib/auth.js history).
+// sign-in via Supabase's own signInWithOAuth. Discord and Twitch are
+// the providers actually enabled today; Google/Apple/Microsoft stay
+// listed but disabled until they're flipped on in the dashboard
+// (attempting a disabled provider lands on a raw Supabase JSON error
+// page — see fetchEnabledOAuthProviders in lib/auth.js). Email
+// confirmation is still deliberately off for this early testing pass.
 
 import { useEffect, useState } from "react";
 import LykodexLogo from "./LykodexLogo";
+import OAuthMark from "./OAuthMark";
 import { signUp, signIn, signInWithOAuth, fetchEnabledOAuthProviders } from "../lib/auth";
 import { supabaseConfigured } from "../lib/supabaseClient";
 import { isPackagedApp } from "../lib/platform";
 import { Browser } from "@capacitor/browser";
 import { App } from "@capacitor/app";
 import CollectionConstellationBackground from "./CollectionConstellationBackground";
+import { COLLEGES } from "../data/colleges";
 
-const oauthProviders = [
-  { name: "Google", provider: "google", initial: "G" },
-  { name: "Apple", provider: "apple", initial: "A" },
-  { name: "Microsoft", provider: "azure", initial: "M" },
-  { name: "Discord", provider: "discord", initial: "D" },
+const CYCLE_MS = 2600;
+
+// The moving element in the hero. Cycles the 5 real Colleges rather
+// than inventing marketing verbs, each in its own categorical section
+// accent — gold --accent is interactive-only and must not be used as
+// display text. All five words render stacked so the box never
+// resizes as the word changes.
+function HeroCycler() {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    const query = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    let timer = null;
+
+    function apply() {
+      if (timer) clearInterval(timer);
+      timer = null;
+      if (query?.matches) {
+        // Freeze on one word rather than blinking or jumping.
+        setIndex(0);
+        return;
+      }
+      timer = setInterval(() => setIndex((i) => (i + 1) % COLLEGES.length), CYCLE_MS);
+    }
+
+    apply();
+    query?.addEventListener("change", apply);
+    return () => {
+      if (timer) clearInterval(timer);
+      query?.removeEventListener("change", apply);
+    };
+  }, []);
+
+  return (
+    <p className="auth-hero__cycler">
+      <span className="auth-hero__cycler-label">Now drifting</span>
+      <span className="auth-hero__cycler-stack">
+        {COLLEGES.map((college, i) => (
+          <span
+            key={college.id}
+            className={`auth-hero__cycler-word auth-hero__cycler-word--${college.id}${
+              i === index ? " auth-hero__cycler-word--active" : ""
+            }`}
+          >
+            {college.label}
+          </span>
+        ))}
+      </span>
+    </p>
+  );
+}
+
+const leadProviders = [
+  { name: "Discord", provider: "discord" },
+  { name: "Twitch", provider: "twitch" },
+];
+
+const soonProviders = [
+  { name: "Google", provider: "google" },
+  { name: "Apple", provider: "apple" },
+  { name: "Microsoft", provider: "azure" },
 ];
 
 export default function LoginPage({ onLoginSuccess, initialMode }) {
@@ -46,6 +102,10 @@ export default function LoginPage({ onLoginSuccess, initialMode }) {
   // this resolves (or fails: fails open to null too, rather than
   // disabling every provider just because this one check failed).
   const [enabledProviders, setEnabledProviders] = useState(null);
+
+  useEffect(() => {
+    if (initialMode) setMode(initialMode);
+  }, [initialMode]);
 
   useEffect(() => {
     fetchEnabledOAuthProviders()
@@ -171,122 +231,157 @@ export default function LoginPage({ onLoginSuccess, initialMode }) {
     }
   }
 
+  function oauthLabel(p, notEnabled) {
+    if (oauthLoading === p.provider) {
+      return isPackagedApp() ? "Waiting…" : "Redirecting…";
+    }
+    if (notEnabled) return `${p.name} (soon)`;
+    return `Continue with ${p.name}`;
+  }
+
+  function renderOauthButtons(providers) {
+    return providers.map((p) => {
+      const notEnabled = enabledProviders?.[p.provider] === false;
+      return (
+        <button
+          key={p.name}
+          type="button"
+          className={`auth-oauth-btn${notEnabled ? " auth-oauth-btn--soon" : ""}`}
+          onClick={() => handleOAuth(p.provider, p.name)}
+          disabled={oauthLoading !== null || notEnabled}
+          title={notEnabled ? `${p.name} sign-in isn't available yet` : undefined}
+        >
+          <span className="auth-oauth-btn__mark">
+            <OAuthMark provider={p.provider} />
+          </span>
+          {oauthLabel(p, notEnabled)}
+        </button>
+      );
+    });
+  }
+
   return (
     <div className="auth-page">
-      <CollectionConstellationBackground />
-      <div className="auth-card">
-        <LykodexLogo className="auth-card__logo" />
-        <h1 className="auth-card__title">
-          {mode === "login" ? "Sign in to Lykodex" : "Create your account"}
-        </h1>
-        <p className="auth-card__subtitle">
-          {mode === "login"
-            ? "Track prices, achievements, and progress in one place."
-            : "Set up your account to start tracking your games."}
-        </p>
+      <div className="auth-stage">
+        <section className="auth-panel">
+          <div className="auth-card">
+            <LykodexLogo className="auth-card__logo" />
 
-        {!supabaseConfigured && (
-          <p className="panel__status panel__status--error">
-            Accounts aren't set up yet on this deployment.
-          </p>
-        )}
-
-        <form className="auth-form" onSubmit={handleSubmit}>
-          <label className="auth-form__field">
-            <span>Email</span>
-            <input
-              type="email"
-              placeholder="you@example.com"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </label>
-
-          <label className="auth-form__field">
-            <span>Password</span>
-            <input
-              type="password"
-              placeholder="••••••••"
-              autoComplete={mode === "signup" ? "new-password" : "current-password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-            />
-          </label>
-
-          {mode === "signup" && (
-            <label className="auth-form__field">
-              <span>Confirm password</span>
-              <input
-                type="password"
-                placeholder="••••••••"
-                autoComplete="new-password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-              />
-            </label>
-          )}
-
-          {error && <p className="panel__status panel__status--error">{error}</p>}
-
-          <button type="submit" className="auth-form__submit" disabled={status === "loading"}>
-            {status === "loading" ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
-          </button>
-        </form>
-
-        <div className="auth-divider">
-          <span>or continue with</span>
-        </div>
-
-        <div className="auth-oauth-row">
-          {oauthProviders.map((p) => {
-            const notEnabled = enabledProviders?.[p.provider] === false;
-            return (
+            <div className="auth-tabs" role="tablist" aria-label="Account">
               <button
-                key={p.name}
                 type="button"
-                className="auth-oauth-btn"
-                onClick={() => handleOAuth(p.provider, p.name)}
-                disabled={oauthLoading !== null || notEnabled}
-                title={notEnabled ? `${p.name} sign-in isn't available yet` : undefined}
+                role="tab"
+                aria-selected={mode === "login"}
+                className={`auth-tabs__btn${mode === "login" ? " auth-tabs__btn--active" : ""}`}
+                onClick={() => setMode("login")}
               >
-                <span className="auth-oauth-btn__mark">{p.initial}</span>
-                {oauthLoading === p.provider
-                  ? isPackagedApp()
-                    ? "Waiting…"
-                    : "Redirecting…"
-                  : notEnabled
-                    ? `${p.name} (soon)`
-                    : p.name}
+                Sign in
               </button>
-            );
-          })}
-        </div>
-        {oauthWaitingExternally && (
-          <div className="auth-oauth-waiting">
-            <p className="panel__status">Finish signing in in the browser that just opened…</p>
-            <button type="button" className="auth-card__switch" onClick={cancelOauthWait}>
-              Cancel
-            </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mode === "signup"}
+                className={`auth-tabs__btn${mode === "signup" ? " auth-tabs__btn--active" : ""}`}
+                onClick={() => setMode("signup")}
+              >
+                Create account
+              </button>
+            </div>
+
+            <h1 className="auth-card__title">
+              {mode === "login" ? "Welcome back" : "Create your Lykodex"}
+            </h1>
+            <p className="auth-card__subtitle">
+              {mode === "login"
+                ? "Sign in to pick up your library, prices, and friends."
+                : "One account for every College — games, cards, shelf, and table."}
+            </p>
+
+            {!supabaseConfigured && (
+              <p className="panel__status panel__status--error">
+                Accounts aren't set up yet on this deployment.
+              </p>
+            )}
+
+            <div className="auth-oauth-row">{renderOauthButtons(leadProviders)}</div>
+
+            <div className="auth-divider">
+              <span>or use email</span>
+            </div>
+
+            <form className="auth-form" onSubmit={handleSubmit}>
+              <label className="auth-form__field">
+                <span>Email</span>
+                <input
+                  type="email"
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </label>
+
+              <label className="auth-form__field">
+                <span>Password</span>
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+              </label>
+
+              {mode === "signup" && (
+                <label className="auth-form__field">
+                  <span>Confirm password</span>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                  />
+                </label>
+              )}
+
+              {error && <p className="panel__status panel__status--error">{error}</p>}
+
+              <button type="submit" className="auth-form__submit" disabled={status === "loading"}>
+                {status === "loading" ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
+              </button>
+            </form>
+
+            <div className="auth-oauth-row auth-oauth-row--soon">{renderOauthButtons(soonProviders)}</div>
+
+            {oauthWaitingExternally && (
+              <div className="auth-oauth-waiting">
+                <p className="panel__status">Finish signing in in the browser that just opened…</p>
+                <button type="button" className="auth-card__switch" onClick={cancelOauthWait}>
+                  Cancel
+                </button>
+              </div>
+            )}
+            {oauthError && <p className="panel__status panel__status--error">{oauthError}</p>}
           </div>
-        )}
-        {oauthError && <p className="panel__status panel__status--error">{oauthError}</p>}
+        </section>
 
-        <p className="auth-card__mfa-note">
-          Two-factor authentication (Google Authenticator) can be enabled after sign-in.
-        </p>
-
-        <button
-          type="button"
-          className="auth-card__switch"
-          onClick={() => setMode(mode === "login" ? "signup" : "login")}
-        >
-          {mode === "login" ? "New here? Create an account" : "Already have an account? Sign in"}
-        </button>
+        <aside className="auth-hero" aria-hidden="true">
+          <CollectionConstellationBackground />
+          <div className="auth-hero__overlay">
+            <span className="auth-hero__eyebrow">Collection constellation</span>
+            <p className="auth-hero__title">
+              <span className="auth-hero__title-line">Five Colleges.</span>
+              <span className="auth-hero__title-line auth-hero__title-line--ghost">One vault.</span>
+            </p>
+            <HeroCycler />
+            <p className="auth-hero__body">Everything you own, drifting as one map.</p>
+          </div>
+        </aside>
       </div>
     </div>
   );

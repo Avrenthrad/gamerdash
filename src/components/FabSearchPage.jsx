@@ -134,7 +134,7 @@ export default function FabSearchPage({ onBack, userId, isLoggedIn, onSignIn, on
             return (
               <li key={card.id} className="backlog-card">
                 {image ? (
-                  <img src={image} alt="" className="backlog-card__thumb" style={{ width: "56px", height: "78px" }} />
+                  <img src={image} alt="" className="backlog-card__thumb" style={{ width: "56px", height: "78px" }} loading="lazy" decoding="async" />
                 ) : (
                   <div className="backlog-card__thumb backlog-card__thumb--placeholder" style={{ width: "56px", height: "78px" }} />
                 )}

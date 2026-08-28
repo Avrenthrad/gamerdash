@@ -202,9 +202,9 @@ export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCr
           <h1 className="price-page__title">Friends</h1>
           <p className="price-page__subtitle">Sign in to add and manage friends.</p>
         </div>
-        <div className="backlog-add">
-          <button type="button" className="linking-row__connect" onClick={onSignIn}>Sign in</button>
-          <button type="button" className="linking-row__connect" onClick={onCreateAccount}>Create account</button>
+        <div className="account-gate-panel__actions">
+          <button type="button" className="auth-form__submit" onClick={onCreateAccount}>Create account</button>
+          <button type="button" className="auth-form__secondary" onClick={onSignIn}>Sign in</button>
         </div>
       </div>
     );

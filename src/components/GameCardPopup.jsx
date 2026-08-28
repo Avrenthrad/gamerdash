@@ -78,7 +78,7 @@ export default function GameCardPopup({
           <>
             <div className="wishlist-card__main">
               {deal.thumb ? (
-                <img src={deal.thumb} alt="" className="wishlist-card__thumb" />
+                <img src={deal.thumb} alt="" className="wishlist-card__thumb" decoding="async" />
               ) : (
                 <div className="wishlist-card__thumb wishlist-card__thumb--placeholder" />
               )}

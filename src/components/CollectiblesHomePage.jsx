@@ -94,7 +94,7 @@ export default function CollectiblesHomePage({ onBack, isLoggedIn, userId, onSig
       <div className="price-page">
         <div className="price-page__head">
           <button type="button" className="back-link" onClick={onBack}>← Back to Overview</button>
-          <h1 className="price-page__title">Collectibles</h1>
+          <h1 className="price-page__title">Loot</h1>
           <p className="price-page__subtitle">Your real shelf — Pops, statues, LEGO, hardware, and more.</p>
         </div>
         <div className="backlog-add">
@@ -113,7 +113,7 @@ export default function CollectiblesHomePage({ onBack, isLoggedIn, userId, onSig
     <div className="price-page">
       <div className="price-page__head">
         <button type="button" className="back-link" onClick={onBack}>← Back to Overview</button>
-        <h1 className="price-page__title">Collectibles</h1>
+        <h1 className="price-page__title">Loot</h1>
         <p className="price-page__subtitle">
           Scan a barcode, or search the real Funko Pop, LEGO (Rebrickable), or vinyl (Discogs)
           catalogs to add items fast — everything else stays honest manual entry.
@@ -186,7 +186,7 @@ function EntryList({ entries, emptyMessage, onStateChange, onRemove }) {
       {entries.map((entry) => (
         <li key={entry.id} className="backlog-card">
           {entry.cover_image_url ? (
-            <img src={entry.cover_image_url} alt="" className="backlog-card__thumb" />
+            <img src={entry.cover_image_url} alt="" className="backlog-card__thumb" loading="lazy" decoding="async" />
           ) : (
             <div className="backlog-card__thumb backlog-card__thumb--placeholder" />
           )}
@@ -411,7 +411,7 @@ function AddItemForm({ userId, onAdded }) {
             <ul className="backlog-search-results">
               {funkoResults.map((pop) => (
                 <li key={pop.handle} className="backlog-search-results__row">
-                  {pop.imageUrl && <img src={pop.imageUrl} alt="" />}
+                  {pop.imageUrl && <img src={pop.imageUrl} alt="" loading="lazy" decoding="async" />}
                   <span>{pop.title}{pop.series ? ` — ${pop.series}` : ""}</span>
                   <button type="button" className="linking-row__connect" onClick={() => handlePickFunko(pop)}>
                     Use this
@@ -444,7 +444,7 @@ function AddItemForm({ userId, onAdded }) {
             <ul className="backlog-search-results">
               {legoResults.map((set) => (
                 <li key={set.setNum} className="backlog-search-results__row">
-                  {set.imageUrl && <img src={set.imageUrl} alt="" />}
+                  {set.imageUrl && <img src={set.imageUrl} alt="" loading="lazy" decoding="async" />}
                   <span>{set.name}{set.year ? ` (${set.year})` : ""} — #{set.setNum}</span>
                   <button type="button" className="linking-row__connect" onClick={() => handlePickLego(set)}>
                     Use this
@@ -476,7 +476,7 @@ function AddItemForm({ userId, onAdded }) {
             <ul className="backlog-search-results">
               {vinylResults.map((release) => (
                 <li key={release.id} className="backlog-search-results__row">
-                  {release.imageUrl && <img src={release.imageUrl} alt="" />}
+                  {release.imageUrl && <img src={release.imageUrl} alt="" loading="lazy" decoding="async" />}
                   <span>{release.title}{release.year ? ` (${release.year})` : ""}{release.format ? ` — ${release.format}` : ""}</span>
                   <button type="button" className="linking-row__connect" onClick={() => handlePickVinyl(release)}>
                     Use this
@@ -489,7 +489,7 @@ function AddItemForm({ userId, onAdded }) {
       )}
 
       {coverImageUrl && (
-        <img src={coverImageUrl} alt="" className="backlog-card__thumb" style={{ alignSelf: "flex-start" }} />
+        <img src={coverImageUrl} alt="" className="backlog-card__thumb" style={{ alignSelf: "flex-start" }} decoding="async" />
       )}
 
       <label className="auth-form__field">

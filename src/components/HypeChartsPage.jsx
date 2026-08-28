@@ -133,7 +133,7 @@ export default function HypeChartsPage({
               >
                 <span className="hype-row__rank">#{row.rank}</span>
                 {row.thumb ? (
-                  <img src={row.thumb} alt="" className="hype-row__thumb" />
+                  <img src={row.thumb} alt="" className="hype-row__thumb" loading="lazy" decoding="async" />
                 ) : (
                   <div className="hype-row__thumb hype-row__thumb--placeholder" />
                 )}

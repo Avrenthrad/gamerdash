@@ -99,6 +99,7 @@ export default function LibrarySection({ isLoggedIn, onSignIn, onCreateAccount, 
                         src={`https://media.steampowered.com/steamcommunity/public/images/apps/${g.appid}/${g.img_icon_url}.jpg`}
                         alt=""
                         className="library-table__icon"
+                        decoding="async"
                       />
                     )}
                     {g.name}

@@ -60,7 +60,7 @@ export default function GuildSpotlightCard({ userId, onOpenGuilds }) {
         <>
           <div className="guild-spotlight__identity">
             {guild.logo_url ? (
-              <img src={guild.logo_url} alt="" className="guild-spotlight__avatar" style={{ objectFit: "cover" }} />
+              <img src={guild.logo_url} alt="" className="guild-spotlight__avatar" style={{ objectFit: "cover" }} decoding="async" />
             ) : (
               <div className="guild-spotlight__avatar" aria-hidden="true">
                 {guild.name.slice(0, 1).toUpperCase()}
