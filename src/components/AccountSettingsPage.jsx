@@ -75,7 +75,12 @@ export default function AccountSettingsPage({
   username,
   onUsernameChange,
   accentColor,
-  onAccentColorChange,
+  // No longer used directly — the swatch row below now calls
+  // setAccentColorExplicit() from useApp() so it can also mark the
+  // choice as customized (see AppContext.jsx). Kept in the prop list
+  // rather than stripped here so App.jsx's wiring doesn't need editing
+  // as part of this change; harmless to just ignore.
+  onAccentColorChange: _onAccentColorChange,
   themeMode,
   onThemeModeChange,
   wallpaperUrl,
@@ -101,7 +106,7 @@ export default function AccountSettingsPage({
   // prop like everything else on this page (an intentional, isolated
   // exception here) since this is exclusive to one account and doesn't
   // belong threaded through every other page's props just for this.
-  const { actingAsLykodex, actAsLykodex, returnToMyAccount } = useApp();
+  const { actingAsLykodex, actAsLykodex, returnToMyAccount, setAccentColorExplicit } = useApp();
   const [isLykodexDelegate, setIsLykodexDelegate] = useState(false);
   const [lykodexToggleStatus, setLykodexToggleStatus] = useState("idle"); // idle | working | error
   useEffect(() => {
@@ -485,7 +490,7 @@ export default function AccountSettingsPage({
               key={option.id}
               type="button"
               className={`accent-swatch accent-swatch--${option.id} ${accentColor === option.id ? "accent-swatch--active" : ""}`}
-              onClick={() => onAccentColorChange(option.id)}
+              onClick={() => setAccentColorExplicit(option.id)}
               aria-pressed={accentColor === option.id}
               title={option.label}
             >

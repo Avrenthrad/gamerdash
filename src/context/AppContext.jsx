@@ -114,6 +114,18 @@ const KNOWN_VIEWS = [
   "college-tabletop",
 ];
 
+// The 5 College home pages only — not their subpages (backlog,
+// achievements, collections, deck builders, etc.), which keep the
+// app-wide gold default. "dashboard" is Gaming's home view id (never
+// renamed — see the College display-label rename, IDs stayed stable).
+const COLLEGE_HOME_VIEWS = [
+  "dashboard",
+  "tcg-home",
+  "college-entertainment",
+  "college-collectibles",
+  "college-tabletop",
+];
+
 const EXPECTED_LAYOUT_KEYS = DEFAULT_DASHBOARD_LAYOUT.map((item) => item.i)
   .sort()
   .join(",");
@@ -231,6 +243,19 @@ export function AppProvider({ children }) {
 
   const [themeMode, setThemeMode] = useState("dark");
   const [accentColor, setAccentColor] = useState("gold");
+  // Whether the user has ever explicitly picked an accent (via the
+  // swatch row in Account Settings) as opposed to just sitting on
+  // whatever the default happens to be. This is a REAL flag, not
+  // derived from accent_color being non-null — the write-back effect
+  // below has always saved accent_color on every profile edit
+  // regardless of whether the user ever opened the theme picker, so
+  // null-ness alone can't tell "never touched it" apart from "saved
+  // the default". Only setAccentColorExplicit (used by the picker)
+  // sets this true. See effectiveAccent below for what this unlocks:
+  // per-page accent defaults (gold on Overview, red on the 5 College
+  // homes) for anyone who hasn't customized, logged-out visitors
+  // included.
+  const [accentCustomized, setAccentCustomized] = useState(false);
   const [wallpaperUrl, setWallpaperUrl] = useState(null);
   const [currency, setCurrency] = useState("AUD");
   const [shareActivityWithGuilds, setShareActivityWithGuilds] = useState(false);
@@ -400,8 +425,18 @@ export function AppProvider({ children }) {
   }, [themeMode]);
 
   useEffect(() => {
-    document.documentElement.dataset.accent = accentColor;
-  }, [accentColor]);
+    // Default (never-customized) accent is page-dependent — gold on
+    // Overview, red on the 5 College home pages, gold everywhere else
+    // — per the user's explicit choice. Once someone actually picks a
+    // swatch (setAccentColorExplicit → accentCustomized = true), that
+    // choice wins everywhere, same as before this feature existed.
+    const effectiveAccent = accentCustomized
+      ? accentColor
+      : COLLEGE_HOME_VIEWS.includes(view)
+      ? "red"
+      : "gold";
+    document.documentElement.dataset.accent = effectiveAccent;
+  }, [accentColor, accentCustomized, view]);
 
   useEffect(() => {
     if (wallpaperUrl) {
@@ -457,6 +492,7 @@ export function AppProvider({ children }) {
       setOverallMasteryComputedAt(null);
       setThemeMode("dark");
       setAccentColor("gold");
+      setAccentCustomized(false);
       setWallpaperUrl(null);
       setCurrency("AUD");
       setXbxpricesKey("");
@@ -500,6 +536,7 @@ export function AppProvider({ children }) {
         // redesign — gold replaces it, so treat old saved picks as gold
         // rather than leaving the theme picker with nothing selected.
         setAccentColor(profile.accent_color === "yellow" ? "gold" : profile.accent_color || "gold");
+        setAccentCustomized(Boolean(profile.accent_customized));
         setWallpaperUrl(profile.wallpaper_url || null);
         setCurrency(profile.currency || "AUD");
         setShareActivityWithGuilds(profile.share_activity_with_guilds || false);
@@ -568,6 +605,7 @@ export function AppProvider({ children }) {
         username,
         theme_mode: themeMode,
         accent_color: accentColor,
+        accent_customized: accentCustomized,
         currency,
         share_activity_with_guilds: shareActivityWithGuilds,
         read_receipts_enabled: readReceiptsEnabled,
@@ -594,6 +632,7 @@ export function AppProvider({ children }) {
     username,
     themeMode,
     accentColor,
+    accentCustomized,
     currency,
     shareActivityWithGuilds,
     readReceiptsEnabled,
@@ -782,6 +821,15 @@ export function AppProvider({ children }) {
     if (error) throw error;
   }, [personalSessionCache]);
 
+  // The only setter that should ever mark accent as customized — used
+  // exclusively by the Account Settings swatch row. Everywhere else
+  // that touches setAccentColor (hydration, logout reset) is loading
+  // state, not a user choosing something, so it must NOT flip this.
+  const setAccentColorExplicit = useCallback((color) => {
+    setAccentColor(color);
+    setAccentCustomized(true);
+  }, []);
+
   const toggleThemeMode = useCallback(() => {
     setThemeMode((prev) => (prev === "dark" ? "light" : "dark"));
   }, []);
@@ -932,6 +980,8 @@ export function AppProvider({ children }) {
       setThemeMode,
       accentColor,
       setAccentColor,
+      accentCustomized,
+      setAccentColorExplicit,
       wallpaperUrl,
       setWallpaperUrl,
       currency,
@@ -1017,6 +1067,8 @@ export function AppProvider({ children }) {
       recomputeOverallMastery,
       themeMode,
       accentColor,
+      accentCustomized,
+      setAccentColorExplicit,
       wallpaperUrl,
       currency,
       shareActivityWithGuilds,
