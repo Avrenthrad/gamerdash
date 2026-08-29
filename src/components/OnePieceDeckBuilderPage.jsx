@@ -193,8 +193,10 @@ export default function OnePieceDeckBuilderPage({ onBack, userId }) {
         </form>
         {leaderResults.length > 0 && (
           <ul className="backlog-search-results">
-            {leaderResults.map((card) => (
-              <li key={card.id} className="backlog-search-results__row">
+            {leaderResults.map((card, index) => (
+              // See lib/onepiece.js — card.id can collide across
+              // unrelated cards in optcgapi.com's own dataset.
+              <li key={`${card.id}-${index}`} className="backlog-search-results__row">
                 <span>{card.name} ({card.color})</span>
                 <button type="button" className="linking-row__connect" onClick={() => handleSetLeader(card)}>Choose</button>
               </li>
@@ -215,8 +217,8 @@ export default function OnePieceDeckBuilderPage({ onBack, userId }) {
 
         {addResults.length > 0 && (
           <ul className="backlog-search-results">
-            {addResults.map((card) => (
-              <li key={card.id} className="backlog-search-results__row">
+            {addResults.map((card, index) => (
+              <li key={`${card.id}-${index}`} className="backlog-search-results__row">
                 <span>{card.name} ({card.type})</span>
                 <button type="button" className="linking-row__connect" onClick={() => handleAddCard(card)}>Add</button>
               </li>

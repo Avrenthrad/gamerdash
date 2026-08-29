@@ -108,10 +108,14 @@ export default function OnePieceSearchPage({ onBack, userId, isLoggedIn, onSignI
 
       {status === "ready" && results.length > 0 && (
         <ul className="backlog-list">
-          {results.slice(0, 30).map((card) => {
+          {results.slice(0, 30).map((card, index) => {
             const price = currentOnePiecePrice(card);
             return (
-              <li key={card.id} className="backlog-card">
+              // See lib/onepiece.js — card.id (card_image_id) has a
+              // handful of confirmed real collisions in optcgapi.com's
+              // own dataset, so index is folded into the key to stay
+              // stable even when that happens.
+              <li key={`${card.id}-${index}`} className="backlog-card">
                 {card.imageUrl ? (
                   <img src={card.imageUrl} alt="" className="backlog-card__thumb" style={{ width: "56px", height: "78px" }} loading="lazy" decoding="async" />
                 ) : (

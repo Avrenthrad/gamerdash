@@ -330,7 +330,16 @@ async function handleComicVine(searchParams, res) {
 // /cards/{id} for a single lookup by Riftcodex's own real id. No real
 // pricing field exists on the card object (has a tcgplayer_id, but no
 // embedded price) — same honest situation Flesh and Blood is in.
+//
+// Confirmed live: Riftcodex (Cloudflare-fronted) returns a real 403 to
+// requests actually originating from Vercel's infrastructure, while
+// identical requests from elsewhere succeed — almost certainly
+// Cloudflare's bot-protection treating known cloud-hosting-provider
+// IP ranges as suspicious, same class of issue Card Kingdom/Comic
+// Vine's User-Agent header above already works around. Sending the
+// same real User-Agent here rather than Node's default one.
 const RIFTCODEX_BASE = "https://api.riftcodex.com";
+const RIFTCODEX_HEADERS = { Accept: "application/json", "User-Agent": "Lykodex/1.0 (+https://lykodex.vercel.app)" };
 
 async function handleRiftbound(searchParams, res) {
   const mode = searchParams.get("mode");
@@ -340,8 +349,12 @@ async function handleRiftbound(searchParams, res) {
       const q = searchParams.get("q");
       if (!q) return res.status(400).json({ error: "Missing q query parameter" });
       const url = `${RIFTCODEX_BASE}/cards/name?fuzzy=${encodeURIComponent(q)}`;
-      const rcRes = await fetch(url, { headers: { Accept: "application/json" } });
-      if (!rcRes.ok) return res.status(rcRes.status).json({ error: "Riftbound search failed" });
+      const rcRes = await fetch(url, { headers: RIFTCODEX_HEADERS });
+      if (!rcRes.ok) {
+        const bodyText = await rcRes.text().catch(() => "");
+        console.error("pricing (riftbound): search upstream error", { url, status: rcRes.status, body: bodyText.slice(0, 300) });
+        return res.status(rcRes.status).json({ error: "Riftbound search failed" });
+      }
       const data = await rcRes.json();
       return res.status(200).json(data);
     }
@@ -350,9 +363,13 @@ async function handleRiftbound(searchParams, res) {
       const id = searchParams.get("id");
       if (!id) return res.status(400).json({ error: "Missing id query parameter" });
       const url = `${RIFTCODEX_BASE}/cards/${encodeURIComponent(id)}`;
-      const rcRes = await fetch(url, { headers: { Accept: "application/json" } });
+      const rcRes = await fetch(url, { headers: RIFTCODEX_HEADERS });
       if (rcRes.status === 404) return res.status(404).json({ error: "Card not found" });
-      if (!rcRes.ok) return res.status(rcRes.status).json({ error: "Riftbound lookup failed" });
+      if (!rcRes.ok) {
+        const bodyText = await rcRes.text().catch(() => "");
+        console.error("pricing (riftbound): card upstream error", { url, status: rcRes.status, body: bodyText.slice(0, 300) });
+        return res.status(rcRes.status).json({ error: "Riftbound lookup failed" });
+      }
       const data = await rcRes.json();
       return res.status(200).json(data);
     }

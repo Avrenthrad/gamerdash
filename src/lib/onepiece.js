@@ -13,9 +13,27 @@ import { getCached, setCached, CACHE_TTL } from "./cache";
 
 const API_ROOT = "https://optcgapi.com/api";
 
+// card_image_id (not card_set_id) is the real unique-per-printing
+// identifier — confirmed live that a Parallel/Alternate Art variant
+// shares the SAME card_set_id as its base printing (e.g. both
+// "Monkey.D.Luffy (024)" and "Monkey.D.Luffy (024) (Parallel)" have
+// card_set_id "OP01-024"), which produced real duplicate React keys
+// and duplicate collection rows when card_set_id was used as `id`.
+// card_image_id is genuinely distinct per variant ("OP01-024" vs
+// "OP01-024_p1")... except optcgapi.com's own dataset ALSO has a
+// handful of confirmed real collisions where card_image_id repeats
+// across two entirely DIFFERENT cards (e.g. "OP03-070" is shared by
+// "Monkey.D.Luffy (Dash Pack)" from Kingdoms of Intrigue and an
+// unrelated "Monkey.D.Luffy" from Pillars of Strength) — a genuine
+// upstream data-quality issue, not something fixable from this side.
+// Search-result rendering keys on `${id}-${index}` to stay stable
+// despite this; getOnePieceCardById below can't fully disambiguate a
+// collision like this, so collection-adding one of a colliding pair
+// is a known, documented edge case rather than a silent bug.
 function normalizeOnePieceCard(card) {
   return {
-    id: card.card_set_id,
+    id: card.card_image_id,
+    cardSetId: card.card_set_id,
     name: card.card_name,
     text: card.card_text,
     setId: card.set_id,
@@ -53,18 +71,23 @@ export async function searchOnePieceCards(query) {
   return (Array.isArray(data) ? data : []).map(normalizeOnePieceCard);
 }
 
-export async function getOnePieceCardById(cardSetId) {
-  const cacheKey = `gd-optcg-card-id:${cardSetId}`;
+// Takes a card_image_id (this module's real per-printing id — see
+// normalizeOnePieceCard above), not a card_set_id — the lookup
+// endpoint only accepts card_set_id, so the base id is recovered by
+// stripping any trailing "_p..." variant suffix, then the matching
+// row is picked out of the (possibly multi-variant) response by its
+// own card_image_id rather than assuming data[0] is the right one.
+export async function getOnePieceCardById(cardImageId) {
+  const cacheKey = `gd-optcg-card-id:${cardImageId}`;
   const cached = getCached(cacheKey, CACHE_TTL.ONE_DAY);
   if (cached !== undefined) return cached;
 
-  const res = await fetch(`${API_ROOT}/sets/card/${encodeURIComponent(cardSetId)}/`);
+  const baseCardSetId = cardImageId.split("_")[0];
+  const res = await fetch(`${API_ROOT}/sets/card/${encodeURIComponent(baseCardSetId)}/`);
   if (!res.ok) return null;
   const data = await res.json();
-  // Real printings share one card_set_id but can have multiple rows
-  // (e.g. a Parallel variant) — the first (non-parallel) is the card's
-  // own canonical printing.
-  const card = Array.isArray(data) && data.length > 0 ? normalizeOnePieceCard(data[0]) : null;
+  const match = Array.isArray(data) ? data.find((c) => c.card_image_id === cardImageId) : null;
+  const card = match ? normalizeOnePieceCard(match) : null;
   setCached(cacheKey, card);
   return card;
 }
