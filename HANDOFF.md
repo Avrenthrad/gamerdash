@@ -134,6 +134,33 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-30 — **Removed the artificial 1000-point cap on Mastery
+  Score.** User flagged "why is this all 1000/1000" on the Gaming
+  Mastery breakdown. Root cause: `normalize()` in `lib/gameMastery.js`
+  used an exponential diminishing-returns curve
+  (`1000 * (1 - e^(-x/typicalMax))`) that asymptotes at 1000 no matter
+  how high the raw score gets — and the `typicalMax` reference values
+  (PlayStation 8000, Steam 5000) were low enough that any reasonably
+  dedicated player saturated the display long before being near the
+  real top end (PS trophy points scale as `count × tier × rarity`, so
+  ~50 platinums alone can clear 8000 raw).
+
+  Replaced with a linear, uncapped formula:
+  `normalized = 1000 × (raw / typicalMax)` — `typicalMax` is now a
+  reference point, not a ceiling; scores can climb past 1000
+  indefinitely. `overallMastery.js` inherits this for free (imports
+  `normalize` from `gameMastery.js`). `GameMasterySection.jsx`'s
+  per-platform breakdown now shows just the number, no more "X / 1000"
+  fraction. Hand-synced into `discord-bot/gameMastery.js` per its
+  existing sync-by-hand convention (separate deployable package, not a
+  shared workspace).
+
+  Xbox's curve (`100 * log10(1 + gamerscore)`) was never actually
+  saturating — flagging in case Cursor or V0 touch the Xbox side and
+  wonder why it looked "fine" already.
+
+  Committed `1c0aa8c`, pushed to `main`.
+
 - 2026-08-30 — **Accent now defaults per-page until customized: gold
   on Overview, red on the 5 College homes.** Discovered along the way:
   the write-back effect in `AppContext.jsx` has always saved
