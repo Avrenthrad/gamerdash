@@ -134,6 +134,37 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-30 — **Accent now defaults per-page until customized: gold
+  on Overview, red on the 5 College homes.** Discovered along the way:
+  the write-back effect in `AppContext.jsx` has always saved
+  `accent_color` on every profile edit regardless of whether the user
+  ever opened the theme picker, so a non-null `accent_color` alone
+  can't tell "genuinely chose gold" apart from "never touched it."
+
+  Added a real `profiles.accent_customized` boolean (migration
+  `add_accent_customized_flag`), set only via the new
+  `setAccentColorExplicit()` in `AppContext.jsx` — used exclusively by
+  the swatch row in `AccountSettingsPage.jsx`. Backfilled `true` only
+  for accounts already on a non-default preset (red/purple/blue);
+  gold and the retired `yellow` alias are treated as "never
+  customized." Until customized (logged-out visitors included, since
+  they never touch this flag at all), the `<html data-accent>` value
+  resolves per current `view`: red on `dashboard` (Gaming)/`tcg-home`/
+  `college-entertainment`/`college-collectibles`/`college-tabletop`
+  (the 5 College **home** views only, not their subpages), gold
+  everywhere else. Once a user picks any swatch, that choice applies
+  everywhere again, same as before this change. No CSS changes needed
+  — the `html[data-accent="red"]` preset already existed in
+  `index.css`.
+
+  `AccountSettingsPage.jsx`'s `onAccentColorChange` prop is now dead
+  (renamed to `_onAccentColorChange` locally to satisfy lint) — the
+  swatch calls `setAccentColorExplicit` via `useApp()` instead. Left
+  `App.jsx`'s wiring of that prop alone rather than touching it mid
+  your Overview work; harmless to leave, safe to clean up whenever.
+
+  Committed `4a06cd6`, pushed to `main`.
+
 - 2026-08-30 — **Real in-app presence added; friends/guild roster sort
   online-first.** User explicitly chose to build genuine in-app
   presence rather than reuse Steam status as an "online" proxy, and
