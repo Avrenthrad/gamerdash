@@ -11,24 +11,15 @@ import { useEffect, useState } from "react";
 import {
   fetchMasteryInputs, saveXboxGamerscore, savePsTrophyCounts,
 } from "../lib/gameMasteryData";
-import {
-  PS_TROPHY_TIERS, PS_RARITY_TIERS, PS_TROPHY_TIER_POINTS, PS_RARITY_MULTIPLIERS,
-  levelFromXp,
-} from "../lib/gameMastery";
+import { PS_TROPHY_TIERS, PS_TROPHY_TIER_POINTS, levelFromXp } from "../lib/gameMastery";
 
 const TIER_LABELS = { bronze: "Bronze", silver: "Silver", gold: "Gold", platinum: "Platinum" };
-const RARITY_LABELS = { common: "Common", rare: "Rare", very_rare: "Very Rare", ultra_rare: "Ultra Rare" };
 const PLATFORM_LABELS = { xbox: "Xbox", playstation: "PlayStation", steam: "Steam" };
 
-function emptyGrid() {
-  const grid = {};
-  PS_TROPHY_TIERS.forEach((tier) => {
-    grid[tier] = {};
-    PS_RARITY_TIERS.forEach((rarity) => {
-      grid[tier][rarity] = "";
-    });
-  });
-  return grid;
+function emptyCounts() {
+  const counts = {};
+  PS_TROPHY_TIERS.forEach((tier) => { counts[tier] = ""; });
+  return counts;
 }
 
 function relativeAsOf(iso) {
@@ -51,7 +42,7 @@ export default function GameMasterySection({
 }) {
   const [xboxInput, setXboxInput] = useState("");
   const [xboxStatus, setXboxStatus] = useState("idle"); // idle | saving | saved | error
-  const [psGrid, setPsGrid] = useState(emptyGrid());
+  const [psCounts, setPsCounts] = useState(emptyCounts());
   const [psStatus, setPsStatus] = useState("idle");
   const [recomputing, setRecomputing] = useState(false);
 
@@ -64,14 +55,18 @@ export default function GameMasterySection({
           setXboxInput(String(inputs.xbox_gamerscore));
         }
         if (inputs.ps_trophy_counts) {
-          const grid = emptyGrid();
+          const counts = emptyCounts();
           PS_TROPHY_TIERS.forEach((tier) => {
-            PS_RARITY_TIERS.forEach((rarity) => {
-              const v = inputs.ps_trophy_counts?.[tier]?.[rarity];
-              if (v !== undefined && v !== null) grid[tier][rarity] = String(v);
-            });
+            // Only a plain number is the current (post-rarity-removal)
+            // shape — an older nested { rarity: count } object from
+            // before this change is silently skipped rather than
+            // rendered as "[object Object]", since there's no honest
+            // way to collapse rarity-weighted sub-counts back into a
+            // single tier count without asking the person to re-enter.
+            const v = inputs.ps_trophy_counts?.[tier];
+            if (typeof v === "number") counts[tier] = String(v);
           });
-          setPsGrid(grid);
+          setPsCounts(counts);
         }
       })
       .catch((err) => console.error("Failed to load Game Mastery inputs:", err));
@@ -96,10 +91,7 @@ export default function GameMasterySection({
     setPsStatus("saving");
     const counts = {};
     PS_TROPHY_TIERS.forEach((tier) => {
-      counts[tier] = {};
-      PS_RARITY_TIERS.forEach((rarity) => {
-        counts[tier][rarity] = Math.max(0, Number(psGrid[tier][rarity]) || 0);
-      });
+      counts[tier] = Math.max(0, Number(psCounts[tier]) || 0);
     });
     try {
       await savePsTrophyCounts(userId, counts);
@@ -206,29 +198,18 @@ export default function GameMasterySection({
       <details style={{ marginTop: "10px" }}>
         <summary className="panel__status" style={{ cursor: "pointer" }}>Enter PlayStation trophies</summary>
         <p className="panel__status" style={{ fontSize: "11px" }}>
-          Read these straight off your own PSN trophy case — it already breaks trophies down by tier and rarity this same way.
+          Read these straight off your own PSN trophy case — just the count per tier, no rarity breakdown needed.
         </p>
         <div className="mastery-ps-grid">
-          <div className="mastery-ps-grid__row mastery-ps-grid__row--head">
-            <span />
-            {PS_RARITY_TIERS.map((rarity) => (
-              <span key={rarity}>{RARITY_LABELS[rarity]} ({PS_RARITY_MULTIPLIERS[rarity]}×)</span>
-            ))}
-          </div>
           {PS_TROPHY_TIERS.map((tier) => (
             <div key={tier} className="mastery-ps-grid__row">
-              <span>{TIER_LABELS[tier]} ({PS_TROPHY_TIER_POINTS[tier]}pt)</span>
-              {PS_RARITY_TIERS.map((rarity) => (
-                <input
-                  key={rarity}
-                  type="number"
-                  min="0"
-                  value={psGrid[tier][rarity]}
-                  onChange={(e) =>
-                    setPsGrid((prev) => ({ ...prev, [tier]: { ...prev[tier], [rarity]: e.target.value } }))
-                  }
-                />
-              ))}
+              <span>{TIER_LABELS[tier]} ({PS_TROPHY_TIER_POINTS[tier]}pt each)</span>
+              <input
+                type="number"
+                min="0"
+                value={psCounts[tier]}
+                onChange={(e) => setPsCounts((prev) => ({ ...prev, [tier]: e.target.value }))}
+              />
             </div>
           ))}
         </div>

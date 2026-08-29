@@ -21,18 +21,6 @@ export function rarityMultiplierFromPercent(percent) {
   return 1.0;
 }
 
-// PlayStation's own trophy case groups trophies into these four named
-// rarity buckets when no numeric percent is available (Sony doesn't
-// expose one publicly) — a person reads these straight off their own
-// profile.
-export const PS_RARITY_TIERS = ["common", "rare", "very_rare", "ultra_rare"];
-export const PS_RARITY_MULTIPLIERS = {
-  common: 1.0,
-  rare: 1.25,
-  very_rare: 1.6,
-  ultra_rare: 2.2,
-};
-
 export const PS_TROPHY_TIERS = ["bronze", "silver", "gold", "platinum"];
 export const PS_TROPHY_TIER_POINTS = {
   bronze: 15,
@@ -49,20 +37,22 @@ export function computeXboxScore(gamerscore) {
   return 100 * Math.log10(1 + g);
 }
 
-// counts: { bronze: { common, rare, very_rare, ultra_rare }, silver: {...}, gold: {...}, platinum: {...} }
-// Each leaf is a real count of trophies the person has earned in that
-// tier x rarity bucket. Missing tiers/rarities are treated as 0, not
-// skipped — a genuinely empty grid just scores 0, same as no trophies.
+// counts: { bronze: number, silver: number, gold: number, platinum: number }
+// Each value is a real count of trophies the person has earned in
+// that tier — no rarity weighting. Rarity multipliers were removed:
+// PlayStation doesn't expose a real per-trophy rarity percentage the
+// way Steam does, so the old 4-tier "common/rare/very_rare/ultra_rare"
+// buckets were a person's own subjective read of their own trophy
+// case, not verified data — dropped in favor of just the tier counts,
+// which are what's actually printed on a PSN trophy list. Missing
+// tiers are treated as 0, not skipped — a genuinely empty set of
+// counts just scores 0, same as no trophies.
 export function computePsScore(counts) {
   if (!counts) return 0;
   let total = 0;
   for (const tier of PS_TROPHY_TIERS) {
-    const tierPoints = PS_TROPHY_TIER_POINTS[tier];
-    const tierCounts = counts[tier] || {};
-    for (const rarity of PS_RARITY_TIERS) {
-      const count = Math.max(0, Number(tierCounts[rarity]) || 0);
-      total += count * tierPoints * PS_RARITY_MULTIPLIERS[rarity];
-    }
+    const count = Math.max(0, Number(counts[tier]) || 0);
+    total += count * PS_TROPHY_TIER_POINTS[tier];
   }
   return total;
 }
@@ -97,7 +87,11 @@ export function normalize(x, typicalMax) {
 
 export const TYPICAL_MAX = {
   xbox: 500,
-  playstation: 8000,
+  // Lowered from 8000 alongside removing PS_RARITY_MULTIPLIERS above —
+  // that removal drops real raw totals by roughly the old average
+  // multiplier (~1.5x), so keeping 8000 here would have made 1000
+  // quietly mean "a less dedicated player" than it used to.
+  playstation: 5300,
   steam: 5000,
 };
 

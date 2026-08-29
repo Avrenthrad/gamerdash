@@ -6871,7 +6871,7 @@ html[data-mode="light"] .current-rotation {
 
 .mastery-ps-grid {
   display: grid;
-  grid-template-columns: 150px repeat(4, 1fr);
+  grid-template-columns: 150px 1fr;
   gap: 6px;
   margin-top: 10px;
   align-items: center;
@@ -6886,15 +6886,6 @@ html[data-mode="light"] .current-rotation {
   color: var(--text-secondary);
 }
 
-.mastery-ps-grid__row--head > span {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-tertiary);
-  font-weight: 600;
-}
-
 .mastery-ps-grid__row input {
   width: 100%;
   background: var(--surface);
@@ -6907,7 +6898,7 @@ html[data-mode="light"] .current-rotation {
 
 @media (max-width: 640px) {
   .mastery-ps-grid {
-    grid-template-columns: 90px repeat(4, 1fr);
+    grid-template-columns: 90px 1fr;
   }
 }
 
