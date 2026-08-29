@@ -31,7 +31,7 @@ import { isPackagedApp } from "../lib/platform";
 import { requestUpfrontPermissions } from "../lib/requestPermissions";
 import { DEFAULT_PLATFORM_ORDER } from "../data/platformOrder";
 import { supabase, supabaseConfigured } from "../lib/supabaseClient";
-import { signOut as supabaseSignOut } from "../lib/auth";
+import { signOut as supabaseSignOut, requestLykodexSession } from "../lib/auth";
 import {
   fetchProfile,
   upsertProfile,
@@ -174,6 +174,14 @@ export function AppProvider({ children }) {
   const [session, setSession] = useState(null);
   const isLoggedIn = Boolean(session);
   const userId = session?.user?.id ?? null;
+
+  // ----- "act as Lykodex" (exclusive to the one registered delegate
+  // account, see lib/auth.js) — a genuine session swap, so this is
+  // holding the real personal session's tokens in memory (never
+  // persisted) purely so flipping back doesn't require a real
+  // re-login. Cleared on a real sign-out either way.
+  const [personalSessionCache, setPersonalSessionCache] = useState(null);
+  const actingAsLykodex = Boolean(personalSessionCache);
 
   // ----- profile -----
   const [avatarUrl, setAvatarUrl] = useState(null);
@@ -724,8 +732,39 @@ export function AppProvider({ children }) {
     if (supabaseConfigured) {
       supabaseSignOut().catch((err) => console.error("Sign out failed:", err));
     }
+    setPersonalSessionCache(null); // a real sign-out ends any Lykodex swap too
     goTo("overview");
   }, [goTo]);
+
+  // Swaps the live session to the Lykodex account — see
+  // lib/auth.js's requestLykodexSession for why this has to be a real
+  // session swap, not a client-side pretend toggle. Caches the current
+  // (personal) session's tokens first so returnToMyAccount() can swap
+  // straight back without a real re-login.
+  const actAsLykodex = useCallback(async () => {
+    const { data: current } = await supabase.auth.getSession();
+    if (!current.session) throw new Error("Not signed in.");
+    const lykodexSession = await requestLykodexSession();
+    setPersonalSessionCache({
+      access_token: current.session.access_token,
+      refresh_token: current.session.refresh_token,
+    });
+    const { error } = await supabase.auth.setSession({
+      access_token: lykodexSession.access_token,
+      refresh_token: lykodexSession.refresh_token,
+    });
+    if (error) {
+      setPersonalSessionCache(null);
+      throw error;
+    }
+  }, []);
+
+  const returnToMyAccount = useCallback(async () => {
+    if (!personalSessionCache) return;
+    const { error } = await supabase.auth.setSession(personalSessionCache);
+    setPersonalSessionCache(null);
+    if (error) throw error;
+  }, [personalSessionCache]);
 
   const toggleThemeMode = useCallback(() => {
     setThemeMode((prev) => (prev === "dark" ? "light" : "dark"));
@@ -844,6 +883,9 @@ export function AppProvider({ children }) {
       session,
       isLoggedIn,
       userId,
+      actingAsLykodex,
+      actAsLykodex,
+      returnToMyAccount,
 
       // profile
       avatarUrl,
@@ -934,6 +976,9 @@ export function AppProvider({ children }) {
       session,
       isLoggedIn,
       userId,
+      actingAsLykodex,
+      actAsLykodex,
+      returnToMyAccount,
       avatarUrl,
       firstName,
       lastName,

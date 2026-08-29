@@ -26,6 +26,8 @@ import { faviconFor, shortStoreName } from "./price/priceUtils";
 import { COLLEGES as ALL_COLLEGES } from "../data/colleges";
 import { supabase } from "../lib/supabaseClient";
 import { fetchMyFriendCode } from "../lib/friends";
+import { checkIsLykodexDelegate } from "../lib/auth";
+import { useApp } from "../hooks/useApp";
 import CollegeIcon from "./CollegeIcon";
 
 const platforms = [
@@ -95,6 +97,33 @@ export default function AccountSettingsPage({
   userId,
   onGoToFriends,
 }) {
+  // "Act as Lykodex" — reached via useApp() directly rather than as a
+  // prop like everything else on this page (an intentional, isolated
+  // exception here) since this is exclusive to one account and doesn't
+  // belong threaded through every other page's props just for this.
+  const { actingAsLykodex, actAsLykodex, returnToMyAccount } = useApp();
+  const [isLykodexDelegate, setIsLykodexDelegate] = useState(false);
+  const [lykodexToggleStatus, setLykodexToggleStatus] = useState("idle"); // idle | working | error
+  useEffect(() => {
+    if (!userId) return;
+    checkIsLykodexDelegate().then(setIsLykodexDelegate);
+  }, [userId]);
+
+  async function handleToggleLykodex() {
+    setLykodexToggleStatus("working");
+    try {
+      if (actingAsLykodex) {
+        await returnToMyAccount();
+      } else {
+        await actAsLykodex();
+      }
+      setLykodexToggleStatus("idle");
+    } catch (err) {
+      console.error("Failed to toggle Lykodex persona:", err);
+      setLykodexToggleStatus("error");
+    }
+  }
+
   const [friendCode, setFriendCode] = useState("");
   useEffect(() => {
     if (!userId) return;
@@ -613,6 +642,39 @@ export default function AccountSettingsPage({
           )}
         </div>
       </section>
+
+      {/* Exclusive to the one registered delegate account — see
+          lib/auth.js/api/pricing.js's lykodex-session handler. Also
+          shown while actingAsLykodex is true even if isLykodexDelegate
+          just came back false, since that check runs against whatever
+          session is CURRENTLY active — once swapped to Lykodex, it's
+          checking Lykodex against itself, not the real delegate, so it
+          would otherwise hide the one control needed to flip back. */}
+      {(isLykodexDelegate || actingAsLykodex) && (
+        <section className="settings-card">
+          <h2 className="settings-card__title">Lykodex system account</h2>
+          <p className="settings-card__note">
+            {actingAsLykodex
+              ? "You're currently acting as Lykodex — everything in the app (profile, friends, guild leadership) is Lykodex's, not yours, until you switch back."
+              : "Switch your whole session to the Lykodex system account — the official leader of the 5 default College guilds. Exclusive to your account."}
+          </p>
+          <button
+            type="button"
+            className="linking-row__connect"
+            onClick={handleToggleLykodex}
+            disabled={lykodexToggleStatus === "working"}
+          >
+            {lykodexToggleStatus === "working"
+              ? "Switching…"
+              : actingAsLykodex
+                ? "Return to my account"
+                : "Act as Lykodex"}
+          </button>
+          {lykodexToggleStatus === "error" && (
+            <p className="panel__status panel__status--error">Couldn't switch — try again.</p>
+          )}
+        </section>
+      )}
 
       <p className="panel__status">Changes save automatically as you type.</p>
     </div>

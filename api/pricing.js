@@ -8,6 +8,12 @@
 // its own exact logic, just dispatched by ?service= instead of being
 // separate files. Same consolidation reasoning as the bungie.js merge.
 //
+// The lykodex-session service below is genuinely unrelated to pricing
+// — it's here purely because this is the file already designated as
+// the "merge point to dodge the function-count ceiling," same as
+// comicvine/rebrickable before it, not because it belongs here
+// conceptually.
+//
 // Usage from the frontend:
 //   fetch("/api/pricing?service=xbxprices&endpoint=search&q=...&region=au")
 //   fetch("/api/pricing?service=xbxprices&endpoint=game&ppid=...&region=au")
@@ -19,8 +25,10 @@
 //   fetch("/api/pricing?service=rebrickable&mode=search&q=...")
 //   fetch("/api/pricing?service=rebrickable&mode=set&setNum=...")
 //   fetch("/api/pricing?service=comicvine&q=...")
+//   POST /api/pricing?service=lykodex-session, Authorization: Bearer <caller's access token>
 
 import { allowCors } from "./_cors.js";
+import { createClient } from "@supabase/supabase-js";
 
 const XBXPRICES_BASE = "https://xbxprices.com/api/v2";
 const CHEAPSHARK_ALLOWED_ENDPOINTS = ["games", "deals", "stores"];
@@ -310,6 +318,81 @@ async function handleComicVine(searchParams, res) {
   }
 }
 
+// Real session swap for the "act as Lykodex" toggle — not a client-
+// side pretend-toggle, since RLS needs a genuine auth.uid() to enforce
+// anything anywhere. The service_role key bypasses RLS entirely, so
+// this endpoint's whole job is verifying, server-side, that the
+// caller is actually the one registered delegate BEFORE ever touching
+// it — never trust a client-supplied "I'm allowed" flag for this.
+//
+// Flow: verify the caller's own access token names a real user (via a
+// plain anon-key client — this step never needs service_role) ->
+// check that user's id against profiles.lykodex_delegate_user_id on
+// the Lykodex account (a service_role read, since the caller can't
+// read someone else's profile row under normal RLS) -> if it matches,
+// admin.generateLink() a one-time magic-link token for the Lykodex
+// account and immediately redeem it via verifyOtp() on a plain
+// anon-key client, which hands back a genuine session (access +
+// refresh token) for the Lykodex account. The client then calls
+// supabase.auth.setSession() with that to actually swap sessions.
+async function handleLykodexSession(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+
+  const authHeader = req.headers.authorization || "";
+  const callerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!callerToken) return res.status(401).json({ error: "Missing Authorization bearer token" });
+
+  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const anonKey = process.env.VITE_SUPABASE_ANON_KEY;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+    console.error("pricing (lykodex-session): missing Supabase env vars");
+    return res.status(500).json({ error: "Server not configured for this" });
+  }
+
+  const anonClient = createClient(supabaseUrl, anonKey);
+  const adminClient = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
+
+  const { data: callerData, error: callerError } = await anonClient.auth.getUser(callerToken);
+  if (callerError || !callerData?.user) return res.status(401).json({ error: "Invalid session" });
+
+  const LYKODEX_EMAIL = "system@lykodex.internal";
+
+  const { data: lykodexProfile, error: profileError } = await adminClient
+    .from("profiles")
+    .select("id, lykodex_delegate_user_id")
+    .eq("username", "Lykodex")
+    .single();
+  if (profileError || !lykodexProfile) {
+    console.error("pricing (lykodex-session): couldn't load Lykodex profile", profileError);
+    return res.status(500).json({ error: "Lykodex account not found" });
+  }
+
+  if (lykodexProfile.lykodex_delegate_user_id !== callerData.user.id) {
+    return res.status(403).json({ error: "Not authorized to act as Lykodex" });
+  }
+
+  const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+    type: "magiclink",
+    email: LYKODEX_EMAIL,
+  });
+  if (linkError || !linkData?.properties?.hashed_token) {
+    console.error("pricing (lykodex-session): generateLink failed", linkError);
+    return res.status(500).json({ error: "Couldn't create a Lykodex session" });
+  }
+
+  const { data: sessionData, error: verifyError } = await anonClient.auth.verifyOtp({
+    type: "magiclink",
+    token_hash: linkData.properties.hashed_token,
+  });
+  if (verifyError || !sessionData?.session) {
+    console.error("pricing (lykodex-session): verifyOtp failed", verifyError);
+    return res.status(500).json({ error: "Couldn't create a Lykodex session" });
+  }
+
+  return res.status(200).json({ session: sessionData.session });
+}
+
 async function handleCurrency(res) {
   try {
     const url = "https://api.frankfurter.app/latest?from=USD&to=AUD,CAD,NZD,GBP,EUR";
@@ -341,6 +424,7 @@ export default async function handler(req, res) {
   if (service === "rebrickable") return handleRebrickable(searchParams, res);
   if (service === "comicvine") return handleComicVine(searchParams, res);
   if (service === "justtcg") return handleJustTcg(res);
+  if (service === "lykodex-session") return handleLykodexSession(req, res);
 
   return res.status(400).json({ error: "Missing or invalid service parameter" });
 }

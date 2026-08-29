@@ -216,3 +216,43 @@ export async function removeDiscordLink(userId) {
   const { error } = await supabase.from("discord_links").delete().eq("user_id", userId);
   if (error) throw error;
 }
+
+// ---------- "Act as Lykodex" — real session swap, not a pretend
+// client-side toggle. RLS needs a genuine auth.uid() to enforce
+// anything anywhere, so the only correct way to make writes actually
+// happen "as Lykodex" everywhere in the app is a real session swap —
+// see api/pricing.js's lykodex-session handler for the server side
+// (it independently re-verifies the caller is the registered delegate
+// every time; this client check is only ever for UI visibility).
+
+// Whether the CURRENT signed-in account is the one registered
+// delegate for the Lykodex system account — purely to decide whether
+// to show the toggle at all.
+export async function checkIsLykodexDelegate() {
+  if (!supabase) return false;
+  const { data, error } = await supabase.rpc("am_i_lykodex_delegate");
+  if (error) {
+    console.error("Failed to check Lykodex delegate status:", error);
+    return false;
+  }
+  return Boolean(data);
+}
+
+// Exchanges the caller's own (already-verified-server-side) session
+// for a genuine Lykodex session. Throws if the caller isn't actually
+// the registered delegate — the server checks this independently of
+// whatever checkIsLykodexDelegate() showed in the UI.
+export async function requestLykodexSession() {
+  const { data: current } = await supabase.auth.getSession();
+  const callerToken = current.session?.access_token;
+  if (!callerToken) throw new Error("Not signed in.");
+
+  const { API_BASE } = await import("./apiBase");
+  const res = await fetch(`${API_BASE}/api/pricing?service=lykodex-session`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${callerToken}` },
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body?.error || "Couldn't start acting as Lykodex.");
+  return body.session; // { access_token, refresh_token, ... }
+}
