@@ -105,7 +105,12 @@ export default function RiftboundSearchPage({ onBack, userId, isLoggedIn, onSign
       </form>
 
       {status === "loading" && <p className="panel__status">Searching…</p>}
-      {status === "error" && <p className="panel__status panel__status--error">Couldn't search right now — Riftcodex is occasionally unavailable, try again in a moment.</p>}
+      {/* Known issue, not intermittent: Riftcodex currently blocks
+          requests from Vercel's infrastructure (confirmed live — see
+          api/pricing.js's handleRiftbound comment) — this will fail
+          every time in production until that's resolved, not just
+          "occasionally." */}
+      {status === "error" && <p className="panel__status panel__status--error">Couldn't search right now — Riftbound search is temporarily unavailable while we sort out an issue with our data provider.</p>}
       {status === "ready" && results.length === 0 && <p className="panel__status">No cards found for that search.</p>}
 
       {status === "ready" && results.length > 0 && (

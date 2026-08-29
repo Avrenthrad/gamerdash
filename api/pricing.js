@@ -333,11 +333,21 @@ async function handleComicVine(searchParams, res) {
 //
 // Confirmed live: Riftcodex (Cloudflare-fronted) returns a real 403 to
 // requests actually originating from Vercel's infrastructure, while
-// identical requests from elsewhere succeed — almost certainly
-// Cloudflare's bot-protection treating known cloud-hosting-provider
-// IP ranges as suspicious, same class of issue Card Kingdom/Comic
-// Vine's User-Agent header above already works around. Sending the
-// same real User-Agent here rather than Node's default one.
+// identical requests from elsewhere succeed. Tried the same
+// User-Agent fix that resolves this for Card Kingdom/Comic Vine above
+// — confirmed live (retested against the real deployed endpoint,
+// several minutes after deploy) that it does NOT fix this one, so
+// this is very likely an IP/ASN-range block on Vercel's egress IPs
+// specifically, not a header-based bot check — a header can't route
+// around that. This service is currently NON-FUNCTIONAL in production
+// as a result (works fine calling api.riftcodex.com directly from
+// outside Vercel, which is how it was verified while building this).
+// Real remaining options, none attempted yet: ask Riftcodex
+// (support@riftcodex.com, per its own OpenAPI contact) to allowlist
+// Vercel's ranges; proxy through a non-Vercel host instead; or proxy
+// through a Cloudflare Worker (Riftcodex is also Cloudflare-fronted,
+// so that path may not trip the same block — unverified guess, not
+// confirmed).
 const RIFTCODEX_BASE = "https://api.riftcodex.com";
 const RIFTCODEX_HEADERS = { Accept: "application/json", "User-Agent": "Lykodex/1.0 (+https://lykodex.vercel.app)" };
 
