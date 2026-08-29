@@ -134,6 +134,42 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-30 — **Real in-app presence added; friends/guild roster sort
+  online-first.** User explicitly chose to build genuine in-app
+  presence rather than reuse Steam status as an "online" proxy, and
+  scoped it to exactly two lists: the friends list and the guild
+  member roster — NOT the friend-request lists.
+
+  New: `src/lib/presence.js` — `subscribeToPresence(userId, onChange)`
+  joins a shared Supabase Realtime Presence channel (`"lykodex-
+  presence"`, keyed by `user_id`), tracks on subscribe, calls back
+  with a live `Set<userId>` on sync/join/leave. `sortOnlineFirst(items,
+  onlineUserIds, getUserId, getDisplayName)` is the shared sort (online
+  alphabetical, then everyone else alphabetical) — used by both call
+  sites despite their different row shapes (`f.friend_id`/`f.profile`
+  vs `m.user_id`/`m.profile`).
+
+  Wired into `AppContext.jsx` as `onlineUserIds` state + a
+  userId-keyed effect (same pattern as `actingAsLykodex`), exposed via
+  context. `FriendsPage.jsx`'s "Your friends" list and `GuildsPage.jsx`'s
+  member roster both consume it via `useApp()` directly rather than
+  new props — same deliberate "everything via props" exception already
+  used in `AccountSettingsPage.jsx`. **Gotcha hit while wiring this**:
+  the guild member roster (`members.map`) lives inside the `GuildDetail`
+  sub-component in `GuildsPage.jsx`, not the top-level `GuildsPage`
+  function — the hook has to go there, not in the outer component, or
+  it's an unused variable in one scope and out-of-scope in the other.
+
+  This is the first Realtime usage anywhere in the codebase (confirmed
+  via grep before starting — zero existing `channel(`/`presenceState`
+  usage). No existing convention to match; if a second Realtime feature
+  gets built, revisit whether this should generalize.
+
+  Committed `8844f1a`, pushed to `main`. Not yet load-tested with two
+  real concurrent sessions — worth a manual check (open two browser
+  profiles signed in as different accounts, confirm each shows the
+  other online) before relying on it.
+
 - 2026-08-29 — **Mobile fully paused and pulled off `main`.** Following
   the earlier "hub-first, mobile paused" decision, the user asked to go
   further: actually remove the native Android/iOS/Capacitor projects
