@@ -25,6 +25,8 @@
 //   fetch("/api/pricing?service=rebrickable&mode=search&q=...")
 //   fetch("/api/pricing?service=rebrickable&mode=set&setNum=...")
 //   fetch("/api/pricing?service=comicvine&q=...")
+//   fetch("/api/pricing?service=riftbound&mode=search&q=...")
+//   fetch("/api/pricing?service=riftbound&mode=card&id=...")
 //   POST /api/pricing?service=lykodex-session, Authorization: Bearer <caller's access token>
 
 import { allowCors } from "./_cors.js";
@@ -318,6 +320,50 @@ async function handleComicVine(searchParams, res) {
   }
 }
 
+// ---------- Riftbound (real card data via Riftcodex, community API) ----------
+// Confirmed live: api.riftcodex.com sends no CORS headers at all
+// (unlike its TCG-College neighbors YGOPRODeck and optcgapi.com, both
+// of which send Access-Control-Allow-Origin: * and so are called
+// directly from lib/yugioh.js/lib/onepiece.js with no proxy) — so this
+// one has to be proxied. Confirmed real endpoints against a live
+// response, not guessed: GET /cards/name?fuzzy=<query> for search, GET
+// /cards/{id} for a single lookup by Riftcodex's own real id. No real
+// pricing field exists on the card object (has a tcgplayer_id, but no
+// embedded price) — same honest situation Flesh and Blood is in.
+const RIFTCODEX_BASE = "https://api.riftcodex.com";
+
+async function handleRiftbound(searchParams, res) {
+  const mode = searchParams.get("mode");
+
+  try {
+    if (mode === "search") {
+      const q = searchParams.get("q");
+      if (!q) return res.status(400).json({ error: "Missing q query parameter" });
+      const url = `${RIFTCODEX_BASE}/cards/name?fuzzy=${encodeURIComponent(q)}`;
+      const rcRes = await fetch(url, { headers: { Accept: "application/json" } });
+      if (!rcRes.ok) return res.status(rcRes.status).json({ error: "Riftbound search failed" });
+      const data = await rcRes.json();
+      return res.status(200).json(data);
+    }
+
+    if (mode === "card") {
+      const id = searchParams.get("id");
+      if (!id) return res.status(400).json({ error: "Missing id query parameter" });
+      const url = `${RIFTCODEX_BASE}/cards/${encodeURIComponent(id)}`;
+      const rcRes = await fetch(url, { headers: { Accept: "application/json" } });
+      if (rcRes.status === 404) return res.status(404).json({ error: "Card not found" });
+      if (!rcRes.ok) return res.status(rcRes.status).json({ error: "Riftbound lookup failed" });
+      const data = await rcRes.json();
+      return res.status(200).json(data);
+    }
+
+    return res.status(400).json({ error: "Missing or invalid mode parameter" });
+  } catch (err) {
+    console.error("pricing (riftbound): fetch threw", err);
+    return res.status(500).json({ error: err.message });
+  }
+}
+
 // Real session swap for the "act as Lykodex" toggle — not a client-
 // side pretend-toggle, since RLS needs a genuine auth.uid() to enforce
 // anything anywhere. The service_role key bypasses RLS entirely, so
@@ -424,6 +470,7 @@ export default async function handler(req, res) {
   if (service === "rebrickable") return handleRebrickable(searchParams, res);
   if (service === "comicvine") return handleComicVine(searchParams, res);
   if (service === "justtcg") return handleJustTcg(res);
+  if (service === "riftbound") return handleRiftbound(searchParams, res);
   if (service === "lykodex-session") return handleLykodexSession(req, res);
 
   return res.status(400).json({ error: "Missing or invalid service parameter" });

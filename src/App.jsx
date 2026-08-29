@@ -47,6 +47,15 @@ const FabDeckBuilderPage = lazy(() => import("./components/FabDeckBuilderPage"))
 const PokemonSearchPage = lazy(() => import("./components/PokemonSearchPage"));
 const PokemonCollectionPage = lazy(() => import("./components/PokemonCollectionPage"));
 const PokemonDeckBuilderPage = lazy(() => import("./components/PokemonDeckBuilderPage"));
+const YugiohSearchPage = lazy(() => import("./components/YugiohSearchPage"));
+const YugiohCollectionPage = lazy(() => import("./components/YugiohCollectionPage"));
+const YugiohDeckBuilderPage = lazy(() => import("./components/YugiohDeckBuilderPage"));
+const OnePieceSearchPage = lazy(() => import("./components/OnePieceSearchPage"));
+const OnePieceCollectionPage = lazy(() => import("./components/OnePieceCollectionPage"));
+const OnePieceDeckBuilderPage = lazy(() => import("./components/OnePieceDeckBuilderPage"));
+const RiftboundSearchPage = lazy(() => import("./components/RiftboundSearchPage"));
+const RiftboundCollectionPage = lazy(() => import("./components/RiftboundCollectionPage"));
+const RiftboundDeckBuilderPage = lazy(() => import("./components/RiftboundDeckBuilderPage"));
 const MtgScanPage = lazy(() => import("./components/MtgScanPage"));
 const PokemonScanPage = lazy(() => import("./components/PokemonScanPage"));
 const FabScanPage = lazy(() => import("./components/FabScanPage"));
@@ -556,6 +565,123 @@ export default function App() {
           {view === "pokemon-decks" && (
             isLoggedIn ? (
               <PokemonDeckBuilderPage onBack={() => goTo("tcg-home")} userId={userId} />
+            ) : (
+              <AccountGatePage
+                title="Deck Builder"
+                onSignIn={() => goTo("login", "login")}
+                onCreateAccount={() => goTo("login", "signup")}
+              />
+            )
+          )}
+
+          {view === "yugioh-search" && (
+            <YugiohSearchPage
+              onBack={() => goTo("tcg-home")}
+              userId={userId}
+              isLoggedIn={isLoggedIn}
+              onSignIn={() => goTo("login", "login")}
+              onCreateAccount={() => goTo("login", "signup")}
+            />
+          )}
+
+          {view === "yugioh-collection" && (
+            isLoggedIn ? (
+              <YugiohCollectionPage
+                onBack={() => goTo("tcg-home")}
+                userId={userId}
+                onGoToSearch={() => goTo("yugioh-search")}
+                onGoToDecks={() => goTo("yugioh-decks")}
+              />
+            ) : (
+              <AccountGatePage
+                title="My Collection"
+                onSignIn={() => goTo("login", "login")}
+                onCreateAccount={() => goTo("login", "signup")}
+              />
+            )
+          )}
+
+          {view === "yugioh-decks" && (
+            isLoggedIn ? (
+              <YugiohDeckBuilderPage onBack={() => goTo("tcg-home")} userId={userId} />
+            ) : (
+              <AccountGatePage
+                title="Deck Builder"
+                onSignIn={() => goTo("login", "login")}
+                onCreateAccount={() => goTo("login", "signup")}
+              />
+            )
+          )}
+
+          {view === "onepiece-search" && (
+            <OnePieceSearchPage
+              onBack={() => goTo("tcg-home")}
+              userId={userId}
+              isLoggedIn={isLoggedIn}
+              onSignIn={() => goTo("login", "login")}
+              onCreateAccount={() => goTo("login", "signup")}
+            />
+          )}
+
+          {view === "onepiece-collection" && (
+            isLoggedIn ? (
+              <OnePieceCollectionPage
+                onBack={() => goTo("tcg-home")}
+                userId={userId}
+                onGoToSearch={() => goTo("onepiece-search")}
+                onGoToDecks={() => goTo("onepiece-decks")}
+              />
+            ) : (
+              <AccountGatePage
+                title="My Collection"
+                onSignIn={() => goTo("login", "login")}
+                onCreateAccount={() => goTo("login", "signup")}
+              />
+            )
+          )}
+
+          {view === "onepiece-decks" && (
+            isLoggedIn ? (
+              <OnePieceDeckBuilderPage onBack={() => goTo("tcg-home")} userId={userId} />
+            ) : (
+              <AccountGatePage
+                title="Deck Builder"
+                onSignIn={() => goTo("login", "login")}
+                onCreateAccount={() => goTo("login", "signup")}
+              />
+            )
+          )}
+
+          {view === "riftbound-search" && (
+            <RiftboundSearchPage
+              onBack={() => goTo("tcg-home")}
+              userId={userId}
+              isLoggedIn={isLoggedIn}
+              onSignIn={() => goTo("login", "login")}
+              onCreateAccount={() => goTo("login", "signup")}
+            />
+          )}
+
+          {view === "riftbound-collection" && (
+            isLoggedIn ? (
+              <RiftboundCollectionPage
+                onBack={() => goTo("tcg-home")}
+                userId={userId}
+                onGoToSearch={() => goTo("riftbound-search")}
+                onGoToDecks={() => goTo("riftbound-decks")}
+              />
+            ) : (
+              <AccountGatePage
+                title="My Collection"
+                onSignIn={() => goTo("login", "login")}
+                onCreateAccount={() => goTo("login", "signup")}
+              />
+            )
+          )}
+
+          {view === "riftbound-decks" && (
+            isLoggedIn ? (
+              <RiftboundDeckBuilderPage onBack={() => goTo("tcg-home")} userId={userId} />
             ) : (
               <AccountGatePage
                 title="Deck Builder"

@@ -112,6 +112,15 @@ const KNOWN_VIEWS = [
   "comics",
   "college-collectibles",
   "college-tabletop",
+  "yugioh-search",
+  "yugioh-collection",
+  "yugioh-decks",
+  "onepiece-search",
+  "onepiece-collection",
+  "onepiece-decks",
+  "riftbound-search",
+  "riftbound-collection",
+  "riftbound-decks",
 ];
 
 // The 5 College home pages only — not their subpages (backlog,

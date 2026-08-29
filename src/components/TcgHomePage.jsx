@@ -1,35 +1,32 @@
-// TCG College hub — links to the real, built MTG and Flesh and Blood
-// features, plus a real collection summary at the top when signed in.
+// TCG College hub — links to all 6 real, built TCG features (MTG,
+// Flesh and Blood, Pokémon, Yu-Gi-Oh!, One Piece, Riftbound), plus a
+// real collection summary at the top when signed in.
 //
-// Unlike Gaming's per-platform ownership breakdown (which had to be
-// left out entirely — no real data source exists for that), a rarity
-// breakdown and estimated value for MTG here ARE honestly buildable:
-// Scryfall gives real rarity and real pricing per card, and this
-// project's own mtg_collection table already tracks real ownership/
-// foil status. Deliberately does NOT show a value "trend" (e.g. "+12%
-// this month") on this summary strip — that's what the dedicated Price
-// Watch page is for, with real recorded history behind it.
+// In-page game tab switcher, same pattern TabletopHomePage.jsx already
+// uses for RPG/Wargames/Dice/Rules — not a separate route/picker
+// layer. GAME_TABS below is the single source of truth for which
+// features + summary component each game gets.
 //
-// Flesh and Blood has no pricing source yet (deferred — see lib/fab.js),
-// so its own summary only shows real counts, no dollar value.
-//
-// In-page game tab switcher (MTG | Flesh and Blood), same pattern
-// TabletopHomePage.jsx already uses for RPG/Wargames/Dice/Rules —
-// not a separate route/picker layer, since two games doesn't warrant
-// an extra click.
-//
-// Pokémon has real pricing built into pokemontcg.io (unlike Flesh and
-// Blood, which has none confirmed yet), so its summary shows a real
-// value like MTG's rather than counts-only.
-//
-// Other TCGs (One Piece, Riftbound, Yu-Gi-Oh) aren't built yet, shown
-// honestly as such rather than omitted or faked.
+// Real pricing IS honestly buildable for MTG (Scryfall), Pokémon
+// (pokemontcg.io), Yu-Gi-Oh! (YGOPRODeck), and One Piece (optcgapi.com)
+// — each summary shows a real estimated collection value. Flesh and
+// Blood and Riftbound have no real pricing source confirmed for either
+// (see lib/fab.js / lib/riftbound.js), so those two summaries are
+// counts-only, never a fabricated number. Deliberately does NOT show a
+// value "trend" (e.g. "+12% this month") on any summary strip — that's
+// what MTG's dedicated Price Watch page is for, with real recorded
+// history behind it.
 
 import { useEffect, useState } from "react";
 import { fetchCollection, enrichCollectionEntry } from "../lib/mtg";
 import { fetchCollection as fetchFabCollection, enrichCollectionEntry as enrichFabCollectionEntry } from "../lib/fabCollection";
 import { fetchCollection as fetchPokemonCollection, enrichCollectionEntry as enrichPokemonCollectionEntry } from "../lib/pokemonCollection";
 import { currentPokemonPrice } from "../lib/pokemon";
+import { fetchCollection as fetchYugiohCollection, enrichCollectionEntry as enrichYugiohCollectionEntry } from "../lib/yugiohCollection";
+import { currentYugiohPrice } from "../lib/yugioh";
+import { fetchCollection as fetchOnePieceCollection, enrichCollectionEntry as enrichOnePieceCollectionEntry } from "../lib/onepieceCollection";
+import { currentOnePiecePrice } from "../lib/onepiece";
+import { fetchCollection as fetchRiftboundCollection, enrichCollectionEntry as enrichRiftboundCollectionEntry } from "../lib/riftboundCollection";
 
 const MTG_FEATURES = [
   { id: "mtg-scan", label: "Scan Cards", icon: "📷", desc: "Free on-device text recognition, matched against real Scryfall data.", emphasized: true },
@@ -54,7 +51,26 @@ const POKEMON_FEATURES = [
   { id: "tcg-marketplace", label: "Marketplace", icon: "💰", desc: "Buy and sell real cards with other Lykodex users." },
 ];
 
-const OTHER_GAMES = ["One Piece", "Riftbound", "Yu-Gi-Oh!"];
+const YUGIOH_FEATURES = [
+  { id: "yugioh-search", label: "Card Search", icon: "🔍", desc: "Real card data and pricing via YGOPRODeck.", emphasized: true },
+  { id: "yugioh-collection", label: "My Collection", icon: "📚", desc: "Real owned cards, real live pricing." },
+  { id: "yugioh-decks", label: "Deck Builder", icon: "🛠️", desc: "Real per-format banlist checking (TCG/OCG/GOAT) against YGOPRODeck's own data." },
+  { id: "tcg-marketplace", label: "Marketplace", icon: "💰", desc: "Buy and sell real cards with other Lykodex users." },
+];
+
+const ONEPIECE_FEATURES = [
+  { id: "onepiece-search", label: "Card Search", icon: "🔍", desc: "Real card data and pricing via optcgapi.com.", emphasized: true },
+  { id: "onepiece-collection", label: "My Collection", icon: "📚", desc: "Real owned cards, real live pricing." },
+  { id: "onepiece-decks", label: "Deck Builder", icon: "🛠️", desc: "Built around one real Leader card, same as Flesh and Blood's Hero anchor." },
+  { id: "tcg-marketplace", label: "Marketplace", icon: "💰", desc: "Buy and sell real cards with other Lykodex users." },
+];
+
+const RIFTBOUND_FEATURES = [
+  { id: "riftbound-search", label: "Card Search", icon: "🔍", desc: "Real card data via Riftcodex.", emphasized: true },
+  { id: "riftbound-collection", label: "My Collection", icon: "📚", desc: "Real owned cards — no pricing shown yet." },
+  { id: "riftbound-decks", label: "Deck Builder", icon: "🛠️", desc: "A real card list — no format/legality checking yet, no confirmed banlist API for a game this new." },
+  { id: "tcg-marketplace", label: "Marketplace", icon: "💰", desc: "Buy and sell real cards with other Lykodex users." },
+];
 
 const RARITY_ORDER = ["mythic", "rare", "uncommon", "common"];
 const RARITY_LABELS = { mythic: "Mythic", rare: "Rare", uncommon: "Uncommon", common: "Common" };
@@ -218,29 +234,204 @@ function PokemonSummary({ isLoggedIn, userId }) {
   );
 }
 
+function YugiohSummary({ isLoggedIn, userId }) {
+  const [entries, setEntries] = useState([]);
+  const [status, setStatus] = useState("idle");
+
+  useEffect(() => {
+    if (!isLoggedIn || !userId) return;
+    setStatus("loading");
+    fetchYugiohCollection(userId)
+      .then((rows) => Promise.all(rows.map(enrichYugiohCollectionEntry)))
+      .then((enriched) => {
+        setEntries(enriched);
+        setStatus("ready");
+      })
+      .catch((err) => {
+        console.error("Yu-Gi-Oh! collection summary fetch failed:", err);
+        setStatus("error");
+      });
+  }, [isLoggedIn, userId]);
+
+  const totalCards = entries.reduce((sum, e) => sum + e.quantity, 0);
+  const totalValue = entries.reduce((sum, e) => {
+    const price = e.card ? currentYugiohPrice(e.card)?.price || 0 : 0;
+    return sum + price * e.quantity;
+  }, 0);
+  const rarityCounts = entries.reduce((acc, e) => {
+    if (e.rarity) acc[e.rarity] = (acc[e.rarity] || 0) + e.quantity;
+    return acc;
+  }, {});
+  const topRarities = Object.entries(rarityCounts).sort((a, b) => b[1] - a[1]).slice(0, 4);
+
+  if (!isLoggedIn || status !== "ready") return null;
+  if (entries.length === 0) {
+    return <p className="panel__status">No cards in your collection yet — start with Search below.</p>;
+  }
+
+  return (
+    <div className="backlog-summary">
+      <div className="panel__stat">
+        <span className="panel__stat-value">{entries.length}</span>
+        <span className="panel__stat-label">Unique cards</span>
+      </div>
+      <div className="panel__stat">
+        <span className="panel__stat-value">{totalCards}</span>
+        <span className="panel__stat-label">Total cards</span>
+      </div>
+      <div className="panel__stat">
+        <span className="panel__stat-value">${totalValue.toFixed(2)}</span>
+        <span className="panel__stat-label">Est. value (USD)</span>
+      </div>
+      {topRarities.map(([rarity, count]) => (
+        <div className="panel__stat" key={rarity}>
+          <span className="panel__stat-value">{count}</span>
+          <span className="panel__stat-label">{rarity}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function OnePieceSummary({ isLoggedIn, userId }) {
+  const [entries, setEntries] = useState([]);
+  const [status, setStatus] = useState("idle");
+
+  useEffect(() => {
+    if (!isLoggedIn || !userId) return;
+    setStatus("loading");
+    fetchOnePieceCollection(userId)
+      .then((rows) => Promise.all(rows.map(enrichOnePieceCollectionEntry)))
+      .then((enriched) => {
+        setEntries(enriched);
+        setStatus("ready");
+      })
+      .catch((err) => {
+        console.error("One Piece collection summary fetch failed:", err);
+        setStatus("error");
+      });
+  }, [isLoggedIn, userId]);
+
+  const totalCards = entries.reduce((sum, e) => sum + e.quantity, 0);
+  const totalValue = entries.reduce((sum, e) => {
+    const price = e.card ? currentOnePiecePrice(e.card)?.price || 0 : 0;
+    return sum + price * e.quantity;
+  }, 0);
+  const rarityCounts = entries.reduce((acc, e) => {
+    if (e.rarity) acc[e.rarity] = (acc[e.rarity] || 0) + e.quantity;
+    return acc;
+  }, {});
+  const topRarities = Object.entries(rarityCounts).sort((a, b) => b[1] - a[1]).slice(0, 4);
+
+  if (!isLoggedIn || status !== "ready") return null;
+  if (entries.length === 0) {
+    return <p className="panel__status">No cards in your collection yet — start with Search below.</p>;
+  }
+
+  return (
+    <div className="backlog-summary">
+      <div className="panel__stat">
+        <span className="panel__stat-value">{entries.length}</span>
+        <span className="panel__stat-label">Unique cards</span>
+      </div>
+      <div className="panel__stat">
+        <span className="panel__stat-value">{totalCards}</span>
+        <span className="panel__stat-label">Total cards</span>
+      </div>
+      <div className="panel__stat">
+        <span className="panel__stat-value">${totalValue.toFixed(2)}</span>
+        <span className="panel__stat-label">Est. value (USD)</span>
+      </div>
+      {topRarities.map(([rarity, count]) => (
+        <div className="panel__stat" key={rarity}>
+          <span className="panel__stat-value">{count}</span>
+          <span className="panel__stat-label">{rarity}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// No real pricing source confirmed for Riftbound (see lib/riftbound.js)
+// — counts only, same as FabSummary above.
+function RiftboundSummary({ isLoggedIn, userId }) {
+  const [entries, setEntries] = useState([]);
+  const [status, setStatus] = useState("idle");
+
+  useEffect(() => {
+    if (!isLoggedIn || !userId) return;
+    setStatus("loading");
+    fetchRiftboundCollection(userId)
+      .then((rows) => Promise.all(rows.map(enrichRiftboundCollectionEntry)))
+      .then((enriched) => {
+        setEntries(enriched);
+        setStatus("ready");
+      })
+      .catch((err) => {
+        console.error("Riftbound collection summary fetch failed:", err);
+        setStatus("error");
+      });
+  }, [isLoggedIn, userId]);
+
+  const totalCards = entries.reduce((sum, e) => sum + e.quantity, 0);
+
+  if (!isLoggedIn || status !== "ready") return null;
+  if (entries.length === 0) {
+    return <p className="panel__status">No cards in your collection yet — start with Search below.</p>;
+  }
+
+  return (
+    <div className="backlog-summary">
+      <div className="panel__stat">
+        <span className="panel__stat-value">{entries.length}</span>
+        <span className="panel__stat-label">Unique cards</span>
+      </div>
+      <div className="panel__stat">
+        <span className="panel__stat-value">{totalCards}</span>
+        <span className="panel__stat-label">Total cards</span>
+      </div>
+    </div>
+  );
+}
+
+const GAME_TABS = [
+  { id: "mtg", label: "Magic: The Gathering", features: MTG_FEATURES, Summary: MtgSummary },
+  { id: "fab", label: "Flesh and Blood", features: FAB_FEATURES, Summary: FabSummary },
+  { id: "pokemon", label: "Pokémon", features: POKEMON_FEATURES, Summary: PokemonSummary },
+  { id: "yugioh", label: "Yu-Gi-Oh!", features: YUGIOH_FEATURES, Summary: YugiohSummary },
+  { id: "onepiece", label: "One Piece", features: ONEPIECE_FEATURES, Summary: OnePieceSummary },
+  { id: "riftbound", label: "Riftbound", features: RIFTBOUND_FEATURES, Summary: RiftboundSummary },
+];
+
 export default function TcgHomePage({ onNavigate, isLoggedIn, userId }) {
-  const [game, setGame] = useState("mtg"); // mtg | fab | pokemon
-  const features = game === "mtg" ? MTG_FEATURES : game === "fab" ? FAB_FEATURES : POKEMON_FEATURES;
+  const [game, setGame] = useState("mtg");
+  const activeTab = GAME_TABS.find((t) => t.id === game) || GAME_TABS[0];
+  const ActiveSummary = activeTab.Summary;
 
   return (
     <div className="price-page">
       <div className="price-page__head">
         <h1 className="price-page__title">TCG</h1>
-        <p className="price-page__subtitle">Magic: The Gathering, Flesh and Blood, and Pokémon are live — more TCGs coming soon.</p>
+        <p className="price-page__subtitle">Magic: The Gathering, Flesh and Blood, Pokémon, Yu-Gi-Oh!, One Piece, and Riftbound.</p>
       </div>
 
       <div className="backlog-status-tabs">
-        <button type="button" className={`quickdash-reset-btn ${game === "mtg" ? "quickdash-reset-btn--active" : ""}`} onClick={() => setGame("mtg")}>Magic: The Gathering</button>
-        <button type="button" className={`quickdash-reset-btn ${game === "fab" ? "quickdash-reset-btn--active" : ""}`} onClick={() => setGame("fab")}>Flesh and Blood</button>
-        <button type="button" className={`quickdash-reset-btn ${game === "pokemon" ? "quickdash-reset-btn--active" : ""}`} onClick={() => setGame("pokemon")}>Pokémon</button>
+        {GAME_TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            className={`quickdash-reset-btn ${game === t.id ? "quickdash-reset-btn--active" : ""}`}
+            onClick={() => setGame(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      {game === "mtg" && <MtgSummary isLoggedIn={isLoggedIn} userId={userId} />}
-      {game === "fab" && <FabSummary isLoggedIn={isLoggedIn} userId={userId} />}
-      {game === "pokemon" && <PokemonSummary isLoggedIn={isLoggedIn} userId={userId} />}
+      <ActiveSummary isLoggedIn={isLoggedIn} userId={userId} />
 
       <div className="overview-grid">
-        {features.map((f) => (
+        {activeTab.features.map((f) => (
           <button
             key={f.id}
             type="button"
@@ -253,10 +444,6 @@ export default function TcgHomePage({ onNavigate, isLoggedIn, userId }) {
           </button>
         ))}
       </div>
-
-      <p className="panel__status" style={{ marginTop: "24px" }}>
-        Not built yet: {OTHER_GAMES.join(", ")}.
-      </p>
     </div>
   );
 }
