@@ -134,6 +134,44 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-30 — **Riftbound search/lookup is currently NON-FUNCTIONAL
+  in production** — found live-testing the TCG College work below.
+  `api/pricing.js`'s `handleRiftbound` gets a real 403 from Riftcodex
+  (`api.riftcodex.com`) specifically when the request originates from
+  Vercel's infrastructure; identical requests from anywhere else
+  succeed. Tried the same User-Agent-header fix that resolves this
+  exact symptom for Card Kingdom/Comic Vine elsewhere in that file —
+  confirmed live, retested several minutes after deploy, that it does
+  **not** fix this one. Very likely a network-level IP/ASN block on
+  Vercel's egress ranges, not a bot-signature check — a header can't
+  route around that.
+
+  Yu-Gi-Oh! and One Piece are unaffected (both called directly from
+  the browser, no Vercel proxy involved) — this is Riftbound-only.
+  `RiftboundSearchPage.jsx`'s error copy was corrected to stop implying
+  "try again in a moment" will help, since it currently fails every
+  time, not occasionally.
+
+  **Not yet attempted, real options if someone picks this up**: ask
+  Riftcodex (`support@riftcodex.com`, per its own OpenAPI contact) to
+  allowlist Vercel's ranges; proxy through a non-Vercel host; or try a
+  Cloudflare Worker instead (Riftcodex is also Cloudflare-fronted —
+  unverified guess that this might not trip the same block). Committed
+  `4539024`.
+
+- 2026-08-30 — Also while testing the above: fixed a real One Piece
+  bug — `card.id` was `card_set_id`, which a Parallel/Alternate Art
+  variant shares with its base printing, producing real duplicate
+  React keys (confirmed live) and risking duplicate-collection-row
+  collisions. Switched to `card_image_id`, distinct per variant —
+  except optcgapi.com's own dataset ALSO has a handful of confirmed
+  genuine collisions where `card_image_id` repeats across two
+  *unrelated* cards (e.g. `OP03-070`) — an upstream data-quality issue,
+  documented in `lib/onepiece.js` rather than silently papered over;
+  render keys fold in the array index to stay stable regardless.
+  Committed `b060b2b` (bundled with the Riftbound User-Agent attempt
+  above, before that attempt was found not to work).
+
 - 2026-08-30 — **TCG College: added full Yu-Gi-Oh!, One Piece, and
   Riftbound support** (search + collection + deck builder + real
   pricing where a real source exists), matching Pokémon's existing
