@@ -134,6 +134,44 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-30 — **TCG College: added full Yu-Gi-Oh!, One Piece, and
+  Riftbound support** (search + collection + deck builder + real
+  pricing where a real source exists), matching Pokémon's existing
+  feature depth. `TcgHomePage.jsx` is now driven by a `GAME_TABS` array
+  (id/label/features/Summary component) instead of the old 3-way
+  ternary — adding a 7th game later is a data entry, not new branching.
+
+  Real APIs used (all confirmed live before building against them, per
+  this project's standing rule against guessing endpoint shapes):
+  - **Yu-Gi-Oh!** — YGOPRODeck (`db.ygoprodeck.com/api/v7`). Free,
+    keyless, sends `Access-Control-Allow-Origin: *` — called directly
+    from `lib/yugioh.js`, no Vercel proxy. Real market pricing
+    (`card_prices`) and real per-format banlist data (`banlist_info`:
+    `ban_tcg`/`ban_ocg`/`ban_goat`) — deck builder checks real
+    copy-limit violations (Forbidden/Limited/Semi-Limited), not just a
+    legal/illegal flag.
+  - **One Piece** — optcgapi.com. Also free, keyless, also sends open
+    CORS — `lib/onepiece.js` calls it directly too. Real market/
+    inventory pricing. Deck builder anchors on one real Leader card,
+    same Hero-anchor shape as Flesh and Blood.
+  - **Riftbound** — Riftcodex (`api.riftcodex.com`). Free, keyless,
+    real rich card data, but confirmed to send **no CORS headers at
+    all** (the odd one out among the three) — proxied through
+    `api/pricing.js`'s existing merge-point convention
+    (`?service=riftbound`) rather than a 13th Vercel function (already
+    at the Hobby-plan cap). No real pricing field on its cards (has a
+    `tcgplayer_id`, no embedded price) and no confirmed banlist API for
+    a game this new — counts-only collection, deck builder has no
+    legality checking, same honest situation Flesh and Blood is in.
+
+  9 new Supabase tables (`yugioh`/`onepiece`/`riftbound` ×
+  `collection`/`decks`/`deck_cards`), 6 new `lib/` modules, 9 new page
+  components, 9 new routes in `App.jsx`. Deliberately NOT built for
+  these 3 (matches what Pokémon's own home-page feature list already
+  omits): binders/set-lists, card scanning, price-watch history charts.
+
+  Committed `6694bd4`, pushed to `main`.
+
 - 2026-08-30 — **PS trophy scoring: dropped rarity weighting, tier
   count only.** `PS_RARITY_TIERS`/`PS_RARITY_MULTIPLIERS` removed from
   `gameMastery.js` (and its `discord-bot/` duplicate) — those were
