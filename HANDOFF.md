@@ -130,6 +130,77 @@ None. `main` / `origin/main` is the only stream.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-29 — **"Act as Lykodex" — real system account + session-swap
+  toggle (`e6462f6`).** A genuine account (`profiles.username =
+  'Lykodex'`, real `auth.users` row, email `system@lykodex.internal`,
+  no real password anyone knows) now owns all 5 official College guilds
+  (`guilds.created_by`) — it's the actual "leader," not Joshua's personal
+  account anymore. `profiles.lykodex_delegate_user_id` on that account
+  names the one real account (Joshua's) allowed to act as it.
+
+  This is an app-wide session swap, not a client-side pretend-toggle —
+  the user explicitly chose that scope, and RLS needs a genuine
+  `auth.uid()` to enforce anything anywhere, so there wasn't a lighter
+  correct option. New `lykodex-session` service merged into
+  `api/pricing.js` (not its own file — `/api` was already at Vercel's
+  Hobby-plan 12-function ceiling) verifies the caller's access token
+  names the registered delegate, then uses the `service_role` key's
+  admin API to mint and hand back a real Lykodex session.
+  `AppContext.jsx`'s `actAsLykodex`/`returnToMyAccount` cache the
+  personal session's tokens first so flipping back is instant, not a
+  re-login. Toggle lives in Account Settings (reached via `useApp()`
+  directly there, not threaded through `App.jsx`'s props — a deliberate,
+  isolated exception since Header.jsx/App.jsx were mid-edit when this
+  landed and this is exclusive to one account anyway). Gated on a
+  narrow `am_i_lykodex_delegate()` RPC purely for UI visibility — the
+  real authorization boundary is the server-side check on every session
+  request, independent of what the toggle shows.
+
+  **Needs one new Vercel env var before it works end-to-end:
+  `SUPABASE_SERVICE_ROLE_KEY`** (Supabase dashboard → Settings → API →
+  the `service_role` secret, never the anon/publishable one) — not yet
+  confirmed added. Same "treat it like a master password" warning as
+  the Discord bot's own README for the same key.
+
+  Also same session: `profiles.selected_colleges` gaining a College now
+  auto-joins that College's official guild via a new trigger
+  (`auto_join_default_college_guilds`, verified end-to-end in a
+  rolled-back transaction) — never auto-removes membership when a
+  College is later deselected, that stays a separate real decision.
+
+- 2026-08-29 — **Stock style chart pattern (documented; partial in app).**
+  Overhaul reference for time-series charts — spline area lines, gradient
+  fills, dashed horizontal grid, title/subtitle + dot legend, dual-series
+  (actual vs target). Named **`stock-style`** in `DESIGN_TOKENS.md`.
+  Early instances: `PriceHistoryChart.jsx`, `FriendMasteryChart.jsx`
+  (`lightweight-charts` AreaSeries). Extend those for new charts.
+
+- 2026-08-29 — **Sliding action bar pattern (documented, not built).**
+  Overhaul reference from JARVIS v0 Integrations ("YOUR ENTIRE STACK.
+  CONNECTED.") — full-bleed horizontal marquee of bordered chips beneath
+  a section headline. Named **`sliding-action-bar`** in `DESIGN_TOKENS.md`
+  (anatomy, motion, Lykodex colors, CSS sketch). Reference:
+  https://v0-jarvis-ruby.vercel.app/#metrics . Distinct from `blockbar`.
+
+- 2026-08-29 — **Blockbar pattern (documented, not built).** Overhaul
+  reference for segmented vertical-block status/history strips — metric
+  row + eyebrow + block track + range labels. Named **`blockbar`** in
+  `DESIGN_TOKENS.md` (anatomy, semantic colors, CSS sketch, use cases).
+  Say "blockbar" when implementing across hub screens.
+
+- 2026-08-29 — **Overview page renovation (in progress).** Command-center
+  hero stage (`overview-command`): split copy + `CollegeMorphHero`, Barlow
+  Condensed headline, rotating stat carousel with **categorical accents**
+  per College (gold reserved for vault total), morph hero syncs to the
+  active slide via `focusCollegeId`. Signed-out state shows Sign in /
+  Create account CTAs; loading uses a neutral skeleton (not gold).
+  "Right now" lane uses `overview-tile` wrappers with accent strips
+  (sky / gold / rose). College grid driven from `COLLEGES` with per-college
+  corner folds, hover borders, and stat colors. Touch:
+  `OverviewPage.jsx`, `CollegeMorphHero.jsx`, `index.css` (`.overview-*`;
+  responsive blocks at end of file). Not yet verified: light theme, live
+  browser check this session.
+
 - 2026-08-29 — **Strategic direction: hub-first, mobile paused; College
   renames (labels only).** All development focus is on the hub (web +
   desktop/Tauri) until it hits the quality bar Joshua wants. Capacitor
