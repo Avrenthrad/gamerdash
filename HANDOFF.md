@@ -134,6 +134,43 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-30 — **PS trophy scoring: dropped rarity weighting, tier
+  count only.** `PS_RARITY_TIERS`/`PS_RARITY_MULTIPLIERS` removed from
+  `gameMastery.js` (and its `discord-bot/` duplicate) — those were
+  always a person's own subjective read of their trophy case's rarity
+  label, never verified data the way Steam's global unlock-percent is.
+  `computePsScore` is now just `count × tier points` per tier.
+  `TYPICAL_MAX.playstation` dropped 8000 → 5300 alongside this (raw
+  totals dropped ~1.5x without the rarity multiplier — left unchanged,
+  1000 would have quietly meant "less dedicated" than before).
+  `GameMasterySection.jsx`'s 4×4 tier×rarity grid is now 4 plain count
+  inputs; old saved `ps_trophy_counts` rows in the previous nested
+  shape are skipped on load, not misrendered. Committed `cc44c28`.
+
+- 2026-08-30 — **Account Linking: Nintendo gets a Username field,
+  loses its Refresh button; all three handle cards get a "connected"
+  view.** `profiles.nintendo_username` added alongside the existing
+  `nintendo_friend_code`. Nintendo's Refresh button removed — it only
+  ever recomputed Gaming Mastery from Xbox/PS/Steam data, which
+  Nintendo never feeds (misleading to leave it there). Once a
+  platform's field(s) are saved, `PlatformHandleCard` now shows a
+  clean connected view (saved values + Disconnect) matching
+  `OAuthProviderCard`'s Discord/Twitch look, instead of leaving a
+  filled-in form sitting there. `HANDLE_PLATFORMS`/`PlatformHandleCard`
+  generalized from one field per platform to a `fields[]` list to
+  support Nintendo's two. Committed `9450172`.
+
+  **Still open, explicitly paused mid-conversation, not started**:
+  user asked for real Xbox OAuth ("Sign in with Microsoft" + the
+  official Xbox Live API) and the unofficial PSN `npsso`-token method
+  so Refresh can pull live Gamerscore/trophies instead of self-
+  reported numbers. Both are real, substantial builds — Xbox needs an
+  Azure app registration (external step, not something done from
+  here) + XSTS token exchange; PSN's method is unofficial/ToS-gray
+  (same one PSNProfiles-style trophy trackers use). User confirmed
+  wanting both built. Not yet scoped or started — pick this up before
+  assuming Xbox/PlayStation stay self-reported.
+
 - 2026-08-30 — **Removed the artificial 1000-point cap on Mastery
   Score.** User flagged "why is this all 1000/1000" on the Gaming
   Mastery breakdown. Root cause: `normalize()` in `lib/gameMastery.js`
