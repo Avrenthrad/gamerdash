@@ -43,51 +43,108 @@ import GameMasterySection from "./GameMasterySection";
 //     root rather than guess one.
 //   - Nintendo has no equivalent self-service stats page at all, so no
 //     accountUrl here.
+//
+// fields is a list (not a single value) because Nintendo needs two —
+// Friend Code AND Username — while Xbox/PlayStation only need one;
+// PlatformHandleCard below renders one input per field but saves/
+// clears them together as a single "platform" unit.
+//
+// hideRefresh: Nintendo has no Gaming Mastery contribution at all (see
+// lib/gameMastery.js — only xbox/playstation/steam feed that score),
+// so a "Refresh" button here would recompute Mastery from Xbox/PS/
+// Steam data while implying it does something with the Nintendo
+// fields, which it never did — misleading, so it's just not offered.
 const HANDLE_PLATFORMS = [
   {
-    id: "xbox_gamertag",
+    id: "xbox",
     label: "Xbox",
-    fieldLabel: "Gamertag",
-    placeholder: "Your Xbox Gamertag",
-    accountUrl: (value) =>
-      value
-        ? `https://account.xbox.com/en-us/profile?gamertag=${encodeURIComponent(value)}`
+    fields: [{ id: "xbox_gamertag", fieldLabel: "Gamertag", placeholder: "Your Xbox Gamertag" }],
+    accountUrl: (values) =>
+      values.xbox_gamertag
+        ? `https://account.xbox.com/en-us/profile?gamertag=${encodeURIComponent(values.xbox_gamertag)}`
         : "https://account.xbox.com/en-us/profile",
     accountLinkLabel: "Find your Gamerscore on Xbox →",
   },
   {
-    id: "playstation_online_id",
+    id: "playstation",
     label: "PlayStation",
-    fieldLabel: "Online ID",
-    placeholder: "Your PSN Online ID",
+    fields: [{ id: "playstation_online_id", fieldLabel: "Online ID", placeholder: "Your PSN Online ID" }],
     accountUrl: () => "https://library.playstation.com",
     accountLinkLabel: "Open your PlayStation Library →",
   },
-  { id: "nintendo_friend_code", label: "Nintendo", fieldLabel: "Friend Code", placeholder: "SW-0000-0000-0000" },
+  {
+    id: "nintendo",
+    label: "Nintendo",
+    fields: [
+      { id: "nintendo_friend_code", fieldLabel: "Friend Code", placeholder: "SW-0000-0000-0000" },
+      { id: "nintendo_username", fieldLabel: "Username", placeholder: "Your Nintendo Account username" },
+    ],
+    hideRefresh: true,
+  },
 ];
 
-function PlatformHandleCard({ platform, value: initialValue, onSaved, onRecomputeMastery }) {
-  const [value, setValue] = useState(initialValue || "");
+// Connected view matches OAuthProviderCard's look (a plain "Disconnect"
+// button, no form) once every field the person has actually filled in
+// is saved — same visual language as Discord/Twitch below, rather than
+// leaving a filled-in save form sitting there looking unfinished.
+function PlatformHandleCard({ platform, values: savedValues, onSaved, onRecomputeMastery }) {
+  const initialFieldValues = {};
+  platform.fields.forEach((f) => { initialFieldValues[f.id] = savedValues[f.id] || ""; });
+
+  const isConnected = platform.fields.some((f) => savedValues[f.id]);
+  const [editing, setEditing] = useState(!isConnected);
+  const [fieldValues, setFieldValues] = useState(initialFieldValues);
   const [status, setStatus] = useState("idle"); // idle | saving | saved | error
+  const [disconnecting, setDisconnecting] = useState(false);
   const [recomputing, setRecomputing] = useState(false);
 
-  // initialValue arrives asynchronously (parent fetches the profile
-  // after this card has already mounted with an empty default) — sync
-  // once the real value shows up, without clobbering anything the
-  // person's already typed.
+  // savedValues arrives asynchronously (parent fetches the profile
+  // after this card has already mounted with empty defaults) — sync
+  // once the real values show up, without clobbering anything the
+  // person's already typed, and drop out of edit mode once something
+  // real is on file.
   useEffect(() => {
-    if (initialValue) setValue(initialValue);
-  }, [initialValue]);
+    const hasAny = platform.fields.some((f) => savedValues[f.id]);
+    if (hasAny) {
+      setFieldValues((prev) => {
+        const next = { ...prev };
+        platform.fields.forEach((f) => {
+          if (savedValues[f.id]) next[f.id] = savedValues[f.id];
+        });
+        return next;
+      });
+      setEditing(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedValues]);
 
   async function handleSave(e) {
     e.preventDefault();
     setStatus("saving");
     try {
-      await onSaved(platform.id, value.trim());
+      const toSave = {};
+      platform.fields.forEach((f) => { toSave[f.id] = fieldValues[f.id]?.trim() || null; });
+      await onSaved(toSave);
       setStatus("saved");
+      setEditing(false);
     } catch (err) {
       console.error(`Failed to save ${platform.label} handle:`, err);
       setStatus("error");
+    }
+  }
+
+  async function handleDisconnect() {
+    setDisconnecting(true);
+    try {
+      const cleared = {};
+      platform.fields.forEach((f) => { cleared[f.id] = null; });
+      await onSaved(cleared);
+      setFieldValues(platform.fields.reduce((acc, f) => ({ ...acc, [f.id]: "" }), {}));
+      setEditing(true);
+    } catch (err) {
+      console.error(`Failed to disconnect ${platform.label}:`, err);
+    } finally {
+      setDisconnecting(false);
     }
   }
 
@@ -98,41 +155,64 @@ function PlatformHandleCard({ platform, value: initialValue, onSaved, onRecomput
     setRecomputing(false);
   }
 
+  if (!editing) {
+    return (
+      <div className="steam-link-card">
+        <h2 className="settings-card__title">{platform.label}</h2>
+        {platform.fields.map((f) => (
+          fieldValues[f.id] && (
+            <p className="settings-card__note" key={f.id}>{f.fieldLabel}: {fieldValues[f.id]}</p>
+          )
+        ))}
+        <div className="backlog-card__actions">
+          <button type="button" className="linking-row__connect" onClick={handleDisconnect} disabled={disconnecting}>
+            {disconnecting ? "Disconnecting…" : `Disconnect ${platform.label}`}
+          </button>
+          {!platform.hideRefresh && (
+            <button
+              type="button"
+              className="linking-row__connect"
+              onClick={handleRefresh}
+              disabled={recomputing}
+              title="Recompute your Gaming Mastery"
+            >
+              {recomputing ? "Refreshing…" : "↻ Refresh"}
+            </button>
+          )}
+        </div>
+        {platform.accountUrl && (
+          <a
+            href={platform.accountUrl(fieldValues)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ps-trophy-attribution"
+          >
+            {platform.accountLinkLabel}
+          </a>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="steam-link-card">
       <h2 className="settings-card__title">{platform.label}</h2>
       <form className="price-search" onSubmit={handleSave}>
-        <input
-          className="price-search__input"
-          type="text"
-          placeholder={platform.placeholder}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-        />
+        {platform.fields.map((f) => (
+          <input
+            key={f.id}
+            className="price-search__input"
+            type="text"
+            placeholder={f.placeholder}
+            value={fieldValues[f.id]}
+            onChange={(e) => setFieldValues((prev) => ({ ...prev, [f.id]: e.target.value }))}
+          />
+        ))}
         <button type="submit" className="price-search__button" disabled={status === "saving"}>
-          {status === "saving" ? "Saving…" : `Save ${platform.fieldLabel}`}
-        </button>
-        <button
-          type="button"
-          className="linking-row__connect"
-          onClick={handleRefresh}
-          disabled={recomputing}
-          title="Recompute your Gaming Mastery"
-        >
-          {recomputing ? "Refreshing…" : "↻ Refresh"}
+          {status === "saving" ? "Saving…" : "Save"}
         </button>
       </form>
       {status === "error" && <p className="panel__status panel__status--error">Couldn't save — try again.</p>}
-      {platform.accountUrl && (
-        <a
-          href={platform.accountUrl(value)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="ps-trophy-attribution"
-        >
-          {platform.accountLinkLabel}
-        </a>
-      )}
     </div>
   );
 }
@@ -223,7 +303,7 @@ export default function AccountLinkingPage({
     if (!userId) return;
     supabase
       .from("profiles")
-      .select("xbox_gamertag, playstation_online_id, nintendo_friend_code")
+      .select("xbox_gamertag, playstation_online_id, nintendo_friend_code, nintendo_username")
       .eq("id", userId)
       .single()
       .then(({ data, error }) => {
@@ -232,13 +312,16 @@ export default function AccountLinkingPage({
       });
   }, [userId]);
 
-  async function saveHandle(fieldId, value) {
+  // Takes a { fieldId: value|null } object rather than a single field —
+  // Nintendo saves/clears two columns (friend code + username) as one
+  // unit, in a single round trip.
+  async function saveHandles(fieldValues) {
     const { error } = await supabase
       .from("profiles")
-      .update({ [fieldId]: value || null })
+      .update(fieldValues)
       .eq("id", userId);
     if (error) throw error;
-    setHandles((prev) => ({ ...prev, [fieldId]: value }));
+    setHandles((prev) => ({ ...prev, ...fieldValues }));
   }
 
   // Discord/Twitch — real Supabase-native OAuth linking, NOT blocked
@@ -373,8 +456,8 @@ export default function AccountLinkingPage({
         <PlatformHandleCard
           key={platform.id}
           platform={platform}
-          value={handles[platform.id]}
-          onSaved={saveHandle}
+          values={handles}
+          onSaved={saveHandles}
           onRecomputeMastery={onRecomputeMastery}
         />
       ))}

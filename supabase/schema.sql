@@ -1578,6 +1578,7 @@ alter table public.profiles add column if not exists overall_mastery_computed_at
 alter table public.profiles add column if not exists xbox_gamertag text;
 alter table public.profiles add column if not exists playstation_online_id text;
 alter table public.profiles add column if not exists nintendo_friend_code text;
+alter table public.profiles add column if not exists nintendo_username text;
 
 -- ---------- Guild customization: logo, banner, description (additive) ----------
 -- Same real-upload pattern as avatars/wallpapers above — a public
