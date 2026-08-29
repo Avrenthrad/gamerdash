@@ -32,6 +32,7 @@ import { requestUpfrontPermissions } from "../lib/requestPermissions";
 import { DEFAULT_PLATFORM_ORDER } from "../data/platformOrder";
 import { supabase, supabaseConfigured } from "../lib/supabaseClient";
 import { signOut as supabaseSignOut, requestLykodexSession } from "../lib/auth";
+import { subscribeToPresence } from "../lib/presence";
 import {
   fetchProfile,
   upsertProfile,
@@ -182,6 +183,21 @@ export function AppProvider({ children }) {
   // re-login. Cleared on a real sign-out either way.
   const [personalSessionCache, setPersonalSessionCache] = useState(null);
   const actingAsLykodex = Boolean(personalSessionCache);
+
+  // ----- online presence (real in-app "who's here now", not Steam
+  // status) — see lib/presence.js. Friends list + guild member roster
+  // sort online-first off this; deliberately not used for friend
+  // requests. -----
+  const [onlineUserIds, setOnlineUserIds] = useState(() => new Set());
+
+  useEffect(() => {
+    if (!supabaseConfigured || !userId) {
+      setOnlineUserIds(new Set());
+      return;
+    }
+    const unsubscribe = subscribeToPresence(userId, setOnlineUserIds);
+    return unsubscribe;
+  }, [userId]);
 
   // ----- profile -----
   const [avatarUrl, setAvatarUrl] = useState(null);
@@ -886,6 +902,7 @@ export function AppProvider({ children }) {
       actingAsLykodex,
       actAsLykodex,
       returnToMyAccount,
+      onlineUserIds,
 
       // profile
       avatarUrl,
@@ -979,6 +996,7 @@ export function AppProvider({ children }) {
       actingAsLykodex,
       actAsLykodex,
       returnToMyAccount,
+      onlineUserIds,
       avatarUrl,
       firstName,
       lastName,

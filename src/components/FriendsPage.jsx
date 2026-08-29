@@ -12,11 +12,18 @@ import {
   blockUser, unblockUser, fetchBlockedUsers,
 } from "../lib/friends";
 import { displayName } from "../lib/guilds";
+import { sortOnlineFirst } from "../lib/presence";
+import { useApp } from "../hooks/useApp";
 import MiniAvatar from "./MiniAvatar";
 import ConfirmDialog from "./ConfirmDialog";
 import FriendMasteryChart from "./FriendMasteryChart";
 
 export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCreateAccount, onGoToInbox }) {
+  // Deliberate exception to this page's usual "everything via props"
+  // convention — see AccountSettingsPage.jsx for the same pattern.
+  // onlineUserIds only lives in AppContext; threading it through
+  // App.jsx's props here isn't worth it for one read-only value.
+  const { onlineUserIds } = useApp();
   const [myCode, setMyCode] = useState("");
   const [friends, setFriends] = useState([]);
   const [requests, setRequests] = useState([]);
@@ -346,7 +353,7 @@ export default function FriendsPage({ onBack, userId, isLoggedIn, onSignIn, onCr
       )}
       {friends.length > 0 && (
         <ul className="backlog-list">
-          {friends.map((f) => (
+          {sortOnlineFirst(friends, onlineUserIds, (f) => f.friend_id, (f) => displayName(f.profile)).map((f) => (
             <li key={f.id} className="backlog-card">
               <MiniAvatar profile={f.profile} />
               <div className="backlog-card__info">

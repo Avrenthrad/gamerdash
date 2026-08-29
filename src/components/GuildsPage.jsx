@@ -21,6 +21,8 @@ import {
 } from "../lib/guilds";
 import { findUserByFriendCode } from "../lib/friends";
 import { supabase } from "../lib/supabaseClient";
+import { sortOnlineFirst } from "../lib/presence";
+import { useApp } from "../hooks/useApp";
 import MiniAvatar from "./MiniAvatar";
 
 function displayName(profile) {
@@ -308,6 +310,11 @@ function GuildRow({ guild, userId, isMember, onView, onRequestJoin }) {
 }
 
 function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, onLeave, onPrivacyChanged }) {
+  // Deliberate exception to this page's usual "everything via props"
+  // convention — see AccountSettingsPage.jsx for the same pattern.
+  // onlineUserIds only lives in AppContext; not worth threading
+  // through App.jsx's/GuildsPage's props for one read-only value.
+  const { onlineUserIds } = useApp();
   const [guild, setGuild] = useState(initialGuild);
   const [tab, setTab] = useState("posts");
   const [members, setMembers] = useState([]);
@@ -644,7 +651,7 @@ function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, o
           {status === "loading" && <p className="panel__status">Loading…</p>}
           {status === "ready" && (
             <ul className="backlog-list">
-              {members.map((m) => {
+              {sortOnlineFirst(members, onlineUserIds, (m) => m.user_id, (m) => displayName(m.profile)).map((m) => {
                 const memberIsOwner = m.user_id === guild.created_by;
                 const memberIsSelf = m.user_id === userId;
                 return (
