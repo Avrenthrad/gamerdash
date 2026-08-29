@@ -126,9 +126,56 @@ builds and runs clean everywhere else it's been tested).
 
 ## Open branches
 
-None. `main` / `origin/main` is the only stream.
+`main` is where all active work happens. One archive-only branch,
+`mobile-paused-2026-08-29` — a full snapshot of the native Android/iOS/
+Capacitor setup exactly as it stood before mobile got pulled off `main`
+(see the entry directly below). Not for active development; it exists
+purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
+
+- 2026-08-29 — **Mobile fully paused and pulled off `main`.** Following
+  the earlier "hub-first, mobile paused" decision, the user asked to go
+  further: actually remove the native Android/iOS/Capacitor projects
+  from the day-to-day tree, not just stop building feature work on them.
+  Before removing anything, the exact pre-removal state was snapshotted
+  on branch `mobile-paused-2026-08-29` (pushed to origin) — fully
+  recoverable from there regardless of what happens to `main` afterward.
+
+  Removed from `main`: `android/`, `ios/`, `capacitor.config.json`,
+  `.github/workflows/release-android.yml`. Removed from `package.json`:
+  the `@capacitor/android`/`@capacitor/ios` dependencies, the
+  `@capacitor/cli` devDependency, and the `cap:sync`/`cap:android`/
+  `cap:ios` scripts — nothing in `src/` ever imported those two platform
+  packages directly (confirmed via a repo-wide grep before removing), so
+  there was nothing else to touch for them. `package-lock.json`
+  regenerated via `npm install` (95 packages dropped, 0 vulnerabilities).
+
+  **Deliberately NOT removed** — these are shared platform-detection
+  code and packages still actively used by working desktop/web code
+  paths, not mobile-only, and gutting them would risk breaking things
+  that work fine today for no real benefit: `src/lib/platform.js`
+  (`isPackagedApp()`/`isTauri()`/`isAndroid()`/`isMobileApp()` — the
+  `isAndroid()`/`isMobileApp()` branches simply never evaluate true
+  anymore with no native shell to run in, which is fine, not broken);
+  `@capacitor/core`/`@capacitor/app`/`@capacitor/browser` (still
+  imported by `oauthRedirect.js`, `LoginPage.jsx`'s native OAuth flow,
+  `UpdateCheckMenuItem.jsx` — all degrade gracefully on web/desktop via
+  Capacitor's own web fallback, confirmed earlier this session);
+  components that render conditionally on `isAndroid()`/`isMobileApp()`
+  (e.g. `AndroidUpdateBanner.jsx`) — left in place, simply dormant.
+
+  Verified: `npx oxlint src` and `npm run build` both clean after the
+  removal + `npm install`. **Not yet verified**: a live GitHub Actions
+  push to confirm `release-android.yml`'s removal actually stops that
+  workflow from triggering (check the Actions tab after the next push
+  — there should be no new Android run).
+
+  User's call on future reuse: the current single-app Capacitor setup
+  (now dormant on the archive branch) is meant to be **preserved and
+  possibly reused for parts** of the future per-College mobile apps,
+  not treated as a throwaway prototype — don't assume it'll be rebuilt
+  fully from scratch without checking first.
 
 - 2026-08-29 — **"Act as Lykodex" — real system account + session-swap
   toggle (`e6462f6`).** A genuine account (`profiles.username =

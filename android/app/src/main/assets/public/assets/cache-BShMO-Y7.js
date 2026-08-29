@@ -1,1 +1,0 @@
-function e(e,t){try{let n=localStorage.getItem(e);if(!n)return;let{value:r,savedAt:i}=JSON.parse(n);if(Date.now()-i>t){localStorage.removeItem(e);return}return r}catch{return}}function t(e,t){try{localStorage.setItem(e,JSON.stringify({value:t,savedAt:Date.now()}))}catch{}}var n={ONE_DAY:864e5,ONE_WEEK:6048e5};export{e as n,t as r,n as t};
