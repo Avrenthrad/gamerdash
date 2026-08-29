@@ -155,7 +155,7 @@ export default function GameMasterySection({
             {masteryBreakdown.map((entry) => (
               <div key={entry.platform} className="mastery-breakdown__row">
                 <span className="mastery-breakdown__platform">{PLATFORM_LABELS[entry.platform] || entry.platform}</span>
-                <span className="mastery-breakdown__score">{Math.round(entry.normalized)} / 1000</span>
+                <span className="mastery-breakdown__score">{Math.round(entry.normalized).toLocaleString()}</span>
                 <span className="mastery-breakdown__meta">
                   {entry.source === "live_steam_api"
                     ? `Live · ${entry.achievementsCounted} achievements across ${entry.gamesScanned} most-played games`

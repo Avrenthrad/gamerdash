@@ -1,14 +1,15 @@
 // Overall Mastery Score — combines a real score from each of the 5
-// Colleges into one 0-1000 number, the same honest way
+// Colleges into one uncapped number, the same honest way
 // lib/gameMastery.js already combines Steam/Xbox/PlayStation: real
-// weighted counts -> a diminishing-returns normalize curve -> average
-// only across Colleges that actually have real data. A College with
-// nothing added contributes nothing — never a fabricated default.
+// weighted counts -> a linear, uncapped normalize (typicalMax is a
+// reference point, not a ceiling) -> average only across Colleges
+// that actually have real data. A College with nothing added
+// contributes nothing — never a fabricated default.
 //
 // Gaming's real cross-platform Mastery Score (see lib/gameMastery.js,
 // user-facing as "Gaming Mastery") is reused directly as this
-// College's contribution — it's already on the same 0-1000 normalized
-// scale, so no extra transform is needed or wanted.
+// College's contribution — it's already on the same normalized scale,
+// so no extra transform is needed or wanted.
 //
 // Every function here is pure (no network, no Supabase) — real inputs
 // get gathered in lib/overallMasteryData.js, which calls into this

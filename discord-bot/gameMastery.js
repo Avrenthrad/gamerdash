@@ -77,15 +77,18 @@ export function computeSteamScore(achievements) {
   );
 }
 
-// ---------- Combining into one 0-1000 Mastery Score ----------
+// ---------- Combining into one uncapped Mastery Score ----------
 
-// norm(x, typicalMax) = 1000 * (1 - exp(-x / typicalMax))
-// Diminishing-returns curve: approaches 1000 but never reaches it, so
-// one absurdly high raw score on one platform can't single-handedly
-// blow the combined score off its 0-1000 scale.
+// norm(x, typicalMax) = 1000 * (x / typicalMax)
+// Linear, deliberately uncapped — typicalMax is a reference point
+// ("about what a genuinely serious player hits"), not a ceiling. Kept
+// in sync with src/lib/gameMastery.js — see that file for why the
+// previous exponential diminishing-returns curve was replaced (it
+// saturated to "1000/1000" for any reasonably dedicated player well
+// before they were anywhere near the top of what's achievable).
 export function normalize(x, typicalMax) {
   if (!typicalMax || typicalMax <= 0) return 0;
-  return 1000 * (1 - Math.exp(-Math.max(0, x) / typicalMax));
+  return 1000 * (Math.max(0, x) / typicalMax);
 }
 
 export const TYPICAL_MAX = {
