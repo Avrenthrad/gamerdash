@@ -32,9 +32,11 @@
 //   POST /api/pricing?service=psn&mode=link, Authorization: Bearer <token>, body {npsso}
 //   POST /api/pricing?service=psn&mode=trophies, Authorization: Bearer <token>
 //   POST /api/pricing?service=lykodex-session, Authorization: Bearer <caller's access token>
+//   GET  /api/pricing?service=mastery-cron, Authorization: Bearer <CRON_SECRET> (Vercel Cron only, see vercel.json)
 
 import { allowCors } from "./_cors.js";
 import { createClient } from "@supabase/supabase-js";
+import { computeXboxScore, computePsScore, computeMasteryScore, accountXpFromMastery, levelFromXp } from "../src/lib/gameMastery.js";
 
 const XBXPRICES_BASE = "https://xbxprices.com/api/v2";
 const CHEAPSHARK_ALLOWED_ENDPOINTS = ["games", "deals", "stores"];
@@ -476,6 +478,55 @@ async function xboxFetchGamerscore(userhash, xstsToken) {
   return { gamerscore: Number(get("Gamerscore")) || 0, gamertag: get("Gamertag") || null };
 }
 
+// Real refresh-if-needed + fetch, factored out so both the per-user
+// endpoint (mode=gamerscore, caller's own bearer token) and the daily
+// cron below (service_role, iterating every linked user) share the
+// exact same logic — returns "not_linked" / "expired" as sentinel
+// strings (rather than throwing) so both callers can render honest,
+// specific messages instead of a generic 500.
+async function getLiveXboxGamerscore(adminClient, userId) {
+  const { data: stored, error: fetchError } = await adminClient.from("xbox_tokens").select("*").eq("user_id", userId).maybeSingle();
+  if (fetchError) throw fetchError;
+  if (!stored) return "not_linked";
+
+  let { userhash, xuid, xsts_token: xstsToken } = stored;
+  const xstsExpired = new Date(stored.xsts_expires_at).getTime() < Date.now();
+  const msExpired = new Date(stored.ms_expires_at).getTime() < Date.now();
+
+  if (xstsExpired) {
+    let msAccessToken = stored.ms_access_token;
+    let newMsFields = null;
+    if (msExpired) {
+      if (!stored.ms_refresh_token) return "expired";
+      const refreshed = await xboxOAuthTokenRequest({ grant_type: "refresh_token", refresh_token: stored.ms_refresh_token, scope: "Xboxlive.signin Xboxlive.offline_access" });
+      msAccessToken = refreshed.access_token;
+      newMsFields = {
+        ms_access_token: refreshed.access_token,
+        ms_refresh_token: refreshed.refresh_token || stored.ms_refresh_token,
+        ms_expires_at: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
+      };
+    }
+    const userTokenResp = await xboxRequestUserToken(msAccessToken);
+    const xsts = await xboxRequestXstsToken(userTokenResp.Token);
+    const claims = xsts.DisplayClaims.xui[0];
+    userhash = claims.uhs;
+    xuid = claims.xid;
+    xstsToken = xsts.Token;
+    await adminClient.from("xbox_tokens").update({
+      ...(newMsFields || {}),
+      xsts_token: xsts.Token,
+      xsts_expires_at: xsts.NotAfter,
+      userhash: claims.uhs,
+      xuid: claims.xid,
+      updated_at: new Date().toISOString(),
+    }).eq("user_id", userId);
+  }
+
+  const { gamerscore, gamertag } = await xboxFetchGamerscore(userhash, xstsToken);
+  if (gamertag) await adminClient.from("xbox_tokens").update({ gamertag }).eq("user_id", userId);
+  return { gamertag: gamertag || stored.gamertag, gamerscore, xuid };
+}
+
 // Verifies the caller against their own Supabase session (same pattern
 // as handleLykodexSession above) and returns a service_role admin
 // client for reading/writing this user's stored tokens.
@@ -536,47 +587,10 @@ async function handleXbox(req, searchParams, res) {
     if (mode === "gamerscore") {
       if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
       const { userId, adminClient } = await verifyCallerAndGetAdminClient(req);
-
-      const { data: stored, error: fetchError } = await adminClient.from("xbox_tokens").select("*").eq("user_id", userId).maybeSingle();
-      if (fetchError) throw fetchError;
-      if (!stored) return res.status(404).json({ error: "Xbox not linked" });
-
-      let { userhash, xuid, xsts_token: xstsToken } = stored;
-      const xstsExpired = new Date(stored.xsts_expires_at).getTime() < Date.now();
-      const msExpired = new Date(stored.ms_expires_at).getTime() < Date.now();
-
-      if (xstsExpired) {
-        let msAccessToken = stored.ms_access_token;
-        let newMsFields = null;
-        if (msExpired) {
-          if (!stored.ms_refresh_token) return res.status(401).json({ error: "Xbox link expired — please re-link" });
-          const refreshed = await xboxOAuthTokenRequest({ grant_type: "refresh_token", refresh_token: stored.ms_refresh_token, scope: "Xboxlive.signin Xboxlive.offline_access" });
-          msAccessToken = refreshed.access_token;
-          newMsFields = {
-            ms_access_token: refreshed.access_token,
-            ms_refresh_token: refreshed.refresh_token || stored.ms_refresh_token,
-            ms_expires_at: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
-          };
-        }
-        const userTokenResp = await xboxRequestUserToken(msAccessToken);
-        const xsts = await xboxRequestXstsToken(userTokenResp.Token);
-        const claims = xsts.DisplayClaims.xui[0];
-        userhash = claims.uhs;
-        xuid = claims.xid;
-        xstsToken = xsts.Token;
-        await adminClient.from("xbox_tokens").update({
-          ...(newMsFields || {}),
-          xsts_token: xsts.Token,
-          xsts_expires_at: xsts.NotAfter,
-          userhash: claims.uhs,
-          xuid: claims.xid,
-          updated_at: new Date().toISOString(),
-        }).eq("user_id", userId);
-      }
-
-      const { gamerscore, gamertag } = await xboxFetchGamerscore(userhash, xstsToken);
-      if (gamertag) await adminClient.from("xbox_tokens").update({ gamertag }).eq("user_id", userId);
-      return res.status(200).json({ gamertag: gamertag || stored.gamertag, gamerscore, xuid });
+      const result = await getLiveXboxGamerscore(adminClient, userId);
+      if (result === "not_linked") return res.status(404).json({ error: "Xbox not linked" });
+      if (result === "expired") return res.status(401).json({ error: "Xbox link expired — please re-link" });
+      return res.status(200).json(result);
     }
 
     if (mode === "unlink") {
@@ -661,6 +675,33 @@ async function psnFetchTrophySummary(accessToken) {
   return res.json(); // { accountId, trophyLevel, earnedTrophies: { bronze, silver, gold, platinum } }
 }
 
+// Same refresh-if-needed + fetch, factored out so both the per-user
+// endpoint (mode=trophies) and the daily cron below share it — see
+// getLiveXboxGamerscore above for the same reasoning.
+async function getLiveTrophies(adminClient, userId) {
+  const { data: stored, error: fetchError } = await adminClient.from("psn_tokens").select("*").eq("user_id", userId).maybeSingle();
+  if (fetchError) throw fetchError;
+  if (!stored) return "not_linked";
+
+  let accessToken = stored.access_token;
+  if (new Date(stored.access_expires_at).getTime() < Date.now()) {
+    if (new Date(stored.refresh_expires_at).getTime() < Date.now()) return "expired";
+    const refreshed = await psnRefreshTokens(stored.refresh_token);
+    accessToken = refreshed.access_token;
+    const now = Date.now();
+    await adminClient.from("psn_tokens").update({
+      access_token: refreshed.access_token,
+      refresh_token: refreshed.refresh_token || stored.refresh_token,
+      access_expires_at: new Date(now + refreshed.expires_in * 1000).toISOString(),
+      refresh_expires_at: new Date(now + refreshed.refresh_token_expires_in * 1000).toISOString(),
+      updated_at: new Date().toISOString(),
+    }).eq("user_id", userId);
+  }
+
+  const summary = await psnFetchTrophySummary(accessToken);
+  return { trophies: summary.earnedTrophies };
+}
+
 async function handlePsn(req, searchParams, res) {
   const mode = searchParams.get("mode");
 
@@ -693,30 +734,10 @@ async function handlePsn(req, searchParams, res) {
     if (mode === "trophies") {
       if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
       const { userId, adminClient } = await verifyCallerAndGetAdminClient(req);
-
-      const { data: stored, error: fetchError } = await adminClient.from("psn_tokens").select("*").eq("user_id", userId).maybeSingle();
-      if (fetchError) throw fetchError;
-      if (!stored) return res.status(404).json({ error: "PlayStation not linked" });
-
-      let accessToken = stored.access_token;
-      if (new Date(stored.access_expires_at).getTime() < Date.now()) {
-        if (new Date(stored.refresh_expires_at).getTime() < Date.now()) {
-          return res.status(401).json({ error: "PlayStation link expired — please re-link with a fresh npsso" });
-        }
-        const refreshed = await psnRefreshTokens(stored.refresh_token);
-        accessToken = refreshed.access_token;
-        const now = Date.now();
-        await adminClient.from("psn_tokens").update({
-          access_token: refreshed.access_token,
-          refresh_token: refreshed.refresh_token || stored.refresh_token,
-          access_expires_at: new Date(now + refreshed.expires_in * 1000).toISOString(),
-          refresh_expires_at: new Date(now + refreshed.refresh_token_expires_in * 1000).toISOString(),
-          updated_at: new Date().toISOString(),
-        }).eq("user_id", userId);
-      }
-
-      const summary = await psnFetchTrophySummary(accessToken);
-      return res.status(200).json({ trophies: summary.earnedTrophies });
+      const result = await getLiveTrophies(adminClient, userId);
+      if (result === "not_linked") return res.status(404).json({ error: "PlayStation not linked" });
+      if (result === "expired") return res.status(401).json({ error: "PlayStation link expired — please re-link with a fresh npsso" });
+      return res.status(200).json(result);
     }
 
     if (mode === "unlink") {
@@ -732,6 +753,115 @@ async function handlePsn(req, searchParams, res) {
     console.error("pricing (psn):", err);
     return res.status(err.status || 500).json({ error: err.message });
   }
+}
+
+// ---------- Daily Mastery recompute (Xbox/PSN only) ----------
+// Vercel Cron (see vercel.json, "0 4 * * *" — same 4am UTC time as the
+// existing pg_cron mastery_score_history snapshot, so the two stay in
+// sync) hits this once a day for every user who has xbox_tokens or
+// psn_tokens linked, refreshing their live Gamerscore/trophy counts
+// automatically instead of waiting for them to click "Recompute"
+// themselves. Steam is deliberately NOT re-fetched here — this cron
+// only targets the Xbox/PSN part of the score; the manual "Recompute
+// Gaming Mastery" button still combines all three fresh. Whatever
+// Steam contribution was last computed is carried forward unchanged
+// (read from the existing mastery_breakdown) rather than silently
+// dropped from the combined score.
+async function recomputeMasteryForUserServerSide(adminClient, userId) {
+  const { data: profile } = await adminClient.from("profiles").select("mastery_breakdown").eq("id", userId).maybeSingle();
+  const { data: inputs } = await adminClient.from("mastery_inputs").select("*").eq("user_id", userId).maybeSingle();
+
+  const rawScores = {};
+  const sources = {};
+
+  const existingSteam = Array.isArray(profile?.mastery_breakdown)
+    ? profile.mastery_breakdown.find((e) => e.platform === "steam")
+    : null;
+  if (existingSteam) {
+    rawScores.steam = existingSteam.raw;
+    sources.steam = { source: existingSteam.source, asOf: existingSteam.asOf, gamesScanned: existingSteam.gamesScanned, achievementsCounted: existingSteam.achievementsCounted };
+  }
+
+  try {
+    const result = await getLiveXboxGamerscore(adminClient, userId);
+    if (result !== "not_linked" && result !== "expired") {
+      rawScores.xbox = computeXboxScore(result.gamerscore);
+      sources.xbox = { source: "live_xbox_api", asOf: new Date().toISOString(), gamerscore: result.gamerscore, gamertag: result.gamertag };
+    } else if (inputs?.xbox_gamerscore != null) {
+      rawScores.xbox = computeXboxScore(inputs.xbox_gamerscore);
+      sources.xbox = { source: "self_reported", asOf: inputs.xbox_updated_at, gamerscore: inputs.xbox_gamerscore };
+    }
+  } catch (err) {
+    console.error(`pricing (mastery-cron): Xbox fetch failed for user ${userId}`, err);
+  }
+
+  try {
+    const result = await getLiveTrophies(adminClient, userId);
+    if (result !== "not_linked" && result !== "expired") {
+      rawScores.playstation = computePsScore(result.trophies);
+      sources.playstation = { source: "live_psn_api", asOf: new Date().toISOString() };
+    } else if (inputs?.ps_trophy_counts) {
+      rawScores.playstation = computePsScore(inputs.ps_trophy_counts);
+      sources.playstation = { source: "self_reported", asOf: inputs.ps_updated_at };
+    }
+  } catch (err) {
+    console.error(`pricing (mastery-cron): PSN fetch failed for user ${userId}`, err);
+  }
+
+  const combined = computeMasteryScore(rawScores);
+  if (!combined) return "no_data";
+
+  const accountXp = accountXpFromMastery(combined.masteryScore);
+  const { level } = levelFromXp(accountXp);
+  const breakdown = combined.breakdown.map((entry) => ({ ...entry, ...sources[entry.platform] }));
+
+  const { error } = await adminClient.from("profiles").update({
+    mastery_score: combined.masteryScore,
+    mastery_xp: accountXp,
+    mastery_level: level,
+    mastery_breakdown: breakdown,
+    mastery_computed_at: new Date().toISOString(),
+  }).eq("id", userId);
+  if (error) throw error;
+  return "updated";
+}
+
+async function handleMasteryCron(req, res) {
+  const authHeader = req.headers.authorization || "";
+  const cronSecret = process.env.CRON_SECRET;
+  // No CRON_SECRET configured = refuse entirely, rather than allow an
+  // unauthenticated public trigger of a job that writes to every
+  // linked user's profile.
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey) {
+    return res.status(500).json({ error: "Server not configured for this" });
+  }
+  const adminClient = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
+
+  const [{ data: xboxRows }, { data: psnRows }] = await Promise.all([
+    adminClient.from("xbox_tokens").select("user_id"),
+    adminClient.from("psn_tokens").select("user_id"),
+  ]);
+  const userIds = [...new Set([...(xboxRows || []).map((r) => r.user_id), ...(psnRows || []).map((r) => r.user_id)])];
+
+  const results = { total: userIds.length, updated: 0, noData: 0, failed: 0 };
+  for (const userId of userIds) {
+    try {
+      const outcome = await recomputeMasteryForUserServerSide(adminClient, userId);
+      if (outcome === "updated") results.updated += 1;
+      else results.noData += 1;
+    } catch (err) {
+      console.error(`pricing (mastery-cron): failed for user ${userId}`, err);
+      results.failed += 1;
+    }
+  }
+
+  return res.status(200).json(results);
 }
 
 // Real session swap for the "act as Lykodex" toggle — not a client-
@@ -843,6 +973,7 @@ export default async function handler(req, res) {
   if (service === "riftbound") return handleRiftbound(searchParams, res);
   if (service === "xbox") return handleXbox(req, searchParams, res);
   if (service === "psn") return handlePsn(req, searchParams, res);
+  if (service === "mastery-cron") return handleMasteryCron(req, res);
   if (service === "lykodex-session") return handleLykodexSession(req, res);
 
   return res.status(400).json({ error: "Missing or invalid service parameter" });
