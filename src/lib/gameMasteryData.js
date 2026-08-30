@@ -3,13 +3,19 @@
 // network); this file is the "wire it up to real data" half:
 //   - Steam: fully live, via the real Steam Web API (unlocked
 //     achievements + Steam's own global unlock-percent rarity).
-//   - Xbox / PlayStation: self-reported — see mastery_inputs in
-//     schema.sql and AccountLinkingPage.jsx for why (no public API
-//     exists for a person's own earned Gamerscore/trophies on either
-//     platform, confirmed while building Account Linking).
+//   - Xbox: live via real Microsoft OAuth + Xbox Live's XSTS token
+//     exchange when linked (see lib/xboxOAuth.js) — falls back to the
+//     older self-reported mastery_inputs.xbox_gamerscore when not
+//     linked or the link has expired.
+//   - PlayStation: live via a real npsso-token-based session when
+//     linked (see lib/psnAuth.js, unofficial but real — Sony offers no
+//     public OAuth app registration path) — falls back to self-
+//     reported mastery_inputs.ps_trophy_counts otherwise.
 
 import { supabase } from "./supabaseClient";
 import { fetchOwnedGames, fetchAchievements, fetchGlobalAchievementPercentages } from "./steam";
+import { fetchLiveGamerscore } from "./xboxOAuth";
+import { fetchLiveTrophies } from "./psnAuth";
 import {
   computeXboxScore,
   computePsScore,
@@ -95,24 +101,46 @@ async function gatherSteamAchievements(steamId) {
 }
 
 // The one function the rest of the app calls: gathers whatever real
-// data is actually available (self-reported Xbox/PS inputs + live
-// Steam data when linked), combines it via the pure scoring module,
-// and persists the result on the profile — same cached-on-profile
-// pattern as gd_score, recomputed on demand rather than every render.
+// data is actually available — live Xbox/PlayStation data first when
+// an account is actually linked (see lib/xboxOAuth.js/lib/psnAuth.js),
+// falling back to the older self-reported mastery_inputs numbers when
+// it isn't — combines it via the pure scoring module, and persists the
+// result on the profile — same cached-on-profile pattern as gd_score,
+// recomputed on demand rather than every render.
 export async function recomputeMastery(userId, linkedSteamId) {
   const inputs = await fetchMasteryInputs(userId).catch(() => null);
 
   const rawScores = {};
   const sources = {};
 
-  if (inputs?.xbox_gamerscore !== null && inputs?.xbox_gamerscore !== undefined) {
-    rawScores.xbox = computeXboxScore(inputs.xbox_gamerscore);
-    sources.xbox = { source: "self_reported", asOf: inputs.xbox_updated_at, gamerscore: inputs.xbox_gamerscore };
+  try {
+    const { gamerscore, gamertag } = await fetchLiveGamerscore();
+    rawScores.xbox = computeXboxScore(gamerscore);
+    sources.xbox = { source: "live_xbox_api", asOf: new Date().toISOString(), gamerscore, gamertag };
+  } catch {
+    // Not linked, or link expired — fall back to whatever was
+    // self-reported, same as before live sync existed.
+    if (inputs?.xbox_gamerscore !== null && inputs?.xbox_gamerscore !== undefined) {
+      rawScores.xbox = computeXboxScore(inputs.xbox_gamerscore);
+      sources.xbox = { source: "self_reported", asOf: inputs.xbox_updated_at, gamerscore: inputs.xbox_gamerscore };
+    }
   }
 
-  if (inputs?.ps_trophy_counts) {
-    rawScores.playstation = computePsScore(inputs.ps_trophy_counts);
-    sources.playstation = { source: "self_reported", asOf: inputs.ps_updated_at };
+  try {
+    // trophies.platinum is typed 0|1 in psn-api's own model (worded as
+    // "1 if the group contains a platinum trophy") but that reads like
+    // it was written for a per-title trophy group, not this account-
+    // level summary — a real profile can clearly have dozens of
+    // platinums, so computePsScore's Number(...) coercion is trusted
+    // over that type at runtime rather than assuming a 0/1 cap.
+    const { trophies } = await fetchLiveTrophies();
+    rawScores.playstation = computePsScore(trophies);
+    sources.playstation = { source: "live_psn_api", asOf: new Date().toISOString() };
+  } catch {
+    if (inputs?.ps_trophy_counts) {
+      rawScores.playstation = computePsScore(inputs.ps_trophy_counts);
+      sources.playstation = { source: "self_reported", asOf: inputs.ps_updated_at };
+    }
   }
 
   if (linkedSteamId) {

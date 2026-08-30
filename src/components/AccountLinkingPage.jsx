@@ -1,21 +1,27 @@
 // Account linking screen — connect gaming and streaming platforms.
 //
-// Genuinely working pieces: Steam (public-profile wishlist sync), and
+// Genuinely working pieces: Steam (public-profile wishlist sync),
 // Discord + Twitch (real OAuth via Supabase's own built-in provider
 // support — see lib/auth.js for why that one specifically isn't
 // blocked on deployment the way a directly-registered OAuth app is:
-// Supabase's OAuth callback is its own fixed domain, not ours).
+// Supabase's OAuth callback is its own fixed domain, not ours), and
+// now Xbox Live + PlayStation Network — both real, live-synced
+// Gamerscore/trophy data, not self-reported:
+//   - Xbox: real Microsoft OAuth ("Sign in with Microsoft") -> Xbox
+//     Live's own XSTS token exchange (see lib/xboxOAuth.js).
+//   - PlayStation: a real npsso-token-based session (see
+//     lib/psnAuth.js) — unofficial (Sony has no public OAuth app
+//     registration path) but real, the same mechanism every PSN
+//     trophy tracker uses.
 //
-// Xbox/PlayStation/Nintendo have no public API for a person's own
-// library/achievements/trophies at all — confirmed while researching
-// each one, not an oversight. Rather than a dead "not available" row,
-// each gets a real self-reported handle field (their actual Gamertag/
-// Online ID/Friend Code) — honest reference info a person can save
-// themselves, never presented as verified or live-synced. The scored
-// numbers (Gamerscore, PS trophy counts) are entered separately below
-// in GameMasterySection, which already has its own real "Recompute"
-// action — the small refresh button next to each handle here just
-// calls that same recompute, it isn't a second, different mechanism.
+// Nintendo still has no public API for a person's own library at all
+// (confirmed while researching it) — it keeps the real self-reported
+// handle field pattern (Friend Code + Username) below. Xbox/PlayStation
+// ALSO still show their self-reported handle fields even once linked —
+// that's the honest fallback for someone who chooses not to sign in
+// (or whose link expires), not a second competing mechanism; whichever
+// is actually available wins when Gaming Mastery recomputes (see
+// lib/gameMasteryData.js).
 //
 // Removed entirely: Destiny 2 (real working Bungie OAuth, but paused
 // on a Bungie-registered redirect URL — dropped from this screen per
@@ -27,6 +33,9 @@ import { useState, useEffect } from "react";
 import { importSteamWishlist } from "../lib/wishlistImport";
 import { linkIdentity, unlinkProviderIdentity, getLinkedProviders, syncDiscordLink, removeDiscordLink } from "../lib/auth";
 import { supabase } from "../lib/supabaseClient";
+import { getXboxSignInUrl, fetchLiveGamerscore, unlinkXbox } from "../lib/xboxOAuth";
+import { linkPsnAccount, fetchLiveTrophies, unlinkPsn } from "../lib/psnAuth";
+import { useApp } from "../hooks/useApp";
 import GameMasterySection from "./GameMasterySection";
 
 // accountUrl, where present, is a real, verified destination for
@@ -275,6 +284,186 @@ function OAuthProviderCard({ label, provider, linkedProviders, onChanged }) {
   );
 }
 
+// Real Microsoft OAuth -> Xbox Live sign-in (see lib/xboxOAuth.js).
+// checkStatus/liveData are populated by actually calling the
+// gamerscore endpoint on mount (rather than trusting a locally-cached
+// flag) since that's the only way to know the link is actually still
+// valid, not just that it existed once.
+function XboxLiveCard() {
+  const { xboxLinkStatus, xboxLinkResult, clearXboxLinkResult } = useApp();
+  const [checkStatus, setCheckStatus] = useState("checking"); // checking | linked | unlinked
+  const [liveData, setLiveData] = useState(null);
+  const [unlinking, setUnlinking] = useState(false);
+  const signInUrl = getXboxSignInUrl();
+
+  async function checkLinked() {
+    setCheckStatus("checking");
+    try {
+      const data = await fetchLiveGamerscore();
+      setLiveData(data);
+      setCheckStatus("linked");
+    } catch {
+      setCheckStatus("unlinked");
+    }
+  }
+
+  useEffect(() => {
+    checkLinked();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Just came back from a real sign-in (xboxLinkStatus set in
+  // AppContext.jsx's OAuth-callback effect) — re-check rather than
+  // trusting the callback result alone, so the card's state matches
+  // whatever fetchLiveGamerscore actually sees.
+  useEffect(() => {
+    if (xboxLinkStatus === "success" || xboxLinkStatus === "error") checkLinked();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [xboxLinkStatus]);
+
+  async function handleUnlink() {
+    setUnlinking(true);
+    try {
+      await unlinkXbox();
+      setCheckStatus("unlinked");
+      setLiveData(null);
+    } catch (err) {
+      console.error("Failed to unlink Xbox:", err);
+    } finally {
+      setUnlinking(false);
+    }
+  }
+
+  return (
+    <div className="steam-link-card">
+      <h2 className="settings-card__title">Xbox Live</h2>
+      {xboxLinkResult?.error && (
+        <p className="panel__status panel__status--error">
+          Sign-in failed: {xboxLinkResult.error}
+          <button type="button" className="game-popup__close" onClick={clearXboxLinkResult} aria-label="Dismiss" style={{ marginLeft: "8px" }}>✕</button>
+        </p>
+      )}
+      {checkStatus === "checking" && <p className="panel__status">Checking…</p>}
+      {checkStatus === "linked" && (
+        <>
+          <p className="settings-card__note">
+            Signed in{liveData?.gamertag ? ` as ${liveData.gamertag}` : ""} — real Gamerscore: <strong>{liveData?.gamerscore?.toLocaleString()}</strong>
+          </p>
+          <button type="button" className="linking-row__connect" onClick={handleUnlink} disabled={unlinking}>
+            {unlinking ? "Disconnecting…" : "Disconnect Xbox Live"}
+          </button>
+        </>
+      )}
+      {checkStatus === "unlinked" && (
+        signInUrl ? (
+          <button type="button" className="price-search__button" onClick={() => { window.location.href = signInUrl; }} style={{ alignSelf: "flex-start" }}>
+            Sign in with Microsoft
+          </button>
+        ) : (
+          <p className="panel__status">Xbox sign-in isn't configured yet — use the Gamertag field below in the meantime.</p>
+        )
+      )}
+    </div>
+  );
+}
+
+// Real npsso-token-based PSN session (see lib/psnAuth.js). The npsso
+// itself is never stored by this app — sent once to complete linking,
+// then only the resulting access/refresh tokens live server-side.
+function PsnCard() {
+  const [checkStatus, setCheckStatus] = useState("checking"); // checking | linked | unlinked
+  const [trophies, setTrophies] = useState(null);
+  const [npsso, setNpsso] = useState("");
+  const [linkStatus, setLinkStatus] = useState("idle"); // idle | linking | error
+  const [linkError, setLinkError] = useState("");
+  const [unlinking, setUnlinking] = useState(false);
+
+  async function checkLinked() {
+    setCheckStatus("checking");
+    try {
+      const { trophies: t } = await fetchLiveTrophies();
+      setTrophies(t);
+      setCheckStatus("linked");
+    } catch {
+      setCheckStatus("unlinked");
+    }
+  }
+
+  useEffect(() => {
+    checkLinked();
+  }, []);
+
+  async function handleLink(e) {
+    e.preventDefault();
+    if (!npsso.trim()) return;
+    setLinkStatus("linking");
+    setLinkError("");
+    try {
+      const { trophies: t } = await linkPsnAccount(npsso.trim());
+      setTrophies(t);
+      setCheckStatus("linked");
+      setNpsso("");
+      setLinkStatus("idle");
+    } catch (err) {
+      console.error("Failed to link PSN:", err);
+      setLinkStatus("error");
+      setLinkError(err.message || "Couldn't link — check your npsso token and try again.");
+    }
+  }
+
+  async function handleUnlink() {
+    setUnlinking(true);
+    try {
+      await unlinkPsn();
+      setCheckStatus("unlinked");
+      setTrophies(null);
+    } catch (err) {
+      console.error("Failed to unlink PSN:", err);
+    } finally {
+      setUnlinking(false);
+    }
+  }
+
+  return (
+    <div className="steam-link-card">
+      <h2 className="settings-card__title">PlayStation Network</h2>
+      {checkStatus === "checking" && <p className="panel__status">Checking…</p>}
+      {checkStatus === "linked" && trophies && (
+        <>
+          <p className="settings-card__note">
+            Real trophy counts: <strong>{trophies.platinum}</strong> platinum, <strong>{trophies.gold}</strong> gold, <strong>{trophies.silver}</strong> silver, <strong>{trophies.bronze}</strong> bronze.
+          </p>
+          <button type="button" className="linking-row__connect" onClick={handleUnlink} disabled={unlinking}>
+            {unlinking ? "Disconnecting…" : "Disconnect PlayStation"}
+          </button>
+        </>
+      )}
+      {checkStatus === "unlinked" && (
+        <>
+          <p className="settings-card__note" style={{ fontSize: "11px" }}>
+            Sony doesn't offer public sign-in for this, so linking uses your own npsso session token instead — the same method every PSN trophy tracker uses. Sign into{" "}
+            <a href="https://ca.account.sony.com/api/v1/ssocookie" target="_blank" rel="noopener noreferrer">this Sony page</a>{" "}
+            in a new tab while logged into PSN, then copy the 64-character value between the quotes and paste it below. Treat it like a password — never share it anywhere else.
+          </p>
+          <form className="price-search" onSubmit={handleLink}>
+            <input
+              className="price-search__input"
+              type="text"
+              placeholder="Paste your npsso token"
+              value={npsso}
+              onChange={(e) => setNpsso(e.target.value)}
+            />
+            <button type="submit" className="price-search__button" disabled={linkStatus === "linking"}>
+              {linkStatus === "linking" ? "Linking…" : "Link PlayStation"}
+            </button>
+          </form>
+          {linkStatus === "error" && <p className="panel__status panel__status--error">{linkError}</p>}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function AccountLinkingPage({
   variant = "settings",
   onFinishOnboarding,
@@ -449,6 +638,13 @@ export default function AccountLinkingPage({
             linkedProviders={linkedProviders}
             onChanged={refreshLinkedProviders}
           />
+        </>
+      )}
+
+      {!isOnboarding && (
+        <>
+          <XboxLiveCard />
+          <PsnCard />
         </>
       )}
 

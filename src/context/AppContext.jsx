@@ -33,6 +33,7 @@ import { DEFAULT_PLATFORM_ORDER } from "../data/platformOrder";
 import { supabase, supabaseConfigured } from "../lib/supabaseClient";
 import { signOut as supabaseSignOut, requestLykodexSession } from "../lib/auth";
 import { subscribeToPresence } from "../lib/presence";
+import { completeXboxLink, consumeXboxOAuthCallback } from "../lib/xboxOAuth";
 import {
   fetchProfile,
   upsertProfile,
@@ -366,6 +367,10 @@ export function AppProvider({ children }) {
   // persisted session on to the dashboard once that resolves, without
   // also hijacking a deliberate later navigation back to login.
   const bootRedirectPendingRef = useRef(false);
+  const pendingXboxCallbackRef = useRef(null);
+  // idle | linking | success | error
+  const [xboxLinkStatus, setXboxLinkStatus] = useState("idle");
+  const [xboxLinkResult, setXboxLinkResult] = useState(null);
 
   // ---------- derived ----------
   const effectivePlatformOrder = useMemo(
@@ -712,6 +717,18 @@ export function AppProvider({ children }) {
 
     requestUpfrontPermissions();
 
+    // Real Microsoft OAuth callback for Xbox Live sign-in (see
+    // lib/xboxOAuth.js) — Microsoft redirects back to this app's own
+    // root with ?code=...&state=xbox-link, which lands here before the
+    // hash-based view has even resolved. consumeXboxOAuthCallback()
+    // both reads and strips these query params immediately (so a
+    // refresh never tries to redeem an already-used code) regardless
+    // of login state; the actual exchange happens in the effect below
+    // once a real session is confirmed, since it needs the caller's
+    // access token.
+    const xboxCallback = consumeXboxOAuthCallback();
+    if (xboxCallback) pendingXboxCallbackRef.current = xboxCallback;
+
     return () => window.removeEventListener("hashchange", syncFromHash);
   }, []);
 
@@ -738,6 +755,38 @@ export function AppProvider({ children }) {
       bootRedirectPendingRef.current = false;
       goTo("overview");
     }
+  }, [isLoggedIn, goTo]);
+
+  // Completes the Xbox Live sign-in once a real session is confirmed —
+  // see the boot effect above for why the code itself was captured
+  // earlier. Routes to Account Linking either way so the result (a
+  // real Gamerscore, or a real error) is visible where the person
+  // started the sign-in from.
+  useEffect(() => {
+    if (!isLoggedIn || !pendingXboxCallbackRef.current) return;
+    const callback = pendingXboxCallbackRef.current;
+    pendingXboxCallbackRef.current = null;
+
+    if (callback.error) {
+      setXboxLinkStatus("error");
+      setXboxLinkResult({ error: callback.error });
+      goTo("linking");
+      return;
+    }
+
+    setXboxLinkStatus("linking");
+    completeXboxLink(callback.code)
+      .then((result) => {
+        setXboxLinkStatus("success");
+        setXboxLinkResult(result);
+        goTo("linking");
+      })
+      .catch((err) => {
+        console.error("Xbox Live sign-in failed:", err);
+        setXboxLinkStatus("error");
+        setXboxLinkResult({ error: err.message });
+        goTo("linking");
+      });
   }, [isLoggedIn, goTo]);
 
   // Every goTo() push a new hash entry onto the browser's real history
@@ -829,6 +878,8 @@ export function AppProvider({ children }) {
     setPersonalSessionCache(null);
     if (error) throw error;
   }, [personalSessionCache]);
+
+  const clearXboxLinkResult = useCallback(() => setXboxLinkResult(null), []);
 
   // The only setter that should ever mark accent as customized — used
   // exclusively by the Account Settings swatch row. Everywhere else
@@ -960,6 +1011,9 @@ export function AppProvider({ children }) {
       actAsLykodex,
       returnToMyAccount,
       onlineUserIds,
+      xboxLinkStatus,
+      xboxLinkResult,
+      clearXboxLinkResult,
 
       // profile
       avatarUrl,
@@ -1056,6 +1110,9 @@ export function AppProvider({ children }) {
       actAsLykodex,
       returnToMyAccount,
       onlineUserIds,
+      xboxLinkStatus,
+      xboxLinkResult,
+      clearXboxLinkResult,
       avatarUrl,
       firstName,
       lastName,

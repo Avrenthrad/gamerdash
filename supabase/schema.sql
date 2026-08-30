@@ -2411,3 +2411,106 @@ create policy "Moderators can delete any comment in their guild"
         and public.can_moderate_guild_content(guild_posts.guild_id, auth.uid())
     )
   );
+
+-- ---------- Mastery score history (daily snapshots) ----------
+-- Applied in production via add_mastery_score_history migration;
+-- documented here so local schema stays the source of truth.
+
+create table if not exists public.mastery_score_history (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  overall_mastery_score numeric not null,
+  recorded_at timestamptz not null default now()
+);
+
+create index if not exists mastery_score_history_user_time_idx
+  on public.mastery_score_history (user_id, recorded_at desc);
+
+alter table public.mastery_score_history enable row level security;
+
+create policy "Users can read their own mastery history"
+  on public.mastery_score_history for select
+  using (user_id = auth.uid());
+
+-- Friend-scoped history for charts (see friends.js).
+create or replace function public.get_friends_mastery_history(p_ids uuid[], p_since timestamptz)
+returns table (user_id uuid, overall_mastery_score numeric, recorded_at timestamptz)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select h.user_id, h.overall_mastery_score, h.recorded_at
+  from public.mastery_score_history h
+  where h.user_id = any(p_ids)
+    and h.recorded_at >= p_since
+    and exists (
+      select 1 from public.friends f
+      where f.user_id = auth.uid()
+        and f.friend_id = h.user_id
+    )
+  order by h.recorded_at asc;
+$$;
+
+-- Guildmate-scoped history — same trust model, shared-guild check.
+create or replace function public.get_guildmates_mastery_history(p_ids uuid[], p_since timestamptz)
+returns table (user_id uuid, overall_mastery_score numeric, recorded_at timestamptz)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select h.user_id, h.overall_mastery_score, h.recorded_at
+  from public.mastery_score_history h
+  where h.user_id = any(p_ids)
+    and h.recorded_at >= p_since
+    and exists (
+      select 1
+      from public.guild_members mine
+      join public.guild_members theirs on mine.guild_id = theirs.guild_id
+      where mine.user_id = auth.uid()
+        and theirs.user_id = h.user_id
+        and theirs.user_id = any(p_ids)
+    )
+  order by h.recorded_at asc;
+$$;
+
+-- ---------- Xbox Live / PSN OAuth tokens (real Gamerscore/trophy sync) ----------
+-- Applied in production via add_xbox_psn_oauth_tokens migration;
+-- documented here so local schema stays the source of truth. See
+-- api/pricing.js's handleXbox/handlePsn and lib/xboxOAuth.js/
+-- lib/psnAuth.js for the real OAuth flows these back.
+--
+-- Deliberately NO select/insert/update/delete policy granted to anon/
+-- authenticated on either table — these are session credentials, not
+-- public profile data, so only the Vercel proxy's service_role client
+-- ever reads/writes them, never the client directly (same posture as
+-- the "act as Lykodex" session-vending endpoint's use of service_role).
+
+create table if not exists public.xbox_tokens (
+  user_id uuid primary key references auth.users on delete cascade,
+  ms_access_token text not null,
+  ms_refresh_token text,
+  ms_expires_at timestamptz not null,
+  xsts_token text not null,
+  xsts_expires_at timestamptz not null,
+  userhash text not null,
+  xuid text not null,
+  gamertag text,
+  updated_at timestamptz default now()
+);
+
+alter table public.xbox_tokens enable row level security;
+
+create table if not exists public.psn_tokens (
+  user_id uuid primary key references auth.users on delete cascade,
+  access_token text not null,
+  refresh_token text not null,
+  access_expires_at timestamptz not null,
+  refresh_expires_at timestamptz not null,
+  account_id text,
+  online_id text,
+  updated_at timestamptz default now()
+);
+
+alter table public.psn_tokens enable row level security;

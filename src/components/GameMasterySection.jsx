@@ -149,9 +149,10 @@ export default function GameMasterySection({
                 <span className="mastery-breakdown__platform">{PLATFORM_LABELS[entry.platform] || entry.platform}</span>
                 <span className="mastery-breakdown__score">{Math.round(entry.normalized).toLocaleString()}</span>
                 <span className="mastery-breakdown__meta">
-                  {entry.source === "live_steam_api"
-                    ? `Live · ${entry.achievementsCounted} achievements across ${entry.gamesScanned} most-played games`
-                    : `Self-reported${relativeAsOf(entry.asOf) ? ` · updated ${relativeAsOf(entry.asOf)}` : ""}`}
+                  {entry.source === "live_steam_api" && `Live · ${entry.achievementsCounted} achievements across ${entry.gamesScanned} most-played games`}
+                  {entry.source === "live_xbox_api" && `Live · ${entry.gamertag ? `${entry.gamertag} · ` : ""}${entry.gamerscore.toLocaleString()} Gamerscore`}
+                  {entry.source === "live_psn_api" && `Live · real trophy counts via your linked PSN account`}
+                  {entry.source === "self_reported" && `Self-reported${relativeAsOf(entry.asOf) ? ` · updated ${relativeAsOf(entry.asOf)}` : ""}`}
                 </span>
               </div>
             ))}

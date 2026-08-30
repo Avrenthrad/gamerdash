@@ -27,6 +27,10 @@
 //   fetch("/api/pricing?service=comicvine&q=...")
 //   fetch("/api/pricing?service=riftbound&mode=search&q=...")
 //   fetch("/api/pricing?service=riftbound&mode=card&id=...")
+//   POST /api/pricing?service=xbox&mode=link, Authorization: Bearer <token>, body {code, redirectUri}
+//   POST /api/pricing?service=xbox&mode=gamerscore, Authorization: Bearer <token>
+//   POST /api/pricing?service=psn&mode=link, Authorization: Bearer <token>, body {npsso}
+//   POST /api/pricing?service=psn&mode=trophies, Authorization: Bearer <token>
 //   POST /api/pricing?service=lykodex-session, Authorization: Bearer <caller's access token>
 
 import { allowCors } from "./_cors.js";
@@ -391,6 +395,335 @@ async function handleRiftbound(searchParams, res) {
   }
 }
 
+// ---------- Xbox Live (real Gamerscore via Microsoft OAuth + XSTS) ----------
+// Real 3-step exchange confirmed against OpenXbox/xbox-webapi-python's
+// actual working implementation (not guessed): (1) authorization code
+// -> Microsoft OAuth2 token at login.live.com, (2) that access token
+// -> an Xbox Live "user token" at user.auth.xboxlive.com, (3) the user
+// token -> an XSTS token at xsts.auth.xboxlive.com (this step also
+// hands back userhash/xuid/gamertag via DisplayClaims.xui[0]). The
+// XSTS token authorizes calls to the real Xbox Live API
+// (profile.xboxlive.com) via `Authorization: XBL3.0 x=<userhash>;<token>`.
+//
+// Tokens are stored server-side only (xbox_tokens table, no RLS
+// policies granted — service_role only, same posture as the
+// lykodex-session endpoint above) and never sent to the client.
+async function xboxOAuthTokenRequest(params) {
+  const clientId = process.env.MICROSOFT_CLIENT_ID;
+  const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
+  const body = new URLSearchParams({ ...params, client_id: clientId });
+  if (clientSecret) body.set("client_secret", clientSecret);
+  const res = await fetch("https://login.live.com/oauth20_token.srf", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(`Microsoft OAuth token request failed: ${data.error_description || data.error || res.status}`);
+  return data; // { access_token, refresh_token, expires_in, ... }
+}
+
+async function xboxRequestUserToken(msAccessToken) {
+  const res = await fetch("https://user.auth.xboxlive.com/user/authenticate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json", "x-xbl-contract-version": "1" },
+    body: JSON.stringify({
+      RelyingParty: "http://auth.xboxlive.com",
+      TokenType: "JWT",
+      Properties: { AuthMethod: "RPS", SiteName: "user.auth.xboxlive.com", RpsTicket: `d=${msAccessToken}` },
+    }),
+  });
+  if (!res.ok) throw new Error(`Xbox Live user token request failed (${res.status})`);
+  return res.json(); // { Token, DisplayClaims: { xui: [...] } }
+}
+
+async function xboxRequestXstsToken(userToken) {
+  const res = await fetch("https://xsts.auth.xboxlive.com/xsts/authorize", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json", "x-xbl-contract-version": "1" },
+    body: JSON.stringify({
+      RelyingParty: "http://xboxlive.com",
+      TokenType: "JWT",
+      Properties: { UserTokens: [userToken], SandboxId: "RETAIL" },
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(`Xbox Live XSTS authorize failed (${res.status}): ${data?.XErr || ""}`);
+  return data; // { Token, DisplayClaims: { xui: [{ xid, uhs, gtg, ... }] } }
+}
+
+async function xboxFetchGamerscore(userhash, xstsToken) {
+  const res = await fetch("https://profile.xboxlive.com/users/me/profile/settings?settings=Gamerscore,Gamertag", {
+    headers: {
+      "x-xbl-contract-version": "3",
+      Authorization: `XBL3.0 x=${userhash};${xstsToken}`,
+    },
+  });
+  if (!res.ok) throw new Error(`Xbox Live profile request failed (${res.status})`);
+  const data = await res.json();
+  const settings = data?.profileUsers?.[0]?.settings || [];
+  const get = (id) => settings.find((s) => s.id === id)?.value;
+  return { gamerscore: Number(get("Gamerscore")) || 0, gamertag: get("Gamertag") || null };
+}
+
+// Verifies the caller against their own Supabase session (same pattern
+// as handleLykodexSession above) and returns a service_role admin
+// client for reading/writing this user's stored tokens.
+async function verifyCallerAndGetAdminClient(req) {
+  const authHeader = req.headers.authorization || "";
+  const callerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!callerToken) throw Object.assign(new Error("Missing Authorization bearer token"), { status: 401 });
+
+  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const anonKey = process.env.VITE_SUPABASE_ANON_KEY;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+    throw Object.assign(new Error("Server not configured for this"), { status: 500 });
+  }
+
+  const anonClient = createClient(supabaseUrl, anonKey);
+  const adminClient = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
+  const { data: callerData, error: callerError } = await anonClient.auth.getUser(callerToken);
+  if (callerError || !callerData?.user) throw Object.assign(new Error("Invalid session"), { status: 401 });
+
+  return { userId: callerData.user.id, adminClient };
+}
+
+async function handleXbox(req, searchParams, res) {
+  const mode = searchParams.get("mode");
+
+  try {
+    if (mode === "link") {
+      if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+      const { userId, adminClient } = await verifyCallerAndGetAdminClient(req);
+      const { code, redirectUri } = req.body || {};
+      if (!code || !redirectUri) return res.status(400).json({ error: "Missing code or redirectUri" });
+
+      const oauth = await xboxOAuthTokenRequest({ grant_type: "authorization_code", code, redirect_uri: redirectUri, scope: "Xboxlive.signin Xboxlive.offline_access" });
+      const userTokenResp = await xboxRequestUserToken(oauth.access_token);
+      const xsts = await xboxRequestXstsToken(userTokenResp.Token);
+      const claims = xsts.DisplayClaims.xui[0];
+      const { gamerscore, gamertag } = await xboxFetchGamerscore(claims.uhs, xsts.Token);
+
+      const now = Date.now();
+      const { error: upsertError } = await adminClient.from("xbox_tokens").upsert({
+        user_id: userId,
+        ms_access_token: oauth.access_token,
+        ms_refresh_token: oauth.refresh_token || null,
+        ms_expires_at: new Date(now + oauth.expires_in * 1000).toISOString(),
+        xsts_token: xsts.Token,
+        xsts_expires_at: xsts.NotAfter,
+        userhash: claims.uhs,
+        xuid: claims.xid,
+        gamertag: gamertag || claims.gtg || null,
+        updated_at: new Date().toISOString(),
+      });
+      if (upsertError) throw upsertError;
+
+      return res.status(200).json({ gamertag: gamertag || claims.gtg, gamerscore });
+    }
+
+    if (mode === "gamerscore") {
+      if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+      const { userId, adminClient } = await verifyCallerAndGetAdminClient(req);
+
+      const { data: stored, error: fetchError } = await adminClient.from("xbox_tokens").select("*").eq("user_id", userId).maybeSingle();
+      if (fetchError) throw fetchError;
+      if (!stored) return res.status(404).json({ error: "Xbox not linked" });
+
+      let { userhash, xuid, xsts_token: xstsToken } = stored;
+      const xstsExpired = new Date(stored.xsts_expires_at).getTime() < Date.now();
+      const msExpired = new Date(stored.ms_expires_at).getTime() < Date.now();
+
+      if (xstsExpired) {
+        let msAccessToken = stored.ms_access_token;
+        let newMsFields = null;
+        if (msExpired) {
+          if (!stored.ms_refresh_token) return res.status(401).json({ error: "Xbox link expired — please re-link" });
+          const refreshed = await xboxOAuthTokenRequest({ grant_type: "refresh_token", refresh_token: stored.ms_refresh_token, scope: "Xboxlive.signin Xboxlive.offline_access" });
+          msAccessToken = refreshed.access_token;
+          newMsFields = {
+            ms_access_token: refreshed.access_token,
+            ms_refresh_token: refreshed.refresh_token || stored.ms_refresh_token,
+            ms_expires_at: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
+          };
+        }
+        const userTokenResp = await xboxRequestUserToken(msAccessToken);
+        const xsts = await xboxRequestXstsToken(userTokenResp.Token);
+        const claims = xsts.DisplayClaims.xui[0];
+        userhash = claims.uhs;
+        xuid = claims.xid;
+        xstsToken = xsts.Token;
+        await adminClient.from("xbox_tokens").update({
+          ...(newMsFields || {}),
+          xsts_token: xsts.Token,
+          xsts_expires_at: xsts.NotAfter,
+          userhash: claims.uhs,
+          xuid: claims.xid,
+          updated_at: new Date().toISOString(),
+        }).eq("user_id", userId);
+      }
+
+      const { gamerscore, gamertag } = await xboxFetchGamerscore(userhash, xstsToken);
+      if (gamertag) await adminClient.from("xbox_tokens").update({ gamertag }).eq("user_id", userId);
+      return res.status(200).json({ gamertag: gamertag || stored.gamertag, gamerscore, xuid });
+    }
+
+    if (mode === "unlink") {
+      if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+      const { userId, adminClient } = await verifyCallerAndGetAdminClient(req);
+      const { error: deleteError } = await adminClient.from("xbox_tokens").delete().eq("user_id", userId);
+      if (deleteError) throw deleteError;
+      return res.status(200).json({ ok: true });
+    }
+
+    return res.status(400).json({ error: "Missing or invalid mode parameter" });
+  } catch (err) {
+    console.error("pricing (xbox):", err);
+    return res.status(err.status || 500).json({ error: err.message });
+  }
+}
+
+// ---------- PlayStation Network (real trophy counts via npsso) ----------
+// Real npsso -> access code -> access/refresh token exchange confirmed
+// against achievements-app/psn-api's actual working implementation
+// (not guessed) — Sony offers no public OAuth app registration path,
+// so this is the same unofficial-but-real mechanism every PSN trophy
+// tracker (PSNProfiles etc.) uses. The npsso itself is a 64-char
+// session-cookie value the person copies from their own browser after
+// signing into ca.account.sony.com — equivalent to a password, never
+// logged, never stored (only the resulting access/refresh tokens are).
+//
+// The client_id/client_secret/redirect_uri/scope values below are
+// PSN's own fixed, public mobile-app OAuth client (confirmed real —
+// every implementation of this flow uses the exact same constants,
+// they are not something Lykodex registered).
+const PSN_AUTH_BASE = "https://ca.account.sony.com/api/authz/v3/oauth";
+const PSN_CLIENT_AUTH_HEADER = "Basic MDk1MTUxNTktNzIzNy00MzcwLTliNDAtMzgwNmU2N2MwODkxOnVjUGprYTV0bnRCMktxc1A=";
+const PSN_REDIRECT_URI = "com.scee.psxandroid.scecompcall://redirect";
+
+async function psnExchangeNpssoForAccessCode(npsso) {
+  const params = new URLSearchParams({
+    access_type: "offline",
+    client_id: "09515159-7237-4370-9b40-3806e67c0891",
+    redirect_uri: PSN_REDIRECT_URI,
+    response_type: "code",
+    scope: "psn:mobile.v2.core psn:clientapp",
+  });
+  const res = await fetch(`${PSN_AUTH_BASE}/authorize?${params.toString()}`, {
+    headers: { Cookie: `npsso=${npsso}` },
+    redirect: "manual",
+  });
+  const location = res.headers.get("location");
+  if (!location || !location.includes("?code=")) {
+    throw new Error("Couldn't get a PSN access code — the npsso token may be invalid or expired.");
+  }
+  return new URLSearchParams(location.split("redirect/")[1]).get("code");
+}
+
+async function psnExchangeAccessCodeForTokens(accessCode) {
+  const res = await fetch(`${PSN_AUTH_BASE}/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: PSN_CLIENT_AUTH_HEADER },
+    body: new URLSearchParams({ code: accessCode, redirect_uri: PSN_REDIRECT_URI, grant_type: "authorization_code", token_format: "jwt" }).toString(),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(`PSN token exchange failed: ${data.error_description || data.error || res.status}`);
+  return data; // { access_token, refresh_token, expires_in, refresh_token_expires_in, ... }
+}
+
+async function psnRefreshTokens(refreshToken) {
+  const res = await fetch(`${PSN_AUTH_BASE}/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: PSN_CLIENT_AUTH_HEADER },
+    body: new URLSearchParams({ refresh_token: refreshToken, grant_type: "refresh_token", token_format: "jwt", scope: "psn:mobile.v2.core psn:clientapp" }).toString(),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(`PSN token refresh failed: ${data.error_description || data.error || res.status}`);
+  return data;
+}
+
+async function psnFetchTrophySummary(accessToken) {
+  const res = await fetch("https://m.np.playstation.com/api/trophy/v1/users/me/trophySummary", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error(`PSN trophy summary request failed (${res.status})`);
+  return res.json(); // { accountId, trophyLevel, earnedTrophies: { bronze, silver, gold, platinum } }
+}
+
+async function handlePsn(req, searchParams, res) {
+  const mode = searchParams.get("mode");
+
+  try {
+    if (mode === "link") {
+      if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+      const { userId, adminClient } = await verifyCallerAndGetAdminClient(req);
+      const { npsso } = req.body || {};
+      if (!npsso) return res.status(400).json({ error: "Missing npsso" });
+
+      const accessCode = await psnExchangeNpssoForAccessCode(npsso);
+      const tokens = await psnExchangeAccessCodeForTokens(accessCode);
+      const summary = await psnFetchTrophySummary(tokens.access_token);
+
+      const now = Date.now();
+      const { error: upsertError } = await adminClient.from("psn_tokens").upsert({
+        user_id: userId,
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        access_expires_at: new Date(now + tokens.expires_in * 1000).toISOString(),
+        refresh_expires_at: new Date(now + tokens.refresh_token_expires_in * 1000).toISOString(),
+        account_id: summary.accountId || null,
+        updated_at: new Date().toISOString(),
+      });
+      if (upsertError) throw upsertError;
+
+      return res.status(200).json({ trophies: summary.earnedTrophies });
+    }
+
+    if (mode === "trophies") {
+      if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+      const { userId, adminClient } = await verifyCallerAndGetAdminClient(req);
+
+      const { data: stored, error: fetchError } = await adminClient.from("psn_tokens").select("*").eq("user_id", userId).maybeSingle();
+      if (fetchError) throw fetchError;
+      if (!stored) return res.status(404).json({ error: "PlayStation not linked" });
+
+      let accessToken = stored.access_token;
+      if (new Date(stored.access_expires_at).getTime() < Date.now()) {
+        if (new Date(stored.refresh_expires_at).getTime() < Date.now()) {
+          return res.status(401).json({ error: "PlayStation link expired — please re-link with a fresh npsso" });
+        }
+        const refreshed = await psnRefreshTokens(stored.refresh_token);
+        accessToken = refreshed.access_token;
+        const now = Date.now();
+        await adminClient.from("psn_tokens").update({
+          access_token: refreshed.access_token,
+          refresh_token: refreshed.refresh_token || stored.refresh_token,
+          access_expires_at: new Date(now + refreshed.expires_in * 1000).toISOString(),
+          refresh_expires_at: new Date(now + refreshed.refresh_token_expires_in * 1000).toISOString(),
+          updated_at: new Date().toISOString(),
+        }).eq("user_id", userId);
+      }
+
+      const summary = await psnFetchTrophySummary(accessToken);
+      return res.status(200).json({ trophies: summary.earnedTrophies });
+    }
+
+    if (mode === "unlink") {
+      if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+      const { userId, adminClient } = await verifyCallerAndGetAdminClient(req);
+      const { error: deleteError } = await adminClient.from("psn_tokens").delete().eq("user_id", userId);
+      if (deleteError) throw deleteError;
+      return res.status(200).json({ ok: true });
+    }
+
+    return res.status(400).json({ error: "Missing or invalid mode parameter" });
+  } catch (err) {
+    console.error("pricing (psn):", err);
+    return res.status(err.status || 500).json({ error: err.message });
+  }
+}
+
 // Real session swap for the "act as Lykodex" toggle — not a client-
 // side pretend-toggle, since RLS needs a genuine auth.uid() to enforce
 // anything anywhere. The service_role key bypasses RLS entirely, so
@@ -498,6 +831,8 @@ export default async function handler(req, res) {
   if (service === "comicvine") return handleComicVine(searchParams, res);
   if (service === "justtcg") return handleJustTcg(res);
   if (service === "riftbound") return handleRiftbound(searchParams, res);
+  if (service === "xbox") return handleXbox(req, searchParams, res);
+  if (service === "psn") return handlePsn(req, searchParams, res);
   if (service === "lykodex-session") return handleLykodexSession(req, res);
 
   return res.status(400).json({ error: "Missing or invalid service parameter" });
