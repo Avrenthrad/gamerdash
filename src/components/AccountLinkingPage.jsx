@@ -65,16 +65,6 @@ import GameMasterySection from "./GameMasterySection";
 // fields, which it never did — misleading, so it's just not offered.
 const HANDLE_PLATFORMS = [
   {
-    id: "xbox",
-    label: "Xbox",
-    fields: [{ id: "xbox_gamertag", fieldLabel: "Gamertag", placeholder: "Your Xbox Gamertag" }],
-    accountUrl: (values) =>
-      values.xbox_gamertag
-        ? `https://account.xbox.com/en-us/profile?gamertag=${encodeURIComponent(values.xbox_gamertag)}`
-        : "https://account.xbox.com/en-us/profile",
-    accountLinkLabel: "Find your Gamerscore on Xbox →",
-  },
-  {
     id: "playstation",
     label: "PlayStation",
     fields: [{ id: "playstation_online_id", fieldLabel: "Online ID", placeholder: "Your PSN Online ID" }],
@@ -492,7 +482,7 @@ export default function AccountLinkingPage({
     if (!userId) return;
     supabase
       .from("profiles")
-      .select("xbox_gamertag, playstation_online_id, nintendo_friend_code, nintendo_username")
+      .select("playstation_online_id, nintendo_friend_code, nintendo_username")
       .eq("id", userId)
       .single()
       .then(({ data, error }) => {
