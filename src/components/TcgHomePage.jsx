@@ -1,6 +1,7 @@
-// TCG College hub — links to all 6 real, built TCG features (MTG,
-// Flesh and Blood, Pokémon, Yu-Gi-Oh!, One Piece, Riftbound), plus a
-// real collection summary at the top when signed in.
+// TCG College hub — links to 5 real, built TCG features (MTG, Flesh
+// and Blood, Pokémon, Yu-Gi-Oh!, One Piece), plus a real collection
+// summary at the top when signed in. A 6th, Riftbound, is fully built
+// but its tab is currently disabled — see the GAME_TABS comment below.
 //
 // In-page game tab switcher, same pattern TabletopHomePage.jsx already
 // uses for RPG/Wargames/Dice/Rules — not a separate route/picker
@@ -26,7 +27,6 @@ import { fetchCollection as fetchYugiohCollection, enrichCollectionEntry as enri
 import { currentYugiohPrice } from "../lib/yugioh";
 import { fetchCollection as fetchOnePieceCollection, enrichCollectionEntry as enrichOnePieceCollectionEntry } from "../lib/onepieceCollection";
 import { currentOnePiecePrice } from "../lib/onepiece";
-import { fetchCollection as fetchRiftboundCollection, enrichCollectionEntry as enrichRiftboundCollectionEntry } from "../lib/riftboundCollection";
 
 const MTG_FEATURES = [
   { id: "mtg-scan", label: "Scan Cards", icon: "📷", desc: "Free on-device text recognition, matched against real Scryfall data.", emphasized: true },
@@ -65,12 +65,6 @@ const ONEPIECE_FEATURES = [
   { id: "tcg-marketplace", label: "Marketplace", icon: "💰", desc: "Buy and sell real cards with other Lykodex users." },
 ];
 
-const RIFTBOUND_FEATURES = [
-  { id: "riftbound-search", label: "Card Search", icon: "🔍", desc: "Real card data via Riftcodex.", emphasized: true },
-  { id: "riftbound-collection", label: "My Collection", icon: "📚", desc: "Real owned cards — no pricing shown yet." },
-  { id: "riftbound-decks", label: "Deck Builder", icon: "🛠️", desc: "A real card list — no format/legality checking yet, no confirmed banlist API for a game this new." },
-  { id: "tcg-marketplace", label: "Marketplace", icon: "💰", desc: "Buy and sell real cards with other Lykodex users." },
-];
 
 const RARITY_ORDER = ["mythic", "rare", "uncommon", "common"];
 const RARITY_LABELS = { mythic: "Mythic", rare: "Rare", uncommon: "Uncommon", common: "Common" };
@@ -352,55 +346,25 @@ function OnePieceSummary({ isLoggedIn, userId }) {
   );
 }
 
-// No real pricing source confirmed for Riftbound (see lib/riftbound.js)
-// — counts only, same as FabSummary above.
-function RiftboundSummary({ isLoggedIn, userId }) {
-  const [entries, setEntries] = useState([]);
-  const [status, setStatus] = useState("idle");
-
-  useEffect(() => {
-    if (!isLoggedIn || !userId) return;
-    setStatus("loading");
-    fetchRiftboundCollection(userId)
-      .then((rows) => Promise.all(rows.map(enrichRiftboundCollectionEntry)))
-      .then((enriched) => {
-        setEntries(enriched);
-        setStatus("ready");
-      })
-      .catch((err) => {
-        console.error("Riftbound collection summary fetch failed:", err);
-        setStatus("error");
-      });
-  }, [isLoggedIn, userId]);
-
-  const totalCards = entries.reduce((sum, e) => sum + e.quantity, 0);
-
-  if (!isLoggedIn || status !== "ready") return null;
-  if (entries.length === 0) {
-    return <p className="panel__status">No cards in your collection yet — start with Search below.</p>;
-  }
-
-  return (
-    <div className="backlog-summary">
-      <div className="panel__stat">
-        <span className="panel__stat-value">{entries.length}</span>
-        <span className="panel__stat-label">Unique cards</span>
-      </div>
-      <div className="panel__stat">
-        <span className="panel__stat-value">{totalCards}</span>
-        <span className="panel__stat-label">Total cards</span>
-      </div>
-    </div>
-  );
-}
-
+// Riftbound deliberately left out of GAME_TABS below for now — its
+// proxy (api/pricing.js's handleRiftbound) is currently blocked in
+// production (Riftcodex 403s requests from Vercel's infrastructure,
+// see that file's comment), so the tab would just be a dead end.
+// RIFTBOUND_FEATURES + RiftboundSummary (same shape as the other
+// per-game summaries above) and this file's now-unused
+// fetchRiftboundCollection/enrichRiftboundCollectionEntry imports were
+// removed rather than kept as dead code — see commit 6694bd4 (the
+// original TCG College build) to restore them, or just re-add a
+// GAME_TABS entry + summary component matching the pattern above,
+// once Riftbound's proxy is fixed. The actual Riftbound page/lib code (RiftboundSearchPage.jsx,
+// lib/riftbound.js, etc.) is untouched and still fully wired — only
+// this file's tab entry point was removed.
 const GAME_TABS = [
   { id: "mtg", label: "Magic: The Gathering", features: MTG_FEATURES, Summary: MtgSummary },
   { id: "fab", label: "Flesh and Blood", features: FAB_FEATURES, Summary: FabSummary },
   { id: "pokemon", label: "Pokémon", features: POKEMON_FEATURES, Summary: PokemonSummary },
   { id: "yugioh", label: "Yu-Gi-Oh!", features: YUGIOH_FEATURES, Summary: YugiohSummary },
   { id: "onepiece", label: "One Piece", features: ONEPIECE_FEATURES, Summary: OnePieceSummary },
-  { id: "riftbound", label: "Riftbound", features: RIFTBOUND_FEATURES, Summary: RiftboundSummary },
 ];
 
 export default function TcgHomePage({ onNavigate, isLoggedIn, userId }) {
@@ -412,7 +376,7 @@ export default function TcgHomePage({ onNavigate, isLoggedIn, userId }) {
     <div className="price-page">
       <div className="price-page__head">
         <h1 className="price-page__title">TCG</h1>
-        <p className="price-page__subtitle">Magic: The Gathering, Flesh and Blood, Pokémon, Yu-Gi-Oh!, One Piece, and Riftbound.</p>
+        <p className="price-page__subtitle">Magic: The Gathering, Flesh and Blood, Pokémon, Yu-Gi-Oh!, and One Piece.</p>
       </div>
 
       <div className="backlog-status-tabs">
