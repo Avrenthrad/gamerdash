@@ -1,6 +1,6 @@
 // Overview "Right now" stock-style chart — multi-series mastery /
 // hours view: gold area for you, green lines per friend, red lines
-// per guildmate. Rotates between Mastery Score and Steam active hours.
+// per guildmate. User picks the metric and range; data regrows on change.
 // See DESIGN_TOKENS.md `stock-style` and lib/overviewChartData.js.
 
 import { useEffect, useRef, useState } from "react";
@@ -11,8 +11,7 @@ const GOLD = "#D4AF37";
 const GOLD_FILL = "rgba(212, 175, 55, 0.34)";
 const LIME = "#84cc16";
 const ROSE = "#E8637D";
-const VIEW_HOLD_MS = 5200;
-const FADE_MS = 380;
+const GROW_MS = 1500;
 const CHART_MIN_HEIGHT = 220;
 
 const VIEWS = [
@@ -56,11 +55,118 @@ function peerColor(kind) {
   return kind === "guild" ? ROSE : LIME;
 }
 
-function syncChartSeries(api, block, isHours = false) {
-  const { chart } = api;
-  const priceFormat = isHours
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - ((-2 * t + 2) ** 3) / 2;
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function priceFormatFor(isHours) {
+  return isHours
     ? { type: "price", precision: 1, minMove: 0.1 }
     : { type: "price", precision: 0, minMove: 1 };
+}
+
+function valueRangeForBlock(block) {
+  const values = [];
+  for (const point of block.you || []) values.push(point.value);
+  for (const peer of block.peers || []) {
+    for (const point of peer.points) values.push(point.value);
+  }
+  if (!values.length) return null;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const pad = Math.max((max - min) * 0.1, 1);
+  return { minValue: min - pad, maxValue: max + pad };
+}
+
+function autoscaleProvider(range) {
+  return () => ({
+    priceRange: range,
+  });
+}
+
+function interpolateGrowingPoints(points, progress) {
+  if (!points.length) return [];
+  const eased = easeInOutCubic(progress);
+
+  if (points.length === 1) {
+    return [{ time: points[0].time, value: points[0].value * eased }];
+  }
+
+  const firstTime = points[0].time;
+  const lastTime = points[points.length - 1].time;
+  const span = lastTime - firstTime;
+
+  if (eased <= 0) {
+    const base = points[0].value;
+    return [
+      { time: firstTime, value: base },
+      { time: firstTime + Math.max(1, Math.floor(span / 120)), value: base },
+    ];
+  }
+
+  const cursorTime = span === 0 ? lastTime : Math.floor(lerp(firstTime, lastTime, eased));
+  const out = [];
+
+  for (let i = 0; i < points.length; i++) {
+    const point = points[i];
+    if (point.time < cursorTime) {
+      out.push(point);
+      continue;
+    }
+
+    const prev = points[Math.max(0, i - 1)];
+    const next = point;
+    const segmentSpan = next.time - prev.time;
+    const segmentT = segmentSpan <= 0 ? 1 : (cursorTime - prev.time) / segmentSpan;
+    const tipTime = Math.max(prev.time + 1, cursorTime);
+
+    out.push({
+      time: tipTime,
+      value: lerp(prev.value, next.value, Math.max(0, Math.min(1, segmentT))),
+    });
+    break;
+  }
+
+  if (out.length < 2) {
+    const anchor = out[0] ?? points[0];
+    out.push({ time: anchor.time + Math.max(1, Math.floor(span / 120)), value: anchor.value });
+  }
+
+  return out;
+}
+
+function setStableScale(api, range) {
+  if (!range) return;
+  const provider = autoscaleProvider(range);
+  api.seriesYou?.applyOptions({ autoscaleInfoProvider: provider });
+  for (const series of api.peerSeries) {
+    series.applyOptions({ autoscaleInfoProvider: provider });
+  }
+}
+
+function clearStableScale(api) {
+  api.seriesYou?.applyOptions({ autoscaleInfoProvider: undefined });
+  for (const series of api.peerSeries) {
+    series.applyOptions({ autoscaleInfoProvider: undefined });
+  }
+}
+
+function cancelChartGrow(api) {
+  if (api.animationId) {
+    cancelAnimationFrame(api.animationId);
+    api.animationId = null;
+  }
+  clearStableScale(api);
+}
+
+function ensureSeriesStructure(api, block, isHours) {
+  const { chart } = api;
+  const priceFormat = priceFormatFor(isHours);
+  const peers = block.peers || [];
 
   if (api.seriesYou) {
     chart.removeSeries(api.seriesYou);
@@ -69,7 +175,7 @@ function syncChartSeries(api, block, isHours = false) {
   for (const series of api.peerSeries) chart.removeSeries(series);
   api.peerSeries = [];
 
-  for (const peer of block.peers || []) {
+  for (const peer of peers) {
     const series = chart.addSeries(LineSeries, {
       color: peerColor(peer.kind),
       lineWidth: 2,
@@ -77,7 +183,6 @@ function syncChartSeries(api, block, isHours = false) {
       priceFormat,
       title: peer.label,
     });
-    series.setData(peer.points);
     api.peerSeries.push(series);
   }
 
@@ -89,8 +194,60 @@ function syncChartSeries(api, block, isHours = false) {
     priceFormat,
     title: "You",
   });
-  api.seriesYou.setData(block.you);
-  chart.timeScale().fitContent();
+}
+
+function applyChartData(api, block) {
+  for (let i = 0; i < (block.peers || []).length; i++) {
+    api.peerSeries[i]?.setData(block.peers[i].points);
+  }
+  api.seriesYou?.setData(block.you);
+  api.chart.timeScale().fitContent();
+}
+
+function animateChartGrow(api, block, { reducedMotion = false, onStart, onEnd } = {}) {
+  cancelChartGrow(api);
+  ensureSeriesStructure(api, block, block.isHours);
+
+  if (reducedMotion || (!block.you.length && !peerPointCount(block))) {
+    applyChartData(api, block);
+    onEnd?.();
+    return;
+  }
+
+  const stableRange = valueRangeForBlock(block);
+  setStableScale(api, stableRange);
+
+  onStart?.();
+  const start = performance.now();
+  let lastFrame = 0;
+
+  function tick(now) {
+    const elapsed = now - start;
+    const progress = Math.min(1, elapsed / GROW_MS);
+
+    if (now - lastFrame >= 16 || progress >= 1) {
+      lastFrame = now;
+
+      if (api.seriesYou) {
+        api.seriesYou.setData(interpolateGrowingPoints(block.you, progress));
+      }
+      (block.peers || []).forEach((peer, i) => {
+        api.peerSeries[i]?.setData(interpolateGrowingPoints(peer.points, progress));
+      });
+    }
+
+    if (progress < 1) {
+      api.animationId = requestAnimationFrame(tick);
+      return;
+    }
+
+    clearStableScale(api);
+    applyChartData(api, block);
+    api.animationId = null;
+    onEnd?.();
+  }
+
+  api.animationId = requestAnimationFrame(tick);
 }
 
 export default function OverviewStockChart({ userId, linkedSteamId }) {
@@ -98,14 +255,24 @@ export default function OverviewStockChart({ userId, linkedSteamId }) {
   const [viewIndex, setViewIndex] = useState(0);
   const [payload, setPayload] = useState(null);
   const [status, setStatus] = useState("loading");
-  const [fadeOut, setFadeOut] = useState(false);
-  const [paused, setPaused] = useState(false);
+  const [growing, setGrowing] = useState(false);
 
   const containerRef = useRef(null);
   const apiRef = useRef(null);
+  const reducedMotionRef = useRef(false);
 
   const view = VIEWS[viewIndex];
   const sinceDays = rangeToDays(range);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    reducedMotionRef.current = mq.matches;
+    const onChange = (e) => {
+      reducedMotionRef.current = e.matches;
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     if (!userId) return;
@@ -161,7 +328,7 @@ export default function OverviewStockChart({ userId, linkedSteamId }) {
       handleScale: false,
     });
 
-    apiRef.current = { chart, seriesYou: null, peerSeries: [] };
+    apiRef.current = { chart, seriesYou: null, peerSeries: [], animationId: null };
 
     const resizeObserver = new ResizeObserver(() => {
       if (!containerRef.current) return;
@@ -171,6 +338,7 @@ export default function OverviewStockChart({ userId, linkedSteamId }) {
     resizeObserver.observe(el);
 
     return () => {
+      cancelChartGrow(apiRef.current);
       resizeObserver.disconnect();
       chart.remove();
     };
@@ -180,21 +348,18 @@ export default function OverviewStockChart({ userId, linkedSteamId }) {
     if (!apiRef.current?.chart || !payload) return;
     const activeView = VIEWS[viewIndex];
     const block = getBlock(activeView, payload);
-    syncChartSeries(apiRef.current, block, activeView.id === "hours");
-  }, [payload, viewIndex]);
+    if (!hasChartData(activeView, payload)) return;
 
-  useEffect(() => {
-    if (paused || VIEWS.length < 2) return;
-    if (!fadeOut) {
-      const t = setTimeout(() => setFadeOut(true), VIEW_HOLD_MS);
-      return () => clearTimeout(t);
-    }
-    const t = setTimeout(() => {
-      setViewIndex((i) => (i + 1) % VIEWS.length);
-      setFadeOut(false);
-    }, FADE_MS);
-    return () => clearTimeout(t);
-  }, [fadeOut, paused]);
+    animateChartGrow(
+      apiRef.current,
+      { ...block, isHours: activeView.id === "hours" },
+      {
+        reducedMotion: reducedMotionRef.current,
+        onStart: () => setGrowing(true),
+        onEnd: () => setGrowing(false),
+      },
+    );
+  }, [payload, viewIndex]);
 
   if (!userId) return null;
 
@@ -206,12 +371,8 @@ export default function OverviewStockChart({ userId, linkedSteamId }) {
   const hoursNote = view.id === "hours" && payload?.hours?.note;
 
   return (
-    <div
-      className="stock-style-chart overview-stock-chart"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-    >
-      <div className={`overview-stock-chart__chrome ${fadeOut ? "overview-stock-chart__chrome--out" : ""}`}>
+    <div className="stock-style-chart overview-stock-chart">
+      <div className="overview-stock-chart__chrome">
         <div className="stock-style-chart__head">
           <div className="stock-style-chart__titles">
             <span className="stock-style-chart__title">{view.title}</span>
@@ -254,7 +415,7 @@ export default function OverviewStockChart({ userId, linkedSteamId }) {
       </div>
 
       <div
-        className={`overview-stock-chart__plot-stage ${showChart ? "overview-stock-chart__plot-stage--live" : "overview-stock-chart__plot-stage--idle"}`}
+        className={`overview-stock-chart__plot-stage ${showChart ? "overview-stock-chart__plot-stage--live" : "overview-stock-chart__plot-stage--idle"}${growing ? " overview-stock-chart__plot-stage--growing" : ""}`}
       >
         <div
           ref={containerRef}
@@ -288,10 +449,7 @@ export default function OverviewStockChart({ userId, linkedSteamId }) {
               aria-selected={i === viewIndex}
               aria-label={v.title}
               className={`sliding-banner__dot ${i === viewIndex ? "sliding-banner__dot--active" : ""}`}
-              onClick={() => {
-                setViewIndex(i);
-                setFadeOut(false);
-              }}
+              onClick={() => setViewIndex(i)}
             />
           ))}
         </div>

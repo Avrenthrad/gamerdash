@@ -7253,8 +7253,27 @@ html[data-mode="light"] .overview-tile {
   transition: opacity var(--duration-fast) var(--ease-standard);
 }
 
-.overview-stock-chart__chrome--out {
-  opacity: 0;
+.overview-stock-chart__plot-stage--growing {
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--accent) 10%, transparent),
+    0 12px 36px color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.overview-stock-chart__plot-stage--growing .overview-stock-chart__plot {
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 12%, transparent));
+  transition: filter 680ms var(--ease-standard);
+}
+
+.overview-stock-chart__plot {
+  transition: filter 900ms var(--ease-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overview-stock-chart__plot-stage--growing .overview-stock-chart__plot,
+  .overview-stock-chart__plot {
+    filter: none;
+    transition: none;
+  }
 }
 
 .stock-style-chart__head {

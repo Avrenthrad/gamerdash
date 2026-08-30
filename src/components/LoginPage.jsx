@@ -69,12 +69,9 @@ function HeroCycler() {
   );
 }
 
-const leadProviders = [
+const oauthProviders = [
   { name: "Discord", provider: "discord" },
   { name: "Twitch", provider: "twitch" },
-];
-
-const soonProviders = [
   { name: "Google", provider: "google" },
   { name: "Apple", provider: "apple" },
   { name: "Microsoft", provider: "azure" },
@@ -303,12 +300,6 @@ export default function LoginPage({ onLoginSuccess, initialMode }) {
               </p>
             )}
 
-            <div className="auth-oauth-row">{renderOauthButtons(leadProviders)}</div>
-
-            <div className="auth-divider">
-              <span>or use email</span>
-            </div>
-
             <form className="auth-form" onSubmit={handleSubmit}>
               <label className="auth-form__field">
                 <span>Email</span>
@@ -356,7 +347,11 @@ export default function LoginPage({ onLoginSuccess, initialMode }) {
               </button>
             </form>
 
-            <div className="auth-oauth-row auth-oauth-row--soon">{renderOauthButtons(soonProviders)}</div>
+            <div className="auth-divider">
+              <span>Or continue with</span>
+            </div>
+
+            <div className="auth-oauth-row auth-oauth-row--soon">{renderOauthButtons(oauthProviders)}</div>
 
             {oauthWaitingExternally && (
               <div className="auth-oauth-waiting">
