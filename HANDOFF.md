@@ -134,6 +134,22 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-30 — **Added real Xbox/PSN library import to Backlog.**
+  Xbox via `titlehub.xboxlive.com`'s title-history endpoint (OpenXbox/
+  xbox-webapi-python), PSN via `m.np.playstation.com`'s `gamelist/v2`
+  (achievements-app/psn-api's `getUserPlayedGames`) — both confirmed
+  real before building. New `getLiveXboxLibrary`/`getLivePsnLibrary`
+  in `api/pricing.js` (`mode=library`), and `lib/libraryImport.js`
+  adds owned/played games to the existing **Backlog**
+  (`backlog_items.platform`), not Wishlist — de-dupes by title
+  (case-insensitive) against what's already there first, since
+  `backlog_items` has no unique constraint to lean on. "Import Library
+  to Backlog" buttons live on both cards in Account Linking, shown
+  once linked. Committed `68ddbd6`.
+
+  **Not yet tested live** — same caveat as the rest of this Xbox/PSN
+  work.
+
 - 2026-08-30 — **Added real Xbox/PSN live activity ("Now Playing").**
   Both confirmed against the same real community library sources the
   Gamerscore/trophy sync used: Xbox via
