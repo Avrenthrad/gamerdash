@@ -134,6 +134,56 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-30 — **Added real Xbox Live sign-in + real PSN trophy sync.**
+  Both confirmed against actual working community implementations
+  (OpenXbox/xbox-webapi-python, achievements-app/psn-api) before
+  building against them, per the standing "never guess an endpoint
+  shape" rule.
+
+  - **Xbox**: real "Sign in with Microsoft" OAuth -> Xbox Live's own
+    3-step token exchange (MS access token -> XBL user token -> XSTS
+    token) -> real Gamerscore from `profile.xboxlive.com`.
+    **NEEDS SETUP before it works**: a real Azure app registration at
+    portal.azure.com — see `.env.example` for the exact redirect-URI
+    requirement (register it as a "Web" platform, not SPA, since the
+    exchange needs the client secret server-side) — then set
+    `VITE_MICROSOFT_CLIENT_ID` + `MICROSOFT_CLIENT_SECRET`. Until
+    that's done, `XboxLiveCard` shows "Xbox sign-in isn't configured
+    yet" rather than a broken button.
+  - **PSN**: real trophy counts via a person's own npsso session token
+    (Sony has no public OAuth registration path — same unofficial-but-
+    real mechanism every PSN trophy tracker uses) -> access/refresh
+    tokens via `ca.account.sony.com` -> real bronze/silver/gold/
+    platinum from `m.np.playstation.com`'s trophySummary. **No setup
+    needed** — this one should already work end-to-end once a real
+    person pastes their own npsso token in Account Linking.
+
+  Both proxied server-side only (`api/pricing.js`'s `handleXbox`/
+  `handlePsn`, merged into the existing dispatch — still at Vercel's
+  12-function cap). Tokens live in new `xbox_tokens`/`psn_tokens`
+  tables with **no RLS policies granted to anon/authenticated** —
+  service_role only, same posture as the "act as Lykodex" endpoint —
+  never sent to the client. Both refresh expired tokens automatically
+  and support a real disconnect.
+
+  `gameMasteryData.js`'s `recomputeMastery` now tries live Xbox/PSN
+  data first (what hitting Refresh actually pulls), falling back to
+  the older self-reported `mastery_inputs` numbers when not linked —
+  not competing mechanisms, whichever's available wins.
+
+  **Not yet built**: packaged (Tauri/Capacitor) support for the Xbox
+  OAuth redirect — same constraint `lib/auth.js`'s `signInWithOAuth`
+  already documents for Discord/Twitch (no same-window redirect back
+  into a packaged app's webview). Web-only for now.
+
+  **Verification status**: lint + build clean, page loads with no
+  console errors. Could NOT click-test the actual linked/unlinked
+  states or a real OAuth round-trip — that needs either a real Azure
+  app (Xbox) or a real logged-in Lykodex account + a real npsso token
+  (PSN), neither available in this session. First real test should be
+  the user's own: get an Azure app set up, then try both cards from a
+  signed-in account. Committed `5d9d373`.
+
 - 2026-08-30 — **Riftbound's tab removed from TCG College** (user's
   call, given the proxy block below made it a dead end for users).
   `RIFTBOUND_FEATURES`/`RiftboundSummary` removed from
