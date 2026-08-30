@@ -1225,6 +1225,11 @@ async function handleCurrency(res) {
 
 export default async function handler(req, res) {
   allowCors(res);
+  // The browser's CORS preflight for a non-simple request (Xbox/PSN
+  // linking's POST + Authorization header, cross-origin from a
+  // packaged build — see _cors.js) lands here as a real OPTIONS
+  // request expecting a bare 204, not any service's actual response.
+  if (req.method === "OPTIONS") return res.status(204).end();
   // Parsing from req.url rather than req.query — cheapshark.js's
   // original comment noted req.query was unreliable under some
   // vercel dev setups, keeping the same safer approach here.
