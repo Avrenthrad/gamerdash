@@ -90,3 +90,10 @@ export async function fetchLiveGamerscore() {
 export async function unlinkXbox() {
   return callXboxService("unlink");
 }
+
+// Real online/offline state + whatever title is actively being played
+// right now (if any) — { online: boolean, playing: { name,
+// richPresence } | null }.
+export async function fetchLiveXboxPresence() {
+  return callXboxService("presence");
+}

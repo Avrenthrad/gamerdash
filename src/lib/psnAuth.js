@@ -42,3 +42,9 @@ export async function fetchLiveTrophies() {
 export async function unlinkPsn() {
   return callPsnService("unlink");
 }
+
+// Real online/offline state + whatever title is actively being played
+// right now (if any) — { online: boolean, playing: { name } | null }.
+export async function fetchLivePsnPresence() {
+  return callPsnService("presence");
+}

@@ -7,6 +7,7 @@
 
 import ProfileHeading from "./ProfileHeading";
 import SteamPresenceCard from "./SteamPresenceCard";
+import GamingPresenceCard from "./GamingPresenceCard";
 import CurrentRotation from "./CurrentRotation";
 import ContinuePlayingCard from "./ContinuePlayingCard";
 import GuildSpotlightCard from "./GuildSpotlightCard";
@@ -47,6 +48,7 @@ export default function GamingDashboard({
 
       <HorizontalLane label="Right now">
         {isLoggedIn && <SteamPresenceCard userId={userId} linkedSteamId={linkedSteamId} />}
+        {isLoggedIn && <GamingPresenceCard userId={userId} />}
         <CurrentRotation
           wishlist={wishlist}
           linkedSteamId={linkedSteamId}
