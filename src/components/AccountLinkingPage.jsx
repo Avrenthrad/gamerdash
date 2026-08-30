@@ -35,6 +35,7 @@ import { linkIdentity, unlinkProviderIdentity, getLinkedProviders, syncDiscordLi
 import { supabase } from "../lib/supabaseClient";
 import { getXboxSignInUrl, fetchLiveGamerscore, unlinkXbox } from "../lib/xboxOAuth";
 import { linkPsnAccount, fetchLiveTrophies, unlinkPsn } from "../lib/psnAuth";
+import { importXboxLibrary, importPsnLibrary } from "../lib/libraryImport";
 import { useApp } from "../hooks/useApp";
 import GameMasterySection from "./GameMasterySection";
 
@@ -280,11 +281,29 @@ function OAuthProviderCard({ label, provider, linkedProviders, onChanged }) {
 // flag) since that's the only way to know the link is actually still
 // valid, not just that it existed once.
 function XboxLiveCard() {
-  const { xboxLinkStatus, xboxLinkResult, clearXboxLinkResult } = useApp();
+  const { userId, xboxLinkStatus, xboxLinkResult, clearXboxLinkResult } = useApp();
   const [checkStatus, setCheckStatus] = useState("checking"); // checking | linked | unlinked
   const [liveData, setLiveData] = useState(null);
   const [unlinking, setUnlinking] = useState(false);
+  const [importStatus, setImportStatus] = useState("idle"); // idle | importing | done | error
+  const [importMessage, setImportMessage] = useState("");
   const signInUrl = getXboxSignInUrl();
+
+  async function handleImportLibrary() {
+    setImportStatus("importing");
+    setImportMessage("");
+    try {
+      const { total, added } = await importXboxLibrary(userId, (current, totalCount) =>
+        setImportMessage(`Importing… ${current} of ${totalCount}`)
+      );
+      setImportStatus("done");
+      setImportMessage(`Added ${added} of ${total} games to your Backlog.`);
+    } catch (err) {
+      console.error("Xbox library import failed:", err);
+      setImportStatus("error");
+      setImportMessage(err.message || "Couldn't import your library right now.");
+    }
+  }
 
   async function checkLinked() {
     setCheckStatus("checking");
@@ -339,9 +358,17 @@ function XboxLiveCard() {
           <p className="settings-card__note">
             Signed in{liveData?.gamertag ? ` as ${liveData.gamertag}` : ""} — real Gamerscore: <strong>{liveData?.gamerscore?.toLocaleString()}</strong>
           </p>
-          <button type="button" className="linking-row__connect" onClick={handleUnlink} disabled={unlinking}>
-            {unlinking ? "Disconnecting…" : "Disconnect Xbox Live"}
-          </button>
+          <div className="backlog-card__actions">
+            <button type="button" className="linking-row__connect" onClick={handleImportLibrary} disabled={importStatus === "importing"}>
+              {importStatus === "importing" ? "Importing…" : "Import Library to Backlog"}
+            </button>
+            <button type="button" className="linking-row__connect" onClick={handleUnlink} disabled={unlinking}>
+              {unlinking ? "Disconnecting…" : "Disconnect Xbox Live"}
+            </button>
+          </div>
+          {importMessage && (
+            <p className={`panel__status ${importStatus === "error" ? "panel__status--error" : ""}`}>{importMessage}</p>
+          )}
         </>
       )}
       {checkStatus === "unlinked" && (
@@ -361,12 +388,31 @@ function XboxLiveCard() {
 // itself is never stored by this app — sent once to complete linking,
 // then only the resulting access/refresh tokens live server-side.
 function PsnCard() {
+  const { userId } = useApp();
   const [checkStatus, setCheckStatus] = useState("checking"); // checking | linked | unlinked
   const [trophies, setTrophies] = useState(null);
   const [npsso, setNpsso] = useState("");
   const [linkStatus, setLinkStatus] = useState("idle"); // idle | linking | error
   const [linkError, setLinkError] = useState("");
   const [unlinking, setUnlinking] = useState(false);
+  const [importStatus, setImportStatus] = useState("idle"); // idle | importing | done | error
+  const [importMessage, setImportMessage] = useState("");
+
+  async function handleImportLibrary() {
+    setImportStatus("importing");
+    setImportMessage("");
+    try {
+      const { total, added } = await importPsnLibrary(userId, (current, totalCount) =>
+        setImportMessage(`Importing… ${current} of ${totalCount}`)
+      );
+      setImportStatus("done");
+      setImportMessage(`Added ${added} of ${total} games to your Backlog.`);
+    } catch (err) {
+      console.error("PSN library import failed:", err);
+      setImportStatus("error");
+      setImportMessage(err.message || "Couldn't import your library right now.");
+    }
+  }
 
   async function checkLinked() {
     setCheckStatus("checking");
@@ -423,9 +469,17 @@ function PsnCard() {
           <p className="settings-card__note">
             Real trophy counts: <strong>{trophies.platinum}</strong> platinum, <strong>{trophies.gold}</strong> gold, <strong>{trophies.silver}</strong> silver, <strong>{trophies.bronze}</strong> bronze.
           </p>
-          <button type="button" className="linking-row__connect" onClick={handleUnlink} disabled={unlinking}>
-            {unlinking ? "Disconnecting…" : "Disconnect PlayStation"}
-          </button>
+          <div className="backlog-card__actions">
+            <button type="button" className="linking-row__connect" onClick={handleImportLibrary} disabled={importStatus === "importing"}>
+              {importStatus === "importing" ? "Importing…" : "Import Library to Backlog"}
+            </button>
+            <button type="button" className="linking-row__connect" onClick={handleUnlink} disabled={unlinking}>
+              {unlinking ? "Disconnecting…" : "Disconnect PlayStation"}
+            </button>
+          </div>
+          {importMessage && (
+            <p className={`panel__status ${importStatus === "error" ? "panel__status--error" : ""}`}>{importMessage}</p>
+          )}
         </>
       )}
       {checkStatus === "unlinked" && (

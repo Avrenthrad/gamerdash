@@ -97,3 +97,9 @@ export async function unlinkXbox() {
 export async function fetchLiveXboxPresence() {
   return callXboxService("presence");
 }
+
+// Real full title/play history — { games: [{ titleId, name, imageUrl,
+// currentGamerscore, totalGamerscore, lastPlayed }] }.
+export async function fetchXboxLibrary() {
+  return callXboxService("library");
+}

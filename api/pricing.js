@@ -30,9 +30,11 @@
 //   POST /api/pricing?service=xbox&mode=link, Authorization: Bearer <token>, body {code, redirectUri}
 //   POST /api/pricing?service=xbox&mode=gamerscore, Authorization: Bearer <token>
 //   POST /api/pricing?service=xbox&mode=presence, Authorization: Bearer <token>
+//   POST /api/pricing?service=xbox&mode=library, Authorization: Bearer <token>
 //   POST /api/pricing?service=psn&mode=link, Authorization: Bearer <token>, body {npsso}
 //   POST /api/pricing?service=psn&mode=trophies, Authorization: Bearer <token>
 //   POST /api/pricing?service=psn&mode=presence, Authorization: Bearer <token>
+//   POST /api/pricing?service=psn&mode=library, Authorization: Bearer <token>
 //   POST /api/pricing?service=lykodex-session, Authorization: Bearer <caller's access token>
 //   GET  /api/pricing?service=mastery-cron, Authorization: Bearer <CRON_SECRET> (Vercel Cron only, see vercel.json)
 
@@ -599,6 +601,79 @@ async function getLiveXboxPresence(adminClient, userId) {
   };
 }
 
+// Real owned/played title history confirmed against OpenXbox/xbox-
+// webapi-python's actual working titlehub provider. Same
+// Authorization scheme as the other Xbox calls, plus titlehub's own
+// required client-identity headers (x-xbl-client-name etc. — a real
+// request without these was confirmed to fail while researching
+// this). maxItems=1000 to get the real full history, not just recent.
+async function xboxFetchLibrary(userhash, xstsToken, xuid) {
+  const url = `https://titlehub.xboxlive.com/users/xuid(${xuid})/titles/titlehistory/decoration/achievement,image?maxItems=1000`;
+  const res = await fetch(url, {
+    headers: {
+      "x-xbl-contract-version": "2",
+      "x-xbl-client-name": "XboxApp",
+      "x-xbl-client-type": "UWA",
+      "x-xbl-client-version": "39.39.22001.0",
+      Authorization: `XBL3.0 x=${userhash};${xstsToken}`,
+    },
+  });
+  if (!res.ok) throw new Error(`Xbox Live title history request failed (${res.status})`);
+  const data = await res.json();
+  return (data.titles || []).map((t) => ({
+    titleId: t.titleId,
+    name: t.name,
+    imageUrl: t.displayImage || null,
+    currentGamerscore: t.achievement?.currentGamerscore ?? null,
+    totalGamerscore: t.achievement?.totalGamerscore ?? null,
+    lastPlayed: t.titleHistory?.lastTimePlayed || null,
+  }));
+}
+
+// Same refresh-if-needed pattern as getLiveXboxGamerscore/
+// getLiveXboxPresence above, calling xboxFetchLibrary at the end.
+async function getLiveXboxLibrary(adminClient, userId) {
+  const { data: stored, error: fetchError } = await adminClient.from("xbox_tokens").select("*").eq("user_id", userId).maybeSingle();
+  if (fetchError) throw fetchError;
+  if (!stored) return "not_linked";
+
+  let { userhash, xuid, xsts_token: xstsToken } = stored;
+  const xstsExpired = new Date(stored.xsts_expires_at).getTime() < Date.now();
+  const msExpired = new Date(stored.ms_expires_at).getTime() < Date.now();
+
+  if (xstsExpired) {
+    let msAccessToken = stored.ms_access_token;
+    let newMsFields = null;
+    if (msExpired) {
+      if (!stored.ms_refresh_token) return "expired";
+      const refreshed = await xboxOAuthTokenRequest({ grant_type: "refresh_token", refresh_token: stored.ms_refresh_token, scope: "Xboxlive.signin Xboxlive.offline_access" });
+      msAccessToken = refreshed.access_token;
+      newMsFields = {
+        ms_access_token: refreshed.access_token,
+        ms_refresh_token: refreshed.refresh_token || stored.ms_refresh_token,
+        ms_expires_at: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
+      };
+    }
+    const userTokenResp = await xboxRequestUserToken(msAccessToken);
+    const xsts = await xboxRequestXstsToken(userTokenResp.Token);
+    const claims = xsts.DisplayClaims.xui[0];
+    userhash = claims.uhs;
+    xuid = claims.xid;
+    xstsToken = xsts.Token;
+    await adminClient.from("xbox_tokens").update({
+      ...(newMsFields || {}),
+      xsts_token: xsts.Token,
+      xsts_expires_at: xsts.NotAfter,
+      userhash: claims.uhs,
+      xuid: claims.xid,
+      updated_at: new Date().toISOString(),
+    }).eq("user_id", userId);
+  }
+
+  const games = await xboxFetchLibrary(userhash, xstsToken, xuid);
+  return { games };
+}
+
 // Verifies the caller against their own Supabase session (same pattern
 // as handleLykodexSession above) and returns a service_role admin
 // client for reading/writing this user's stored tokens.
@@ -669,6 +744,15 @@ async function handleXbox(req, searchParams, res) {
       if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
       const { userId, adminClient } = await verifyCallerAndGetAdminClient(req);
       const result = await getLiveXboxPresence(adminClient, userId);
+      if (result === "not_linked") return res.status(404).json({ error: "Xbox not linked" });
+      if (result === "expired") return res.status(401).json({ error: "Xbox link expired — please re-link" });
+      return res.status(200).json(result);
+    }
+
+    if (mode === "library") {
+      if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+      const { userId, adminClient } = await verifyCallerAndGetAdminClient(req);
+      const result = await getLiveXboxLibrary(adminClient, userId);
       if (result === "not_linked") return res.status(404).json({ error: "Xbox not linked" });
       if (result === "expired") return res.status(401).json({ error: "Xbox link expired — please re-link" });
       return res.status(200).json(result);
@@ -802,6 +886,47 @@ async function getLivePsnPresence(adminClient, userId) {
   };
 }
 
+// Real played-games list confirmed against achievements-app/psn-api's
+// actual working getUserPlayedGames implementation — same Bearer
+// token as trophy/presence fetching, different (gamelist) endpoint.
+async function psnFetchLibrary(accessToken, accountId) {
+  const url = `https://m.np.playstation.com/api/gamelist/v2/users/${accountId}/titles?limit=500`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!res.ok) throw new Error(`PSN game list request failed (${res.status})`);
+  const data = await res.json();
+  return (data.titles || []).map((t) => ({
+    titleId: t.titleId,
+    name: t.name,
+    imageUrl: t.imageUrl || null,
+    lastPlayed: t.lastPlayedDateTime || null,
+  }));
+}
+
+async function getLivePsnLibrary(adminClient, userId) {
+  const { data: stored, error: fetchError } = await adminClient.from("psn_tokens").select("*").eq("user_id", userId).maybeSingle();
+  if (fetchError) throw fetchError;
+  if (!stored) return "not_linked";
+  if (!stored.account_id) return "not_linked";
+
+  let accessToken = stored.access_token;
+  if (new Date(stored.access_expires_at).getTime() < Date.now()) {
+    if (new Date(stored.refresh_expires_at).getTime() < Date.now()) return "expired";
+    const refreshed = await psnRefreshTokens(stored.refresh_token);
+    accessToken = refreshed.access_token;
+    const now = Date.now();
+    await adminClient.from("psn_tokens").update({
+      access_token: refreshed.access_token,
+      refresh_token: refreshed.refresh_token || stored.refresh_token,
+      access_expires_at: new Date(now + refreshed.expires_in * 1000).toISOString(),
+      refresh_expires_at: new Date(now + refreshed.refresh_token_expires_in * 1000).toISOString(),
+      updated_at: new Date().toISOString(),
+    }).eq("user_id", userId);
+  }
+
+  const games = await psnFetchLibrary(accessToken, stored.account_id);
+  return { games };
+}
+
 // Same refresh-if-needed + fetch, factored out so both the per-user
 // endpoint (mode=trophies) and the daily cron below share it — see
 // getLiveXboxGamerscore above for the same reasoning.
@@ -871,6 +996,15 @@ async function handlePsn(req, searchParams, res) {
       if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
       const { userId, adminClient } = await verifyCallerAndGetAdminClient(req);
       const result = await getLivePsnPresence(adminClient, userId);
+      if (result === "not_linked") return res.status(404).json({ error: "PlayStation not linked" });
+      if (result === "expired") return res.status(401).json({ error: "PlayStation link expired — please re-link with a fresh npsso" });
+      return res.status(200).json(result);
+    }
+
+    if (mode === "library") {
+      if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+      const { userId, adminClient } = await verifyCallerAndGetAdminClient(req);
+      const result = await getLivePsnLibrary(adminClient, userId);
       if (result === "not_linked") return res.status(404).json({ error: "PlayStation not linked" });
       if (result === "expired") return res.status(401).json({ error: "PlayStation link expired — please re-link with a fresh npsso" });
       return res.status(200).json(result);

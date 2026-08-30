@@ -48,3 +48,8 @@ export async function unlinkPsn() {
 export async function fetchLivePsnPresence() {
   return callPsnService("presence");
 }
+
+// Real played-games list — { games: [{ titleId, name, imageUrl, lastPlayed }] }.
+export async function fetchPsnLibrary() {
+  return callPsnService("library");
+}
