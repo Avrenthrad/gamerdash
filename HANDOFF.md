@@ -134,6 +134,34 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-30 — **Added real Xbox/PSN live activity ("Now Playing").**
+  Both confirmed against the same real community library sources the
+  Gamerscore/trophy sync used: Xbox via
+  `userpresence.xboxlive.com/users/me?level=all` (OpenXbox/xbox-webapi-
+  python), PSN via `m.np.playstation.com`'s `basicPresences` endpoint
+  (achievements-app/psn-api). New `getLiveXboxPresence`/
+  `getLivePsnPresence` in `api/pricing.js` (`mode=presence` on the
+  existing `xbox`/`psn` services), and a new `GamingPresenceCard.jsx`
+  (same sliding-banner style as `SteamPresenceCard.jsx`) in Gaming
+  Dashboard's "Right now" lane. Committed `4eb7fe3`.
+
+  **Self only, deliberately** — showing a friend's Xbox/PSN presence
+  needs a friend-scoped server-side check (both token tables have no
+  client-readable RLS at all) that doesn't exist yet. Pick this up if
+  extending: mirror `get_friends_linked_steam_ids`'s friend-scoped RPC
+  pattern, but the "is this real user actually my friend" check has to
+  happen server-side (in `api/pricing.js`, using service_role) since
+  the tokens themselves can never be exposed to the client either way
+  — a client-side RPC returning someone else's raw presence data
+  wouldn't be safe to gate with just "are we friends" at the RLS layer
+  the way Steam's linked-id lookup is.
+
+  **Not yet tested live** — same caveat as the rest of this Xbox/PSN
+  work, needs a real signed-in account with both linked to click
+  through and confirm the actual UI renders sensibly (particularly:
+  does `richPresence`/`titleName` come back populated in practice, or
+  mostly null for non-title-cooperative games).
+
 - 2026-08-30 — **Replaced crude placeholder brand icons with real
   logos** (Discord/Twitch/YouTube/App Store/Google Play/Steam sourced
   from Simple Icons, MIT-licensed real vector reproductions; Xbox/
