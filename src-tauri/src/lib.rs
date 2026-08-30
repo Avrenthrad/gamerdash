@@ -1,5 +1,5 @@
 #[cfg(desktop)]
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -15,10 +15,26 @@ pub fn run() {
     // one. The callback here just brings the original window forward.
     #[cfg(desktop)]
     let builder = builder
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
                 let _ = window.set_focus();
+            }
+            // On Windows/Linux, a deep-link redirect (Discord/Twitch/
+            // Xbox OAuth callbacks — see lib/oauthRedirect.js and
+            // AppContext.jsx's Xbox effect) reaches an already-running
+            // app as a plain CLI argument to this SECOND launch
+            // attempt, not as a direct event — the deep-link plugin's
+            // own docs note "you must also check argv here" for
+            // exactly this reason. Without forwarding it, the window
+            // above still gets focused but the actual callback URL
+            // (with the real OAuth code) never reaches the frontend
+            // at all — confirmed live as Xbox sign-in silently
+            // "flicking back to the app" with nothing ever completing.
+            // Forwarding it means re-emitting the same event
+            // @tauri-apps/plugin-deep-link's onOpenUrl listens on.
+            if let Some(url) = args.into_iter().find(|a| a.starts_with("lykodex://")) {
+                let _ = app.emit("deep-link://new-url", vec![url]);
             }
         }))
         .plugin(tauri_plugin_updater::Builder::new().build())

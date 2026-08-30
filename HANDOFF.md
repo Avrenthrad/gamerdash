@@ -134,6 +134,29 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-30 — **Fixed deep-link callbacks never reaching the frontend
+  on Windows desktop (`src-tauri/src/lib.rs`).** Confirmed live: Xbox
+  sign-in on desktop got past Azure's consent screen fine (after the
+  two Azure fixes below) but then "flicked back to the app and
+  repeated" — never actually linking. Root cause, confirmed against
+  Tauri's own docs/example (which has the identical gap): on Windows/
+  Linux, a deep-link redirect (`lykodex://...`) reaching an
+  already-running app arrives as a plain CLI argument to a *second*
+  launch attempt, which `tauri-plugin-single-instance` intercepts — the
+  existing callback only used that to refocus the window and silently
+  discarded the argument, so the actual callback URL (with the real
+  OAuth code) never reached the frontend's `onOpenUrl` listener at
+  all. Fixed by having the callback scan `argv` for a `lykodex://` URL
+  and re-emit it on `deep-link://new-url` — the exact event
+  `@tauri-apps/plugin-deep-link`'s `onOpenUrl` listens on — so it
+  reaches `oauthRedirect.js`/`AppContext.jsx`'s Xbox effect the same as
+  a cold start would.
+
+  **This likely also explains any past flakiness linking Discord/
+  Twitch specifically on the desktop app** (same scheme, same
+  mechanism) — worth a real re-test now that this is fixed, not just
+  Xbox.
+
 - 2026-08-30 — **Set VITE_MICROSOFT_CLIENT_ID in the desktop release
   workflow.** It was never added since Xbox desktop support didn't
   exist until the entry just above this one — without it,
