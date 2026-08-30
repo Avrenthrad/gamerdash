@@ -75,6 +75,15 @@ jobs:
           # on this deployment" instead of the real login form).
           VITE_SUPABASE_URL: https://zcwrlnljtfvslldwyldq.supabase.co
           VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpjd3JsbmxqdGZ2c2xsZHd5bGRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTc3NTYsImV4cCI6MjEwMTY3Mzc1Nn0.JByUotyDU_QM6KkoPVeGfXxjOOST7b4WSyKMQl-1JmU
+          # The client ID (not the secret - that's server-side only,
+          # used in api/pricing.js's token exchange, never bundled
+          # into the client) is what getXboxSignInUrl() needs to build
+          # the Microsoft consent URL at all. Without this the desktop
+          # build silently shows "Xbox sign-in isn't configured yet"
+          # even with real packaged-app support built and Azure's
+          # redirect URI registered (confirmed live) - same public,
+          # not-secret status as the Supabase values above.
+          VITE_MICROSOFT_CLIENT_ID: 0992438b-884c-458d-8387-cae830a765bb
         with:
           tagName: desktop-v${{ env.DESKTOP_VERSION }}
           releaseName: "Lykodex Desktop ${{ env.DESKTOP_VERSION }}"
