@@ -134,6 +134,22 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-30 — **Xbox Live sign-in and PSN trophy sync both confirmed
+  working end-to-end** by the user (real Gamerscore/real trophy counts
+  actually showing up). Cleanup once that was confirmed: removed the
+  self-reported Xbox Gamerscore manual-entry field from
+  `GameMasterySection.jsx` (`recomputeMastery` already prefers the
+  live value automatically once linked, so it was pure redundancy) —
+  committed `ef6eb42`. PlayStation's manual trophy-count entry stays,
+  as the honest fallback for anyone who doesn't want to link PSN.
+
+  This closes out a real multi-step debugging chain (see the entries
+  below for the actual bugs found and fixed along the way — a stale
+  Supabase Site URL, a `flowType` mismatch, a client secret/ID mix-up,
+  a missing `SUPABASE_SERVICE_ROLE_KEY`, and a genuine env-var-name bug
+  in `api/pricing.js` itself). Nothing else known outstanding for
+  either integration.
+
 - 2026-08-30 — **Fixed a real bug in the Xbox Live token exchange
   itself**, found live-testing after the Discord/Twitch fixes below
   were confirmed working: `xboxOAuthTokenRequest()` in `api/pricing.js`
