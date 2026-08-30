@@ -409,7 +409,17 @@ async function handleRiftbound(searchParams, res) {
 // policies granted — service_role only, same posture as the
 // lykodex-session endpoint above) and never sent to the client.
 async function xboxOAuthTokenRequest(params) {
-  const clientId = process.env.MICROSOFT_CLIENT_ID;
+  // Deliberately the SAME env var lib/xboxOAuth.js reads client-side
+  // (VITE_MICROSOFT_CLIENT_ID), not a separate server-only name — the
+  // client ID isn't a secret, and Vercel's serverless runtime still
+  // has VITE_-prefixed vars in process.env regardless (that prefix
+  // only controls what Vite inlines into the browser bundle). Using
+  // two different names here was a real bug: the token exchange
+  // silently sent client_id="" (process.env.MICROSOFT_CLIENT_ID was
+  // never actually set by anyone, since setup instructions only ever
+  // said to set VITE_MICROSOFT_CLIENT_ID), which Microsoft correctly
+  // rejected as "the client does not exist."
+  const clientId = process.env.VITE_MICROSOFT_CLIENT_ID;
   const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
   const body = new URLSearchParams({ ...params, client_id: clientId });
   if (clientSecret) body.set("client_secret", clientSecret);
