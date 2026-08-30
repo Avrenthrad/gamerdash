@@ -682,18 +682,9 @@ export default function AccountLinkingPage({
             linkedProviders={linkedProviders}
             onChanged={refreshLinkedProviders}
           />
-          <OAuthProviderCard
-            label="Google"
-            provider="google"
-            linkedProviders={linkedProviders}
-            onChanged={refreshLinkedProviders}
-          />
-          <OAuthProviderCard
-            label="Apple"
-            provider="apple"
-            linkedProviders={linkedProviders}
-            onChanged={refreshLinkedProviders}
-          />
+          {/* Google/Apple cards hidden for now — same deferred
+              external-setup reason as LoginPage.jsx's oauthProviders
+              list. Re-add here once that infrastructure is done. */}
         </>
       )}
 

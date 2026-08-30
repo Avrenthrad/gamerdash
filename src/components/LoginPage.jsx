@@ -72,9 +72,13 @@ function HeroCycler() {
 const oauthProviders = [
   { name: "Discord", provider: "discord" },
   { name: "Twitch", provider: "twitch" },
-  { name: "Google", provider: "google" },
-  { name: "Apple", provider: "apple" },
   { name: "Microsoft", provider: "azure" },
+  // Google/Apple hidden for now — enabling them needs a broader round
+  // of external app-registration infrastructure (Google Cloud OAuth
+  // client, Apple Services ID + private key) the user is deferring to
+  // a later pass. See HANDOFF.md for the setup checklist when picked
+  // back up; re-add { name: "Google", provider: "google" } and
+  // { name: "Apple", provider: "apple" } here at that point.
 ];
 
 export default function LoginPage({ onLoginSuccess, initialMode }) {
