@@ -134,6 +134,33 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-30 — **Fixed a real bug in the Xbox Live token exchange
+  itself**, found live-testing after the Discord/Twitch fixes below
+  were confirmed working: `xboxOAuthTokenRequest()` in `api/pricing.js`
+  read `process.env.MICROSOFT_CLIENT_ID` (a server-only name), but the
+  setup docs (`.env.example`) only ever said to set
+  `VITE_MICROSOFT_CLIENT_ID` (the client-side name) — so the server
+  always sent `client_id=""` to Microsoft, which correctly rejected it
+  as "the client does not exist." Fixed to read
+  `VITE_MICROSOFT_CLIENT_ID` instead — the client ID isn't a secret,
+  and Vercel's serverless runtime has `VITE_`-prefixed vars in
+  `process.env` regardless (that prefix only controls what Vite
+  inlines into the browser bundle). No two separate env vars needed.
+  Committed `f16beec`.
+
+  Also needed and now set (both by the user, confirmed): the real
+  Azure app's actual client ID (`0992438b-884c-458d-8387-cae830a765bb`
+  — an earlier mix-up briefly had a client *secret's* `keyId` pasted
+  into `VITE_MICROSOFT_CLIENT_ID` instead, which produced the same
+  "client does not exist" error for a completely different reason —
+  worth remembering both failure modes look identical from the error
+  message alone) and `SUPABASE_SERVICE_ROLE_KEY` (was never set at all
+  until now — also unblocks the "Act as Lykodex" toggle from earlier
+  in this project, which needed the same var).
+
+  **Not yet confirmed working end-to-end** — waiting on the user to
+  retest after this deploy goes out.
+
 - 2026-08-30 — **Fixed two real, pre-existing OAuth bugs surfaced while
   testing Xbox Live sign-in** (neither was caused by that work, both
   had just never been exercised/noticed before):
