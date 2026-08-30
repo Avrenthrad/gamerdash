@@ -1,7 +1,13 @@
+<!-- The real current PlayStation brand mark (stem+bowl "P" merged
+     with sweeping wing shapes), not the older PS-button-glyph icon
+     Simple Icons draws under this slug — those are two genuinely
+     different real Sony marks, and this one matches what was actually
+     asked for. Hand-approximated with straight-edged wings rather
+     than the original's subtly curved ones, for reliable rendering. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="PlayStation">
-  <rect width="48" height="48" rx="12" fill="#003791"/>
-  <path fill="#fff" d="M23.2 14.2 17.6 24h11.2L23.2 14.2Z"/>
-  <circle cx="33.5" cy="19" r="4.2" fill="none" stroke="#fff" stroke-width="2.6"/>
-  <path stroke="#fff" stroke-width="2.6" stroke-linecap="round" d="m15.2 33.2 5.6 5.6M20.8 33.2l-5.6 5.6"/>
-  <rect x="28.8" y="30.8" width="8.4" height="8.4" fill="none" stroke="#fff" stroke-width="2.6" rx="0.5"/>
+  <path fill="#006FCD" d="M19 6h6v29.5l-6 2.2Z"/>
+  <path fill="#006FCD" d="M25 6c5.4.5 9 3 9 8.4 0 5.3-3.6 7.6-9 7.1Z"/>
+  <rect x="23.6" y="10.5" width="1.8" height="9" fill="#fff"/>
+  <path fill="#006FCD" d="M25 34.8 40.5 29.5c1.6-.5 2.9.1 1.1 1.4-1 .7-2.3 1.4-2.3 1.4L25 37.5Z"/>
+  <path fill="#006FCD" d="M19 35 7 39c-1.9.6-2.5-.4-.9-1.4.9-.6 2-1 2-1L19 33.2Z"/>
 </svg>

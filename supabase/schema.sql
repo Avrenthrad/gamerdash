@@ -2514,3 +2514,21 @@ create table if not exists public.psn_tokens (
 );
 
 alter table public.psn_tokens enable row level security;
+
+-- Narrow status-only RPCs — xbox_tokens/psn_tokens intentionally have
+-- no client-readable RLS policy above, so the UI needs a safe way to
+-- check "is MY account linked" without exposing token values. Each
+-- only reveals whether the CALLING user's own row exists.
+create or replace function public.is_xbox_linked()
+returns boolean language sql security definer set search_path = public stable as $$
+  select exists (select 1 from public.xbox_tokens where user_id = auth.uid());
+$$;
+revoke execute on function public.is_xbox_linked() from public, anon;
+grant execute on function public.is_xbox_linked() to authenticated;
+
+create or replace function public.is_psn_linked()
+returns boolean language sql security definer set search_path = public stable as $$
+  select exists (select 1 from public.psn_tokens where user_id = auth.uid());
+$$;
+revoke execute on function public.is_psn_linked() from public, anon;
+grant execute on function public.is_psn_linked() to authenticated;

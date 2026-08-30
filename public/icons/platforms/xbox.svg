@@ -1,4 +1,15 @@
+<!-- Not sourced from Simple Icons (they don't carry a Microsoft Xbox
+     mark). A simplified stylization of the real Xbox sphere logo
+     (white circle + green crossing bands) rather than an attempt at
+     its precise tapered wing/shield geometry — two earlier freehand
+     attempts at that came out unrecognizable (a tribal-mask shape,
+     not Xbox), so this trades some fidelity for a shape guaranteed to
+     actually render as a clean, recognizable circle-and-X. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Xbox">
   <rect width="48" height="48" rx="12" fill="#107C10"/>
-  <path fill="#fff" d="M24 11.5c4.2 3.4 7 6.8 8.5 10.2 1.5 3.4 1.5 6.4 0 9-1.5 2.6-4.3 5-8.5 7.1-4.2-2.1-7-4.5-8.5-7.1-1.5-2.6-1.5-5.6 0-9 1.5-3.4 4.3-6.8 8.5-10.2Zm0 5.2c-2.4 2-4 4-4.8 6-.8 2-.8 3.7 0 5.1.8 1.4 2.4 2.8 4.8 4.3 2.4-1.5 4-2.9 4.8-4.3.8-1.4.8-3.1 0-5.1-.8-2-2.4-4-4.8-6Z"/>
+  <circle cx="24" cy="24" r="14" fill="#fff"/>
+  <g stroke="#107C10" stroke-width="5.5" stroke-linecap="round">
+    <path d="M15 15 L33 33" fill="none"/>
+    <path d="M33 15 L15 33" fill="none"/>
+  </g>
 </svg>

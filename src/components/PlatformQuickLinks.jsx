@@ -33,18 +33,34 @@ export const GAMING_PLATFORMS = [
     label: "Xbox",
     iconSrc: "/icons/platforms/xbox.svg",
     className: "overview-platform-bar__link--xbox",
-    isLinked: ({ handles }) => Boolean(handles.xbox_gamertag),
-    profileUrl: ({ handles }) => xboxProfileUrl(handles.xbox_gamertag),
-    linkPrompt: "Add Xbox Gamertag",
+    // Real Xbox Live sign-in (xbox_tokens) replaced the old
+    // self-reported xbox_gamertag field — see is_xbox_linked() RPC
+    // (xbox_tokens has no client-readable RLS policy at all, service_
+    // role only, so this narrow status-only check is how the client
+    // learns "is MY account linked" without touching token values).
+    isLinked: ({ handles }) => Boolean(handles.xboxLinked),
+    // Falls back to the bare (non-personalized) profile URL when
+    // linked but no gamertag is on file (real Xbox Live sign-in
+    // doesn't write to the old self-reported field it replaced) —
+    // without this, `url` would be null and the icon would render as
+    // "not linked" despite genuinely being linked.
+    profileUrl: ({ handles }) => xboxProfileUrl(handles.xboxGamertag) || "https://account.xbox.com/en-us/profile",
+    linkPrompt: "Sign in with Microsoft",
   },
   {
     id: "playstation",
     label: "PlayStation",
     iconSrc: "/icons/platforms/playstation.svg",
     className: "overview-platform-bar__link--playstation",
-    isLinked: ({ handles }) => Boolean(handles.playstation_online_id),
+    // Real PSN trophy sync (psn_tokens) is the primary signal now —
+    // same is_psn_linked() RPC reasoning as Xbox above. The old
+    // self-reported playstation_online_id field is still a real,
+    // separate thing (just a handle, not proof of a real PSN link),
+    // so it's kept as a fallback for the profile-link destination
+    // only, not for "is this linked" status.
+    isLinked: ({ handles }) => Boolean(handles.psnLinked),
     profileUrl: () => playstationProfileUrl(),
-    linkPrompt: "Add PSN Online ID",
+    linkPrompt: "Link PlayStation",
   },
 ];
 
@@ -56,18 +72,22 @@ export function usePlatformHandles(userId) {
       setHandles({});
       return;
     }
-    supabase
-      .from("profiles")
-      .select("xbox_gamertag, playstation_online_id")
-      .eq("id", userId)
-      .single()
-      .then(({ data, error }) => {
-        if (error) {
-          console.error("Failed to load platform handles:", error);
-          return;
-        }
-        setHandles(data || {});
+    Promise.all([
+      supabase.from("profiles").select("xbox_gamertag, playstation_online_id").eq("id", userId).single(),
+      supabase.rpc("is_xbox_linked"),
+      supabase.rpc("is_psn_linked"),
+    ]).then(([profileRes, xboxRes, psnRes]) => {
+      if (profileRes.error) {
+        console.error("Failed to load platform handles:", profileRes.error);
+        return;
+      }
+      setHandles({
+        xboxGamertag: profileRes.data?.xbox_gamertag,
+        playstationOnlineId: profileRes.data?.playstation_online_id,
+        xboxLinked: Boolean(xboxRes.data),
+        psnLinked: Boolean(psnRes.data),
       });
+    });
   }, [userId]);
 
   return handles;

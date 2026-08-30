@@ -1,4 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="YouTube">
-  <rect width="48" height="48" rx="12" fill="#ff0000"/>
-  <path fill="#fff" d="M38.5 17.2c-.4-1.6-1.6-2.8-3.2-3.2C32.7 13.5 24 13.5 24 13.5s-8.7 0-11.3.5c-1.6.4-2.8 1.6-3.2 3.2-.5 2.6-.5 8.1-.5 8.1s0 5.5.5 8.1c.4 1.6 1.6 2.8 3.2 3.2 2.6.5 11.3.5 11.3.5s8.7 0 11.3-.5c1.6-.4 2.8-1.6 3.2-3.2.5-2.6.5-8.1.5-8.1s0-5.5-.5-8.1zM21.5 29.8V18.8l9.5 5.5-9.5 5.5z"/>
+<!-- Real YouTube mark (Simple Icons) — the fetched path already draws
+     the rounded-rect + play-triangle as ONE shape (the triangle is a
+     same-path cutout via subpath winding), so it's rendered directly
+     in red with no separate background rect — layering it as a white
+     silhouette on top of a red square (as this file mistakenly did on
+     the first pass) would have shown a solid white blob, not the
+     clean red-shape-with-triangle-cutout the reference actually is. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="YouTube">
+  <path fill="#FF0000" d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
 </svg>

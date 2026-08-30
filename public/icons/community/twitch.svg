@@ -1,4 +1,11 @@
+<!-- Matches Twitch's app-icon style (speech-bubble glyph with a black
+     outline + two bars) rather than the plain "glitch" silhouette
+     Simple Icons draws — that one rendered as a solid white blob on
+     purple, not the outlined bubble shape actually being asked for. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Twitch">
   <rect width="48" height="48" rx="12" fill="#9146FF"/>
-  <path fill="#fff" d="M12 10h24v20l-6 6h-5l-3 3v-3h-6V10Zm4 4v12h4v-4h4v4h4l3-3V14H16Zm8 2h4v8h-4v-8Zm-6 0h4v8h-4v-8Z"/>
+  <path fill="#000" d="M17.5 16.5 20 14h11.5l3 3v9l-5.5 5.5h-4.5L21.5 34.5V31.5H17.5Z"/>
+  <path fill="#fff" d="M19 16 21.5 13.5H32L34.5 16v8.5L29.5 29.5H25L22 32.5V29.5H19Z"/>
+  <rect x="24.5" y="18.5" width="2.3" height="6" fill="#000"/>
+  <rect x="29" y="18.5" width="2.3" height="6" fill="#000"/>
 </svg>
