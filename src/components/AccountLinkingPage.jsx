@@ -682,6 +682,18 @@ export default function AccountLinkingPage({
             linkedProviders={linkedProviders}
             onChanged={refreshLinkedProviders}
           />
+          <OAuthProviderCard
+            label="Google"
+            provider="google"
+            linkedProviders={linkedProviders}
+            onChanged={refreshLinkedProviders}
+          />
+          <OAuthProviderCard
+            label="Apple"
+            provider="apple"
+            linkedProviders={linkedProviders}
+            onChanged={refreshLinkedProviders}
+          />
         </>
       )}
 

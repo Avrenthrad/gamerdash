@@ -134,6 +134,33 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-30 — **Wired Google + Apple OAuth cards into Account
+  Linking.** Turns out `LoginPage.jsx`'s `oauthProviders` array
+  (line ~72) already listed Google/Apple/Microsoft alongside Discord/
+  Twitch and rendered them through the same `renderOauthButtons` /
+  `enabledProviders` gate from `fetchEnabledOAuthProviders()` — there
+  was no hardcoded "coming soon" split to move them out of, so the
+  Login page needed **zero changes**. `OAuthMark.jsx` already had real
+  Google/Apple marks too. The only real gap was Account Linking, which
+  added two more `OAuthProviderCard` entries (Google, Apple) right
+  after Twitch's — that component is fully generic on `provider`, so
+  no new component was needed.
+
+  **Blocked on external setup, not code** — both buttons will keep
+  showing "(soon)"/erroring until each provider is actually enabled in
+  Supabase's dashboard (Authentication > Providers), which needs:
+  - **Google**: an OAuth 2.0 Client ID (Web application) in Google
+    Cloud Console, redirect URI
+    `https://zcwrlnljtfvslldwyldq.supabase.co/auth/v1/callback`, paste
+    Client ID + Secret into Supabase.
+  - **Apple**: a Services ID (not an App ID) configured for "Sign in
+    with Apple" with the same redirect URI, plus a Sign-in-with-Apple
+    private key (.p8) — Supabase's Apple provider screen wants Services
+    ID, Team ID, Key ID, and the key contents together.
+
+  Pick this up once either is enabled server-side — no code change
+  needed then, just live-test the button.
+
 - 2026-08-30 — **Added real Xbox/PSN library import to Backlog.**
   Xbox via `titlehub.xboxlive.com`'s title-history endpoint (OpenXbox/
   xbox-webapi-python), PSN via `m.np.playstation.com`'s `gamelist/v2`
