@@ -2432,8 +2432,16 @@ create policy "Users can read their own mastery history"
   on public.mastery_score_history for select
   using (user_id = auth.uid());
 
--- Friend-scoped history for charts (see friends.js).
-create or replace function public.get_friends_mastery_history(p_ids uuid[], p_since timestamptz)
+-- Friend-scoped history for charts (see friends.js). Unioned with
+-- each friend's LIVE overall_mastery_score (as a synthetic "now" row)
+-- so a same-day recompute (e.g. clicking "Recompute Gaming Mastery",
+-- or the daily Xbox/PSN cron) shows up immediately on the chart
+-- instead of waiting for the next 4am UTC snapshot-mastery-scores-
+-- daily pg_cron run (see mastery_score_history's own comment above) —
+-- confirmed live: a friend's chart didn't reflect their same-day
+-- recompute at all before this, since the history table itself is
+-- only ever written once a day.
+create or replace function public.get_friends_mastery_history(p_ids uuid[], p_since timestamptz default (now() - '90 days'::interval))
 returns table (user_id uuid, overall_mastery_score numeric, recorded_at timestamptz)
 language sql
 security definer
@@ -2449,7 +2457,17 @@ as $$
       where f.user_id = auth.uid()
         and f.friend_id = h.user_id
     )
-  order by h.recorded_at asc;
+  union all
+  select p.id, p.overall_mastery_score, now()
+  from public.profiles p
+  where p.id = any(p_ids)
+    and p.overall_mastery_score > 0
+    and exists (
+      select 1 from public.friends f
+      where f.user_id = auth.uid()
+        and f.friend_id = p.id
+    )
+  order by recorded_at asc;
 $$;
 
 -- Guildmate-scoped history — same trust model, shared-guild check.

@@ -134,6 +134,41 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-30 — **Set VITE_MICROSOFT_CLIENT_ID in the desktop release
+  workflow.** It was never added since Xbox desktop support didn't
+  exist until the entry just above this one — without it,
+  `getXboxSignInUrl()` silently returns null and the Xbox Live card
+  shows "Xbox sign-in isn't configured yet" even with real
+  packaged-app OAuth support built and the Azure redirect URI
+  registered. Confirmed live on the desktop app. Client ID only (a
+  public OAuth identifier, not the secret, which stays server-side
+  only in Vercel).
+
+- 2026-08-30 — **Friends' Mastery Score chart now reflects a same-day
+  recompute, not just the next day's snapshot.** `get_friends_mastery_
+  history` (RPC behind `FriendMasteryChart.jsx`) only ever read
+  `mastery_score_history`, which is written exactly once a day by the
+  live `snapshot-mastery-scores-daily` pg_cron job (0 4 * * * UTC) —
+  so a friend clicking "Recompute Gaming Mastery" (or the daily Xbox/
+  PSN cron) updated their real `profiles.overall_mastery_score`
+  instantly, but the chart had no way to show it until the next day's
+  4am UTC snapshot. Confirmed live: exactly this mismatch reported by
+  the user right after a friend recomputed.
+
+  Fixed by having the RPC `union all` each friend's current live
+  `overall_mastery_score` as a synthetic "now" row alongside the real
+  history rows — same idea as a stock chart's live intraday tick on
+  top of its official daily closes. Applied directly via
+  `apply_migration` (`append_live_score_to_friends_mastery_history`)
+  and mirrored in `supabase/schema.sql`. No client-side change needed
+  — `FriendMasteryChart.jsx` already just plots whatever rows the RPC
+  returns.
+
+  `get_guildmates_mastery_history` (documented in `schema.sql`) has
+  the same one-snapshot-a-day gap but isn't actually deployed to
+  production (no live guild Mastery Score chart exists yet) — apply
+  the same `union all` fix there whenever that feature gets built.
+
 - 2026-08-30 — **Fixed CORS preflight blocking Xbox/PSN linking on
   packaged builds, then built real Xbox desktop/mobile support.**
   Two related fixes:
