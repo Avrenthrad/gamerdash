@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Bricolage+Grotesque:wght@500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Bricolage+Grotesque:wght@500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@500&display=swap');
 
 /* Tailwind utilities only — no Preflight, so it doesn't reset/override
    the hand-built design system below. */
@@ -142,7 +142,8 @@
      single full-bleed headline can hit the extreme scale contrast that
      look needs without a condensed face leaking into ordinary UI. */
   --font-display-condensed: 'Barlow Condensed', 'Bricolage Grotesque', sans-serif;
-  --font-body: 'Hanken Grotesk', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --font-label: var(--font-body);
   --font-mono: 'JetBrains Mono', monospace;
 
   /* ---------- Semantic design tokens ----------
@@ -612,11 +613,12 @@ button { font-family: inherit; }
 }
 
 .panel__eyebrow {
-  font-family: var(--font-mono);
-  font-size: 11px;
+  font-family: var(--font-label);
+  font-size: 11.5px;
+  font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
 }
 
 .panel__title {
@@ -1010,6 +1012,12 @@ button { font-family: inherit; }
   color: var(--lime);
 }
 
+.tag--steam-purchased {
+  border: 1px solid #66c0f4;
+  color: #66c0f4;
+  background: color-mix(in srgb, #66c0f4 10%, transparent);
+}
+
 .tag--muted {
   border: 1px solid var(--border);
   color: var(--text-muted);
@@ -1374,9 +1382,10 @@ button { font-family: inherit; }
 
 .auth-hero__eyebrow {
   display: block;
-  font-family: var(--font-mono);
+  font-family: var(--font-label);
   font-size: 11px;
-  letter-spacing: 0.19em;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--accent);
   margin-bottom: 10px;
@@ -1427,9 +1436,10 @@ button { font-family: inherit; }
 }
 
 .auth-hero__cycler-label {
-  font-family: var(--font-mono);
+  font-family: var(--font-label);
   font-size: 11px;
-  letter-spacing: 0.19em;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-tertiary);
 }
@@ -2552,6 +2562,42 @@ button { font-family: inherit; }
   height: 1px;
   background: var(--border);
   margin: 8px 4px;
+}
+
+.dash-drawer__community-links {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 14px 10px;
+}
+
+.dash-drawer__community-link {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dash-drawer__community-link img {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+a.dash-drawer__community-link:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  box-shadow: var(--shadow-sm);
+}
+
+.dash-drawer__community-link--placeholder {
+  opacity: 0.72;
+  cursor: default;
 }
 
 .dash-drawer__item--danger {
@@ -4209,6 +4255,81 @@ button { font-family: inherit; }
   color: var(--sky);
 }
 
+/* ---------- Lykodex persona toggle (delegate account only) ---------- */
+
+.lykodex-persona-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.lykodex-persona-toggle:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.lykodex-persona-toggle__track {
+  display: block;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  position: relative;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.lykodex-persona-toggle[aria-pressed="true"] .lykodex-persona-toggle__track {
+  border-color: var(--alpha-yellow);
+  background: color-mix(in srgb, var(--alpha-yellow) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--alpha-yellow) 28%, transparent);
+}
+
+.lykodex-persona-toggle__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--bg);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  transition: transform 0.2s ease;
+}
+
+.lykodex-persona-toggle[aria-pressed="true"] .lykodex-persona-toggle__thumb {
+  transform: translateX(18px);
+}
+
+.lykodex-persona-toggle__mark {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  object-fit: cover;
+}
+
+.lykodex-persona-toggle__label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  min-width: 2.8em;
+  text-align: left;
+}
+
+.lykodex-persona-toggle[aria-pressed="true"] .lykodex-persona-toggle__label {
+  color: var(--alpha-yellow);
+}
+
 /* ---------- Accent colour swatches (Account Settings > Theme) ---------- */
 
 .accent-swatch-row {
@@ -4721,46 +4842,31 @@ button { font-family: inherit; }
   margin-bottom: 12px;
 }
 
-.mastery-contribution__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.mastery-contribution__xp-bar {
+  margin-top: 0;
+  height: 10px;
 }
 
-.mastery-contribution__row {
-  display: grid;
-  grid-template-columns: 76px 1fr 34px;
-  align-items: center;
-  gap: 10px;
-}
-
-.mastery-contribution__platform {
+.mastery-contribution__xp-note {
+  margin: 10px 0 0;
   font-size: 12px;
   color: var(--text-muted);
+  line-height: 1.4;
 }
 
-.mastery-contribution__bar {
-  height: 6px;
-  border-radius: 999px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
-  overflow: hidden;
+.mastery-contribution__xp-remaining {
+  color: var(--text);
+  font-weight: 600;
 }
 
-.mastery-contribution__bar-fill {
-  height: 100%;
-  background: var(--grad-red);
-  border-radius: 999px;
+.mastery-contribution__xp-meta {
+  color: var(--text-tertiary);
 }
 
-.mastery-contribution__score {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--accent);
-  text-align: right;
+.release-calendar-card {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--sky) 5%, transparent), transparent 42%),
+    var(--surface);
 }
 
 .release-calendar-list {
@@ -4769,30 +4875,98 @@ button { font-family: inherit; }
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--surface-raised) 55%, transparent);
 }
 
 .release-calendar-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(84px, 92px) minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  padding: 11px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  transition: background var(--duration-fast) var(--ease-standard);
+}
+
+.release-calendar-row:last-child {
+  border-bottom: none;
+}
+
+.release-calendar-row:hover {
+  background: color-mix(in srgb, var(--sky) 6%, var(--surface-raised));
+}
+
+.release-calendar-row__when {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .release-calendar-row__countdown {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--accent);
-  flex-shrink: 0;
-  width: 78px;
+  font-weight: 600;
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+
+.release-calendar-row__date {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  line-height: 1.2;
 }
 
 .release-calendar-row__name {
-  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.release-calendar-row__tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  max-width: 168px;
+}
+
+.release-calendar-row--today .release-calendar-row__countdown,
+.release-calendar-row--soon .release-calendar-row__countdown {
+  color: var(--accent);
+}
+
+.release-calendar-row--today {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.release-calendar-row--near .release-calendar-row__countdown {
+  color: var(--amber);
+}
+
+@media (max-width: 560px) {
+  .release-calendar-row {
+    grid-template-columns: minmax(72px, 80px) minmax(0, 1fr);
+    grid-template-areas:
+      "when name"
+      "tags tags";
+    row-gap: 8px;
+  }
+
+  .release-calendar-row__when { grid-area: when; }
+  .release-calendar-row__name { grid-area: name; }
+  .release-calendar-row__tags {
+    grid-area: tags;
+    max-width: none;
+    justify-content: flex-start;
+  }
 }
 
 .news-announcements-list {
@@ -4828,10 +5002,284 @@ button { font-family: inherit; }
   color: var(--text-muted);
 }
 
+.guild-spotlight-card {
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
+.guild-spotlight-card .panel__head {
+  margin-bottom: 10px;
+}
+
+.guild-spotlight__hero {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  min-height: 132px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+.guild-spotlight__hero--fallback {
+  background:
+    radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--violet) 34%, transparent), transparent 58%),
+    radial-gradient(90% 120% at 0% 100%, color-mix(in srgb, var(--rose) 22%, transparent), transparent 55%),
+    linear-gradient(145deg, color-mix(in srgb, var(--surface-raised) 88%, #000), var(--surface));
+}
+
+.guild-spotlight__banner {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.guild-spotlight__hero-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #000 10%, transparent) 0%, color-mix(in srgb, #000 72%, transparent) 100%),
+    linear-gradient(90deg, color-mix(in srgb, #000 35%, transparent), transparent 55%);
+  pointer-events: none;
+}
+
+.guild-spotlight__hero-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  padding: 16px;
+  min-height: 132px;
+}
+
+.guild-spotlight__logo-ring {
+  flex-shrink: 0;
+  padding: 3px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  border: 1px solid color-mix(in srgb, #fff 18%, var(--border));
+  box-shadow: 0 10px 28px color-mix(in srgb, #000 35%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.guild-spotlight__logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 13px;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+}
+
+.guild-spotlight__logo--fallback {
+  background: var(--grad-red);
+  color: var(--text-on-accent);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 24px;
+}
+
 .guild-spotlight__identity {
+  min-width: 0;
+  padding-bottom: 2px;
+}
+
+.guild-spotlight__name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  line-height: 1.15;
+  color: #fff;
+  text-shadow: 0 1px 12px color-mix(in srgb, #000 55%, transparent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guild-spotlight__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.guild-spotlight__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, #fff 88%, var(--text-muted));
+  background: color-mix(in srgb, #000 28%, transparent);
+  border: 1px solid color-mix(in srgb, #fff 16%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.guild-spotlight__chip--private {
+  color: #f0d4ff;
+  border-color: color-mix(in srgb, var(--violet) 55%, transparent);
+}
+
+.guild-spotlight__chip--public {
+  color: #d7f5ff;
+  border-color: color-mix(in srgb, var(--sky) 55%, transparent);
+}
+
+.guild-spotlight__chip--official {
+  color: #ffe0e8;
+  border-color: color-mix(in srgb, var(--rose) 60%, transparent);
+}
+
+.guild-spotlight__description {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.guild-spotlight__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px 0 16px;
+  border-top: 1px solid var(--border);
+}
+
+.guild-spotlight__roster {
   display: flex;
   align-items: center;
+  gap: 10px;
+}
+
+.guild-spotlight__avatar-stack {
+  display: flex;
+  align-items: center;
+}
+
+.guild-spotlight__avatar-stack .mini-avatar {
+  width: 28px;
+  height: 28px;
+  margin-left: -8px;
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.guild-spotlight__avatar-stack .mini-avatar:first-child {
+  margin-left: 0;
+}
+
+.guild-spotlight__roster-meta {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.guild-spotlight__pulse {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-raised) 80%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+}
+
+.guild-spotlight__pulse-copy {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.guild-spotlight__pulse-copy strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.guild-spotlight__pulse-time {
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.guild-spotlight__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid color-mix(in srgb, var(--rose) 45%, var(--border));
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--rose) 16%, transparent), color-mix(in srgb, var(--rose) 6%, transparent)),
+    var(--surface-raised);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.guild-spotlight__cta:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--rose) 65%, var(--border));
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--rose) 14%, transparent);
+}
+
+.guild-spotlight__cta-arrow {
+  color: var(--rose);
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.guild-spotlight__cta:hover .guild-spotlight__cta-arrow {
+  transform: translateX(2px);
+}
+
+.guild-spotlight__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
   gap: 12px;
+  padding: 8px 6px 14px;
+}
+
+.guild-spotlight__empty-art {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--violet) 35%, transparent), transparent 58%),
+    linear-gradient(145deg, var(--surface-raised), var(--surface));
+  border: 1px solid var(--border);
+}
+
+.guild-spotlight__empty-glyph {
+  font-size: 28px;
+  line-height: 1;
+  filter: grayscale(0.1);
+}
+
+.guild-spotlight__empty-copy {
+  margin: 0;
+  max-width: 28ch;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
 }
 
 .guild-spotlight__avatar {
@@ -5387,8 +5835,24 @@ button { font-family: inherit; }
 .profile-heading__tools {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
   margin-left: auto;
+}
+
+.profile-heading__platform-links,
+.profile-heading__stream-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profile-heading__refresh {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  justify-content: center;
+  margin-left: 0;
 }
 
 .profile-heading__tool {
@@ -5449,13 +5913,6 @@ button { font-family: inherit; }
   font-size: 20px;
   font-weight: 700;
   color: var(--text);
-}
-
-.current-rotation__subtitle {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: var(--text-muted);
-  max-width: 42ch;
 }
 
 .current-rotation__actions {
@@ -5728,6 +6185,22 @@ html[data-mode="light"] .empty-state {
 html[data-mode="light"] .current-rotation {
   background: linear-gradient(180deg, rgba(232, 40, 61, 0.05), transparent 70%),
     var(--surface);
+}
+
+html[data-mode="light"] .overview-command {
+  box-shadow: var(--shadow-sm);
+}
+
+html[data-mode="light"] .overview-command::before {
+  opacity: 0.22;
+}
+
+html[data-mode="light"] .overview-tile {
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--surface) 92%, white),
+    var(--surface)
+  );
 }
 
 /* ---------- Preorder badge (wishlist cards, real Steam comingSoon data) ---------- */
@@ -6010,6 +6483,496 @@ html[data-mode="light"] .current-rotation {
 
 /* ---------- Overview page ---------- */
 
+.overview-page {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding-bottom: 12px;
+}
+
+/* Command-center stage — split copy + morphing College hero */
+.overview-command {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.overview-command::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px);
+  background-size: 80px 80px;
+  opacity: 0.35;
+  mask-image: linear-gradient(135deg, black 0%, transparent 72%);
+}
+
+.overview-command__grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
+  gap: 8px 28px;
+  padding: 32px 36px 28px;
+  align-items: center;
+}
+
+.overview-command__grid--nav {
+  cursor: pointer;
+}
+
+.overview-command__grid--nav:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: var(--radius-lg);
+}
+
+.overview-command__grid--nav[data-college="gaming"]:hover {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--sky) 6%, transparent), transparent 55%);
+}
+.overview-command__grid--nav[data-college="tcg"]:hover {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--violet) 6%, transparent), transparent 55%);
+}
+.overview-command__grid--nav[data-college="entertainment"]:hover {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--rose) 6%, transparent), transparent 55%);
+}
+.overview-command__grid--nav[data-college="collectibles"]:hover {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--amber) 6%, transparent), transparent 55%);
+}
+.overview-command__grid--nav[data-college="tabletop"]:hover {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--lime) 6%, transparent), transparent 55%);
+}
+
+.overview-command__grid--nav .hero-card__dots {
+  cursor: default;
+}
+
+.overview-command__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.overview-command__eyebrow,
+.overview-section__eyebrow {
+  font-family: var(--font-label);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.overview-command__title {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  font-family: var(--font-display-condensed);
+  font-size: clamp(2.4rem, 5vw, 3.4rem);
+  font-weight: 700;
+  line-height: 0.92;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+
+.overview-command__title-line {
+  display: block;
+}
+
+.overview-command__title-line--cycle {
+  display: inline-grid;
+  align-items: baseline;
+}
+
+.overview-command__title-cycle-word {
+  grid-area: 1 / 1;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 420ms var(--ease-standard);
+}
+
+.overview-command__title-cycle-word--active {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overview-command__title-cycle-word {
+    transition: none;
+  }
+}
+
+.overview-command__title-line--ghost {
+  color: color-mix(in srgb, var(--text-primary) 22%, transparent);
+}
+
+.overview-command__title-line--ghost .overview-command__title-cycle-word {
+  color: inherit;
+}
+
+.overview-command__subtitle {
+  margin: 0;
+  max-width: 38ch;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.overview-command__hint {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  color: var(--text-muted);
+  max-width: 36ch;
+}
+
+.overview-command__hint--error {
+  color: color-mix(in srgb, var(--rose) 75%, var(--text-muted));
+}
+
+.overview-command__guest {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+.overview-command__cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.overview-command__cta .auth-form__submit,
+.overview-command__cta .auth-form__secondary {
+  width: auto;
+  min-width: 132px;
+}
+
+.overview-stat-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+  max-width: 320px;
+}
+
+.overview-stat-skeleton__eyebrow,
+.overview-stat-skeleton__number,
+.overview-stat-skeleton__unit {
+  display: block;
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--border) 70%, transparent) 0%,
+    color-mix(in srgb, var(--border) 35%, transparent) 50%,
+    color-mix(in srgb, var(--border) 70%, transparent) 100%
+  );
+  background-size: 200% 100%;
+  animation: overviewSkeletonShimmer 1.4s ease-in-out infinite;
+}
+
+.overview-stat-skeleton__eyebrow {
+  width: 42%;
+  height: 11px;
+}
+
+.overview-stat-skeleton__number {
+  width: 58%;
+  height: 48px;
+  border-radius: var(--radius-lg);
+}
+
+.overview-stat-skeleton__unit {
+  width: 72%;
+  height: 14px;
+}
+
+@keyframes overviewSkeletonShimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overview-stat-skeleton__eyebrow,
+  .overview-stat-skeleton__number,
+  .overview-stat-skeleton__unit {
+    animation: none;
+  }
+}
+
+.overview-command__visual {
+  min-height: 300px;
+  pointer-events: none;
+}
+
+.overview-command .college-morph-hero--command-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  min-height: 100%;
+  border-radius: inherit;
+  background: transparent;
+  pointer-events: none;
+}
+
+.overview-command .college-morph-hero--command-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      105deg,
+      color-mix(in srgb, var(--surface) 92%, transparent) 0%,
+      color-mix(in srgb, var(--surface) 55%, transparent) 38%,
+      transparent 62%
+    ),
+    radial-gradient(
+      ellipse 85% 75% at 72% 48%,
+      color-mix(in srgb, var(--sky) 10%, transparent),
+      transparent 68%
+    );
+}
+
+.overview-command .college-morph-hero--command-stage .college-morph-hero__canvas {
+  width: 100%;
+  height: 100%;
+  opacity: 1;
+}
+
+.overview-command .college-morph-hero--command-stage .college-morph-hero__mark {
+  position: absolute;
+  z-index: 2;
+  right: clamp(28px, 5vw, 52px);
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: auto;
+}
+
+.overview-command .college-morph-hero--command-stage .college-morph-hero__mark--out {
+  transform: translateY(-50%) scale(0.88);
+}
+
+.overview-command .college-morph-hero--command-stage .college-morph-hero__icon {
+  filter: drop-shadow(0 0 28px color-mix(in srgb, currentColor 45%, transparent));
+}
+
+.overview-command__colleges {
+  position: relative;
+  z-index: 1;
+  padding: 0 36px 26px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-raised) 35%, transparent), transparent);
+}
+
+.overview-command__colleges-eyebrow {
+  margin: 18px 0 12px;
+  font-family: var(--font-label);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.overview-grid--hero {
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 10px;
+}
+
+.overview-card--hero {
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.overview-card--hero .overview-card__value {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.overview-card--hero .overview-card__tagline {
+  font-size: 11px;
+  margin-bottom: 0;
+}
+
+.overview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.overview-lane {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  align-items: stretch;
+}
+
+.overview-tile {
+  position: relative;
+  min-height: 132px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--surface) 88%, transparent),
+    var(--surface)
+  );
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.overview-tile::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 1;
+  background: var(--accent);
+}
+
+.overview-tile--steam::before { background: var(--sky); }
+.overview-tile--guild::before { background: var(--accent); }
+.overview-tile--friends::before { background: var(--rose); }
+
+.overview-tile--steam {
+  min-height: 420px;
+}
+
+.overview-tile__stack .overview-stock-chart {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.overview-tile__stack {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.overview-tile__stack .sliding-banner {
+  flex-shrink: 0;
+}
+
+.overview-tile__stack .presence-card {
+  min-height: 0;
+}
+
+.overview-tile .presence-card,
+.overview-tile .guild-pulse-slide,
+.overview-tile .panel {
+  margin-bottom: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  min-height: 72px;
+}
+
+.overview-tile .sliding-banner {
+  min-height: 88px;
+  padding: 10px 14px 8px;
+  gap: 6px;
+}
+
+.overview-tile .sliding-banner__viewport {
+  min-height: 48px;
+}
+
+.overview-tile .presence-card {
+  padding: 6px 4px;
+  gap: 8px;
+  align-items: center;
+  min-height: 48px;
+}
+
+.overview-tile .presence-card__body {
+  gap: 1px;
+  min-width: 0;
+}
+
+.overview-tile .presence-card__title {
+  font-size: 13px;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.overview-tile .presence-card__meta {
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.overview-tile .presence-card__steam-avatar {
+  width: 28px;
+  height: 28px;
+}
+
+.overview-tile .presence-card__dot {
+  width: 8px;
+  height: 8px;
+}
+
+.overview-tile--steam .sliding-banner__dot--active {
+  background: var(--sky);
+}
+
+.overview-tile--guild .sliding-banner__dot--active {
+  background: var(--accent);
+}
+
+.presence-card__steam-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+}
+
+.overview-tile .panel {
+  padding: 16px 18px 18px;
+}
+
+.overview-hero--embedded {
+  margin: 10px 0 0;
+}
+
+.overview-hero--embedded .overview-hero__number {
+  font-size: clamp(2.75rem, 6vw, 3.75rem);
+}
+
+.overview-ticker--inset {
+  position: relative;
+  z-index: 1;
+  margin-top: 0;
+  border-top: 1px solid var(--border);
+  border-bottom: none;
+}
+
+.overview-ticker--inset::before {
+  background: linear-gradient(90deg, var(--surface), transparent);
+}
+
+.overview-ticker--inset::after {
+  background: linear-gradient(270deg, var(--surface), transparent);
+}
+
 /* The one big orchestrated moment on the app's front page: an
    animated count-up of everything you've collected, with a single
    gold shimmer sweep across the number on load (light catching a
@@ -6024,12 +6987,12 @@ html[data-mode="light"] .current-rotation {
 }
 
 .overview-hero__eyebrow {
-  font-family: var(--font-mono);
+  font-family: var(--font-label);
   font-size: 11.5px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
 }
 
 .overview-hero__value {
@@ -6105,6 +7068,59 @@ html[data-mode="light"] .current-rotation {
   pointer-events: none;
 }
 
+/* Categorical accents on the rotating stat — gold reserved for vault total */
+.overview-hero[data-accent="gaming"] .overview-hero__aura {
+  background: radial-gradient(circle, color-mix(in srgb, var(--sky) 42%, transparent), transparent 70%);
+}
+.overview-hero[data-accent="tcg"] .overview-hero__aura {
+  background: radial-gradient(circle, color-mix(in srgb, var(--violet) 42%, transparent), transparent 70%);
+}
+.overview-hero[data-accent="entertainment"] .overview-hero__aura {
+  background: radial-gradient(circle, color-mix(in srgb, var(--rose) 42%, transparent), transparent 70%);
+}
+.overview-hero[data-accent="collectibles"] .overview-hero__aura {
+  background: radial-gradient(circle, color-mix(in srgb, var(--amber) 42%, transparent), transparent 70%);
+}
+.overview-hero[data-accent="tabletop"] .overview-hero__aura {
+  background: radial-gradient(circle, color-mix(in srgb, var(--lime) 42%, transparent), transparent 70%);
+}
+
+.overview-hero[data-accent="gaming"] .overview-hero__number {
+  background: linear-gradient(135deg, var(--sky), color-mix(in srgb, var(--sky) 55%, white));
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.overview-hero[data-accent="tcg"] .overview-hero__number {
+  background: linear-gradient(135deg, var(--violet), color-mix(in srgb, var(--violet) 55%, white));
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.overview-hero[data-accent="entertainment"] .overview-hero__number {
+  background: linear-gradient(135deg, var(--rose), color-mix(in srgb, var(--rose) 55%, white));
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.overview-hero[data-accent="collectibles"] .overview-hero__number {
+  background: linear-gradient(135deg, var(--amber), color-mix(in srgb, var(--amber) 55%, white));
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.overview-hero[data-accent="tabletop"] .overview-hero__number {
+  background: linear-gradient(135deg, var(--lime), color-mix(in srgb, var(--lime) 55%, white));
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.overview-hero .hero-card__dot--active[data-accent="vault"],
+.overview-hero .hero-card__dot--active[data-accent="total"] {
+  background: var(--accent);
+}
+.overview-hero .hero-card__dot--active[data-accent="gaming"] { background: var(--sky); }
+.overview-hero .hero-card__dot--active[data-accent="tcg"] { background: var(--violet); }
+.overview-hero .hero-card__dot--active[data-accent="entertainment"] { background: var(--rose); }
+.overview-hero .hero-card__dot--active[data-accent="collectibles"] { background: var(--amber); }
+.overview-hero .hero-card__dot--active[data-accent="tabletop"] { background: var(--lime); }
+
 @keyframes overviewHeroShimmer {
   to { transform: translateX(130%); }
 }
@@ -6179,62 +7195,37 @@ html[data-mode="light"] .current-rotation {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
-/* ---------- Guild Pulse card (Overview) ---------- */
+/* ---------- Guild Pulse card (Overview sliding banner) ---------- */
 
-.guild-pulse__empty {
-  display: flex;
+.guild-pulse-slide {
+  align-items: center;
+}
+
+.guild-pulse-slide--special {
+  background: color-mix(in srgb, var(--amber) 8%, transparent);
+}
+
+.guild-pulse-slide--special .presence-card__title {
+  color: var(--amber);
+}
+
+.guild-pulse-slide--cta {
   flex-direction: column;
   align-items: flex-start;
   gap: 10px;
 }
 
-.guild-pulse__list {
-  list-style: none;
+.guild-pulse-slide.presence-card--empty {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+}
+
+.guild-pulse-slide.presence-card--empty p {
   margin: 0;
-  padding: 10px 0 0;
-  border-top: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.guild-pulse__row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.guild-pulse__row--special {
-  padding: 8px 10px;
-  margin: 0 -10px;
-  background: color-mix(in srgb, var(--amber) 10%, transparent);
-  border-radius: var(--radius-md);
-}
-
-.guild-pulse__row--special .guild-pulse__row-text {
-  color: var(--amber);
-  font-weight: 500;
-}
-
-.guild-pulse__row-body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  flex: 1;
-}
-
-.guild-pulse__row-text {
+  color: var(--text-secondary);
   font-size: 13px;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.guild-pulse__row-meta {
-  font-size: 11.5px;
-  color: var(--text-muted);
 }
 
 .guild-pulse__chip {
@@ -6242,6 +7233,314 @@ html[data-mode="light"] .current-rotation {
   display: grid;
   place-items: center;
   opacity: 0.85;
+}
+
+/* ---------- Stock-style chart (Overview steam tile) ---------- */
+
+.stock-style-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.overview-stock-chart {
+  padding: 0 12px 10px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  margin-top: 2px;
+}
+
+.overview-stock-chart__chrome {
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.overview-stock-chart__chrome--out {
+  opacity: 0;
+}
+
+.stock-style-chart__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.stock-style-chart__titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.stock-style-chart__title {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.stock-style-chart__subtitle {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  line-height: 1.35;
+}
+
+.stock-style-chart__legend {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.stock-style-chart__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.stock-style-chart__legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.stock-style-chart__legend-dot--you {
+  background: var(--accent);
+}
+
+.stock-style-chart__legend-dot--friends {
+  background: var(--lime);
+}
+
+.stock-style-chart__legend-dot--guild {
+  background: var(--rose);
+}
+
+.stock-style-chart__legend-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.overview-stock-chart__status {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
+.overview-stock-chart__plot-stage {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  margin: 2px -4px 0;
+}
+
+.overview-stock-chart__plot-stage--live {
+  min-height: clamp(200px, 32vh, 300px);
+  padding: 8px 4px 4px;
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(
+      ellipse 90% 70% at 50% 100%,
+      color-mix(in srgb, var(--accent) 12%, transparent),
+      transparent 72%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 35%, transparent),
+      transparent 55%
+    );
+  border: 1px solid color-mix(in srgb, var(--accent) 14%, var(--border));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--accent) 8%, transparent),
+    0 12px 32px color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.overview-stock-chart__plot-stage--idle {
+  min-height: 0;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+}
+
+.stock-style-chart__plot {
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: clamp(200px, 32vh, 300px);
+}
+
+.overview-stock-chart__plot--hidden {
+  display: none;
+}
+
+.overview-stock-chart__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.overview-stock-chart__ranges {
+  display: inline-flex;
+  gap: 4px;
+  padding: 2px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  border: 1px solid var(--border);
+}
+
+.overview-stock-chart__range {
+  min-width: 28px;
+  padding: 4px 7px;
+  border: none;
+  border-radius: calc(var(--radius-md) - 2px);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.overview-stock-chart__range--active {
+  background: color-mix(in srgb, var(--sky) 18%, transparent);
+  color: var(--sky);
+}
+
+/* ---------- Overview platform links (chart toolbar) ---------- */
+
+.overview-platform-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 0 2px 4px;
+}
+
+.overview-platform-bar__links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.overview-platform-bar__link {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    background var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard),
+    opacity var(--duration-fast) var(--ease-standard),
+    filter var(--duration-fast) var(--ease-standard);
+  text-decoration: none;
+  padding: 0;
+  overflow: hidden;
+}
+
+.overview-platform-bar__link--brand,
+.overview-platform-bar__link--stream {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+.overview-platform-bar__link--brand img,
+.overview-platform-bar__link--stream img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 999px;
+}
+
+.overview-platform-bar__link--brand:not(.overview-platform-bar__link--active),
+.overview-platform-bar__link--stream:not(.overview-platform-bar__link--active) {
+  opacity: 0.55;
+  filter: grayscale(0.2);
+}
+
+.overview-platform-bar__link:hover {
+  background: var(--surface-raised);
+  transform: translateY(-1px);
+}
+
+.overview-platform-bar__link--active {
+  border-color: color-mix(in srgb, currentColor 45%, var(--border));
+}
+
+.overview-platform-bar__link--steam.overview-platform-bar__link--active {
+  color: #66c0f4;
+}
+
+.overview-platform-bar__link--xbox.overview-platform-bar__link--active {
+  color: #4fce4f;
+}
+
+.overview-platform-bar__link--playstation.overview-platform-bar__link--active {
+  color: #4da3ec;
+}
+
+.overview-platform-bar__refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+.overview-platform-bar__refresh:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sky) 12%, transparent);
+  border-color: color-mix(in srgb, var(--sky) 35%, var(--border));
+  color: var(--sky);
+}
+
+.overview-platform-bar__refresh:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.overview-platform-bar__refresh-label {
+  line-height: 1;
+}
+
+.overview-platform-bar__note {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  line-height: 1.35;
+}
+
+@media (max-width: 480px) {
+  .overview-platform-bar__refresh-label {
+    display: none;
+  }
 }
 
 @media (max-width: 640px) {
@@ -6329,10 +7628,32 @@ html[data-mode="light"] .current-rotation {
     opacity var(--duration-base) var(--ease-standard);
 }
 
+.overview-card[data-college="gaming"]::before { background: var(--sky); }
+.overview-card[data-college="tcg"]::before { background: var(--violet); }
+.overview-card[data-college="entertainment"]::before { background: var(--rose); }
+.overview-card[data-college="collectibles"]::before { background: var(--amber); }
+.overview-card[data-college="tabletop"]::before { background: var(--lime); }
+
 .overview-card:hover {
   border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
+}
+
+.overview-card[data-college="gaming"]:hover {
+  border-color: color-mix(in srgb, var(--sky) 45%, var(--border));
+}
+.overview-card[data-college="tcg"]:hover {
+  border-color: color-mix(in srgb, var(--violet) 45%, var(--border));
+}
+.overview-card[data-college="entertainment"]:hover {
+  border-color: color-mix(in srgb, var(--rose) 45%, var(--border));
+}
+.overview-card[data-college="collectibles"]:hover {
+  border-color: color-mix(in srgb, var(--amber) 45%, var(--border));
+}
+.overview-card[data-college="tabletop"]:hover {
+  border-color: color-mix(in srgb, var(--lime) 45%, var(--border));
 }
 
 .overview-card:hover::before {
@@ -6370,12 +7691,19 @@ html[data-mode="light"] .current-rotation {
 }
 
 .overview-card__label {
-  font-family: var(--font-mono);
-  font-size: 12px;
+  font-family: var(--font-label);
+  font-size: 11.5px;
+  font-weight: 600;
   color: var(--text-muted);
-  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
+}
+
+.overview-card__tagline {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
 }
 
 .overview-card__value {
@@ -6383,6 +7711,16 @@ html[data-mode="light"] .current-rotation {
   font-size: 36px;
   font-weight: 700;
   letter-spacing: -0.01em;
+}
+
+.overview-card[data-college="gaming"] .overview-card__value { color: var(--sky); }
+.overview-card[data-college="tcg"] .overview-card__value { color: var(--violet); }
+.overview-card[data-college="entertainment"] .overview-card__value { color: var(--rose); }
+.overview-card[data-college="collectibles"] .overview-card__value { color: var(--amber); }
+.overview-card[data-college="tabletop"] .overview-card__value { color: var(--lime); }
+
+.overview-card__value--loading {
+  color: var(--text-muted);
 }
 
 .overview-card__unit {
@@ -7041,7 +8379,8 @@ html[data-mode="light"] .current-rotation {
 .college-morph-hero__canvas {
   position: absolute;
   inset: 0;
-  margin: auto;
+  width: 100%;
+  height: 100%;
 }
 
 .college-morph-hero__mark {
@@ -7062,13 +8401,14 @@ html[data-mode="light"] .current-rotation {
 }
 
 .college-morph-hero__icon {
-  filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.1));
+  filter: drop-shadow(0 0 24px rgba(255, 255, 255, 0.14));
 }
 
 .college-morph-hero__label {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.14em;
+  font-family: var(--font-label);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-secondary);
 }
@@ -7355,33 +8695,154 @@ html[data-mode="light"] .current-rotation {
 .friends-activity-card {
   flex-direction: column;
   align-items: stretch;
-  gap: 10px;
+  gap: 12px;
 }
 
-/* ---------- Sliding banner (auto-rotating single-item display —
-   friends' live status, Guild Pulse) ---------- */
+.friends-activity-card__tabs-wrap {
+  margin-top: 2px;
+}
+
+.friends-activity-card__tabs {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 12px;
+}
+
+.friends-activity-card__tab-indicator {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--rose);
+  transition: transform 380ms var(--ease-standard), width 380ms var(--ease-standard);
+  pointer-events: none;
+}
+
+.friends-activity-card__tab {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: var(--surface-raised);
+  overflow: hidden;
+  cursor: pointer;
+  opacity: 0.55;
+  transition:
+    opacity var(--duration-base) var(--ease-standard),
+    transform var(--duration-base) var(--ease-standard),
+    border-color var(--duration-base) var(--ease-standard);
+}
+
+.friends-activity-card__tab img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.friends-activity-card__tab span {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.friends-activity-card__tab--active {
+  opacity: 1;
+  transform: scale(1.06);
+  border-color: color-mix(in srgb, var(--rose) 55%, transparent);
+}
+
+.friends-activity-card__status-pane {
+  min-height: 52px;
+  overflow: hidden;
+}
+
+.friends-activity-card__status-slide {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 380ms var(--ease-standard), transform 380ms var(--ease-standard);
+}
+
+.friends-activity-card__status-slide--out {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.friends-activity-card__status {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.friends-activity-card__status-line,
+.friends-activity-card__status-name {
+  font-size: 13.5px;
+  line-height: 1.35;
+  color: var(--text-primary);
+}
+
+.friends-activity-card__status-meta {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .friends-activity-card__tab-indicator,
+  .friends-activity-card__status-slide {
+    transition: none;
+  }
+
+  .friends-activity-card__status-slide--out {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- Sliding banner (auto-rotating horizontal slides —
+   friends' live Steam status, Guild Pulse) ---------- */
 
 .sliding-banner {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-height: 0;
+  flex: 1;
 }
 
-.sliding-banner__item {
-  opacity: 1;
-  transform: translateY(0);
-  transition: opacity 380ms ease, transform 380ms ease;
+.sliding-banner__viewport {
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
 }
 
-.sliding-banner__item--out {
-  opacity: 0;
-  transform: translateY(-6px);
+.sliding-banner__track {
+  display: flex;
+  width: 100%;
+  will-change: transform;
+}
+
+.sliding-banner__slide {
+  flex: 0 0 100%;
+  min-width: 0;
 }
 
 .sliding-banner__dots {
   display: flex;
   gap: 6px;
   align-self: center;
+  flex-shrink: 0;
 }
 
 .sliding-banner__dot {
@@ -7392,10 +8853,13 @@ html[data-mode="light"] .current-rotation {
   border: none;
   background: var(--border);
   cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
 }
 
 .sliding-banner__dot--active {
   background: var(--accent);
+  transform: scale(1.15);
 }
 
 /* ---------- Friend Mastery Score chart (Friends tab) ---------- */
@@ -7780,15 +9244,14 @@ html[data-mode="light"] .current-rotation {
   object-fit: cover;
 }
 
-/* ---------- Mobile shell: bottom tab bar replaces the header icon
-   cluster + top College tabs row below this breakpoint. One
-   navigation surface on mobile, not two competing ones — see the
-   comment above <nav className="mobile-tab-bar"> in Header.jsx.
-   Deliberately placed at the end of the file — it overrides base
-   rules (.college-tabs, .dash-header__right, etc.) declared much
-   earlier, and CSS cascade order among equal-specificity selectors
-   is source order, matched-media-query or not, so this has to come
-   after everything it needs to beat. ---------- */
+/* ---------- Mobile shell: bottom tab bar replaces the top College tabs
+   row below this breakpoint; header keeps search/inbox/notifications/
+   avatar so every page shares the same top bar. Deliberately placed at
+   the end of the file — it overrides base rules (.college-tabs,
+   .dash-header__right, etc.) declared much earlier, and CSS cascade
+   order among equal-specificity selectors is source order, matched-
+   media-query or not, so this has to come after everything it needs
+   to beat. ---------- */
 
 .mobile-tab-bar {
   display: none;
@@ -7799,21 +9262,67 @@ html[data-mode="light"] .current-rotation {
 }
 
 @media (max-width: 720px) {
-  .dash-header__right > .dash-header__icon-btn,
-  .dash-header__right > .dash-header__menu-wrap,
   .dash-header__right > .dash-header__score,
-  .dash-header__right > .dash-header__avatar-btn,
-  .dash-header__left-group .theme-toggle,
-  .alpha-badge,
   .college-tabs {
     display: none;
   }
 
-  .dash-header__right {
+  .alpha-badge {
+    display: flex;
+    flex-shrink: 0;
+    padding: 2px 7px;
+    gap: 0;
+    transform: rotate(-2deg);
+  }
+
+  .alpha-badge__title {
+    font-size: 9px;
+    letter-spacing: 0.08em;
+  }
+
+  .alpha-badge__subtitle {
+    display: none;
+  }
+
+  .dash-header__center {
+    gap: 8px;
     min-width: 0;
   }
 
-  body {
+  .dash-header__inner {
+    padding: 14px 10px;
+    gap: 8px;
+  }
+
+  .dash-header__right {
+    min-width: 0;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .dash-header__icon-btn,
+  .dash-header__avatar-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+  }
+
+  .dash-header__avatar-btn {
+    border-radius: 50%;
+  }
+
+  .dash-header__icon-dot {
+    top: 4px;
+    right: 4px;
+    width: 7px;
+    height: 7px;
+  }
+
+  .dash-header__menu-wrap .dash-header__popover {
+    right: 0;
+  }
+
+  body:has(.mobile-tab-bar) {
     padding-bottom: calc(66px + env(safe-area-inset-bottom, 0px));
   }
 
@@ -7922,6 +9431,36 @@ html[data-mode="light"] .current-rotation {
     gap: 2px;
     padding: 0 4px 8px;
   }
+
+  .dash-drawer__friend-avatars {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 0 4px 12px;
+  }
+
+  .dash-drawer__friend-avatar {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 2px solid var(--border);
+    border-radius: 50%;
+    background: var(--surface-raised);
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+  }
+
+  .dash-drawer__friend-avatar:hover {
+    border-color: var(--accent);
+  }
+
+  .dash-drawer__friend-avatar .mini-avatar {
+    width: 100%;
+    height: 100%;
+    border: none;
+    font-size: 14px;
+  }
 }
 
 /* ---------- Lane primitive for mobile hub pages ----------
@@ -7946,9 +9485,10 @@ html[data-mode="light"] .current-rotation {
 
   .h-lane-title {
     display: block;
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    letter-spacing: 0.09em;
+    font-family: var(--font-label);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--text-muted);
     margin: 18px 4px 8px;
@@ -8032,5 +9572,65 @@ html[data-mode="light"] .current-rotation {
   .account-gate-page__actions .auth-form__submit,
   .account-gate-page__actions .auth-form__secondary {
     width: 100%;
+  }
+}
+
+@media (max-width: 860px) {
+  .overview-command__grid {
+    grid-template-columns: 1fr;
+    padding: 24px 20px 20px;
+    gap: 16px;
+  }
+
+  .overview-command__colleges {
+    padding: 0 20px 20px;
+  }
+
+  .overview-grid--hero {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .overview-command__visual {
+    order: -1;
+    min-height: 220px;
+  }
+
+  .overview-command .college-morph-hero--command-stage .college-morph-hero__mark {
+    right: auto;
+    left: 50%;
+    top: 34%;
+    transform: translate(-50%, -50%);
+  }
+
+  .overview-command .college-morph-hero--command-stage .college-morph-hero__mark--out {
+    transform: translate(-50%, -50%) scale(0.88);
+  }
+
+  .overview-command .college-morph-hero--command-stage::after {
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--surface) 88%, transparent) 0%,
+        color-mix(in srgb, var(--surface) 45%, transparent) 42%,
+        transparent 70%
+      ),
+      radial-gradient(
+        ellipse 90% 60% at 50% 34%,
+        color-mix(in srgb, var(--sky) 12%, transparent),
+        transparent 70%
+      );
+  }
+
+  .overview-command__cta .auth-form__submit,
+  .overview-command__cta .auth-form__secondary {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .overview-lane.h-lane {
+    display: flex;
+    flex-direction: column;
   }
 }

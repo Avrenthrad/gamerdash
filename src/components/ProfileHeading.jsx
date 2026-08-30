@@ -1,9 +1,12 @@
 /**
  * Profile heading — dashboard identity strip.
- * Real GD Score + wishlist count when available; layout controls sit on the right.
+ * Real Mastery Score when available; platform + stream links and tools on the right.
  */
 
 import { useEffect, useState } from "react";
+import { getProfileStreamQuickLinks } from "../lib/streamingProfiles";
+import { QuickLinkRow } from "./CommunityQuickLinks";
+import { MasteryRefreshButton, PlatformQuickLinks } from "./PlatformQuickLinks";
 
 function DefaultAvatarIcon() {
   return (
@@ -23,12 +26,12 @@ export default function ProfileHeading({
   masteryScore = 0,
   masteryLevel = 0,
   isLoggedIn,
-  wishlistCount,
+  userId,
+  linkedSteamId,
   onGoToSettings,
   onGoToLinking,
-  customizingLayout,
-  onToggleCustomize,
-  onResetLayout,
+  onRecomputeMastery,
+  profileDetails,
 }) {
   const fullName = [firstName, lastName].filter(Boolean).join(" ");
   const displayName = fullName || username || (isLoggedIn ? "Player" : "Guest");
@@ -38,6 +41,8 @@ export default function ProfileHeading({
   useEffect(() => {
     setAvatarBroken(false);
   }, [avatarUrl]);
+
+  const profileStreamLinks = getProfileStreamQuickLinks(profileDetails);
 
   return (
     <section className="profile-heading">
@@ -66,7 +71,7 @@ export default function ProfileHeading({
           <span className="profile-heading__stat-value">
             {Number(gdScore || 0).toLocaleString()}
           </span>
-          <span className="profile-heading__stat-label">GD Score</span>
+          <span className="profile-heading__stat-label">Mastery Score</span>
         </div>
         {isLoggedIn && masteryScore > 0 && (
           <div className="profile-heading__stat" title="Cross-platform Gaming Mastery Score — see Account Linking for the breakdown">
@@ -74,37 +79,36 @@ export default function ProfileHeading({
             <span className="profile-heading__stat-label">Gaming Mastery · Lvl {masteryLevel}</span>
           </div>
         )}
-        {typeof wishlistCount === "number" && (
-          <div className="profile-heading__stat">
-            <span className="profile-heading__stat-value">{wishlistCount}</span>
-            <span className="profile-heading__stat-label">Wishlist</span>
-          </div>
-        )}
       </div>
 
       <div className="profile-heading__tools">
-        {onToggleCustomize && (
-          <button
-            type="button"
-            className={`profile-heading__tool ${customizingLayout ? "is-active" : ""}`}
-            onClick={onToggleCustomize}
-          >
-            {customizingLayout ? "Done" : "Customize layout"}
-          </button>
-        )}
-        {customizingLayout && onResetLayout && (
-          <button type="button" className="profile-heading__tool" onClick={onResetLayout}>
-            Reset
-          </button>
+        {isLoggedIn && (
+          <>
+            <PlatformQuickLinks
+              userId={userId}
+              linkedSteamId={linkedSteamId}
+              onGoToLinking={onGoToLinking}
+              className="profile-heading__platform-links"
+            />
+            {profileStreamLinks.length > 0 && (
+              <QuickLinkRow
+                links={profileStreamLinks}
+                className="profile-heading__stream-links"
+                linkClassName="overview-platform-bar__link overview-platform-bar__link--stream overview-platform-bar__link--active"
+                ariaLabel="Your streaming channels"
+              />
+            )}
+            <MasteryRefreshButton
+              linkedSteamId={linkedSteamId}
+              onRecomputeMastery={onRecomputeMastery}
+              className="overview-platform-bar__refresh profile-heading__refresh"
+              showLabel={false}
+            />
+          </>
         )}
         {isLoggedIn && onGoToSettings && (
           <button type="button" className="profile-heading__tool" onClick={onGoToSettings}>
             Settings
-          </button>
-        )}
-        {isLoggedIn && onGoToLinking && (
-          <button type="button" className="profile-heading__tool" onClick={onGoToLinking}>
-            Link accounts
           </button>
         )}
       </div>

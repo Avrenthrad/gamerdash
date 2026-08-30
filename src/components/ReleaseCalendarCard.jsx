@@ -8,12 +8,12 @@
 // wishlist get flagged, so it's part personal (your stuff), part
 // general "what's coming" — same honest data either way.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { fetchUpcomingReleases } from "../lib/rawg";
 import { fetchWishlistUpcoming, fetchOwnedGames } from "../lib/steam";
 
-const PREVIEW_COUNT = 6;
-const WINDOW_DAYS = 60;
+const PREVIEW_COUNT = 10;
+const WINDOW_DAYS = 120;
 
 function daysUntil(dateStr) {
   const today = new Date();
@@ -29,12 +29,89 @@ function countdownLabel(days) {
   return `In ${days} days`;
 }
 
+function formatReleaseDate(dateStr) {
+  const target = new Date(dateStr);
+  if (Number.isNaN(target.getTime())) return "";
+  return target.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function urgencyClass(days) {
+  if (days <= 0) return "release-calendar-row--today";
+  if (days <= 7) return "release-calendar-row--soon";
+  if (days <= 30) return "release-calendar-row--near";
+  return "";
+}
+
+function buildStatusTags(entry, { ownedAppids, ownedNames }) {
+  const owned = entry.appid
+    ? ownedAppids.has(entry.appid)
+    : ownedNames.has(entry.name.toLowerCase());
+
+  if (owned) {
+    return [{ key: "purchased", label: "Steam Purchased", className: "tag tag--steam-purchased" }];
+  }
+
+  const tags = [];
+  if (entry.isSteamWishlist) {
+    tags.push({ key: "steam-wishlist", label: "Steam Wishlist", className: "tag tag--amber-outline" });
+  } else if (entry.isLykodexWishlist) {
+    tags.push({ key: "wishlisted", label: "Wishlisted", className: "tag tag--rose-outline" });
+  }
+
+  const platform = entry.platforms?.[0];
+  if (platform && !entry.isSteamWishlist) {
+    tags.push({ key: `platform-${platform}`, label: platform, className: "tag tag--platform" });
+  }
+
+  return tags;
+}
+
+function mergeReleases(steamUpcoming, rawgReleases, wishlistTitles) {
+  const byName = new Map();
+
+  for (const game of steamUpcoming) {
+    const key = game.name.toLowerCase();
+    byName.set(key, {
+      id: `steam-${game.appid}`,
+      appid: game.appid,
+      name: game.name,
+      releaseDate: game.releaseDate,
+      isSteamWishlist: true,
+      isLykodexWishlist: wishlistTitles.has(key),
+      platforms: ["Steam"],
+    });
+  }
+
+  for (const game of rawgReleases) {
+    const key = game.name.toLowerCase();
+    if (byName.has(key)) continue;
+    byName.set(key, {
+      id: `rawg-${game.id}`,
+      name: game.name,
+      releaseDate: game.released,
+      isSteamWishlist: false,
+      isLykodexWishlist: wishlistTitles.has(key),
+      platforms: game.platforms || [],
+    });
+  }
+
+  return [...byName.values()]
+    .filter((entry) => entry.releaseDate && daysUntil(entry.releaseDate) >= 0)
+    .sort((a, b) => new Date(a.releaseDate) - new Date(b.releaseDate))
+    .slice(0, PREVIEW_COUNT);
+}
+
 export default function ReleaseCalendarCard({ wishlist, linkedSteamId, onOpenUpcomingReleases }) {
-  const [releases, setReleases] = useState([]);
+  const [rawgReleases, setRawgReleases] = useState([]);
   const [status, setStatus] = useState("loading"); // loading | ready | no_key | error
-  const [steamUpcoming, setSteamUpcoming] = useState([]); // real releases from the linked Steam wishlist
+  const [steamUpcoming, setSteamUpcoming] = useState([]);
   const [ownedAppids, setOwnedAppids] = useState(new Set());
   const [ownedNames, setOwnedNames] = useState(new Set());
+
+  const wishlistTitles = useMemo(
+    () => new Set((wishlist || []).map((w) => w.title.toLowerCase())),
+    [wishlist]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -50,11 +127,11 @@ export default function ReleaseCalendarCard({ wishlist, linkedSteamId, onOpenUpc
           setStatus("no_key");
           return;
         }
-        const sorted = [...result]
-          .filter((g) => g.released)
-          .sort((a, b) => new Date(a.released) - new Date(b.released))
-          .slice(0, PREVIEW_COUNT);
-        setReleases(sorted);
+        setRawgReleases(
+          [...result]
+            .filter((g) => g.released)
+            .sort((a, b) => new Date(a.released) - new Date(b.released))
+        );
         setStatus("ready");
       })
       .catch((err) => {
@@ -65,19 +142,15 @@ export default function ReleaseCalendarCard({ wishlist, linkedSteamId, onOpenUpc
     return () => { cancelled = true; };
   }, []);
 
-  // Steam's own logged-in-only Personal Calendar can't be reached from
-  // here (see lib/steam.js's fetchWishlistUpcoming comment) — this is
-  // the real, legitimately-reachable stand-in: your actual Steam
-  // wishlist crossed with each game's actual Steam release date.
   useEffect(() => {
     if (!linkedSteamId) {
       setSteamUpcoming([]);
       return;
     }
     let cancelled = false;
-    fetchWishlistUpcoming(linkedSteamId)
+    fetchWishlistUpcoming(linkedSteamId, 80)
       .then((result) => {
-        if (!cancelled) setSteamUpcoming(result.slice(0, PREVIEW_COUNT));
+        if (!cancelled) setSteamUpcoming(result);
       })
       .catch((err) => {
         console.error("Steam wishlist release lookup failed:", err);
@@ -86,9 +159,6 @@ export default function ReleaseCalendarCard({ wishlist, linkedSteamId, onOpenUpc
     return () => { cancelled = true; };
   }, [linkedSteamId]);
 
-  // Real owned-library check — so an upcoming DLC/expansion for a game
-  // you already own (or, rarer, a re-release you already have) gets
-  // flagged the same honest way "Wishlisted" already is.
   useEffect(() => {
     if (!linkedSteamId) {
       setOwnedAppids(new Set());
@@ -112,55 +182,54 @@ export default function ReleaseCalendarCard({ wishlist, linkedSteamId, onOpenUpc
     return () => { cancelled = true; };
   }, [linkedSteamId]);
 
-  const wishlistTitles = new Set((wishlist || []).map((w) => w.title.toLowerCase()));
+  const preview = useMemo(
+    () => mergeReleases(steamUpcoming, status === "ready" ? rawgReleases : [], wishlistTitles),
+    [steamUpcoming, rawgReleases, status, wishlistTitles]
+  );
 
-  // Steam-sourced entries are more accurate (real per-title release
-  // dates, not RAWG's broader guess) and already known-wishlisted, so
-  // they take priority — the general list only fills in titles Steam
-  // didn't already cover.
-  const steamNames = new Set(steamUpcoming.map((g) => g.name.toLowerCase()));
-  const generalReleases = releases.filter((g) => !steamNames.has(g.name.toLowerCase()));
+  const tagContext = { ownedAppids, ownedNames };
+  const showEmpty = preview.length === 0 && status !== "loading";
 
   return (
-    <div className="panel hero-card">
+    <div className="panel hero-card release-calendar-card">
       <div className="panel__head">
         <span className="panel__eyebrow">Release Calendar</span>
         <button type="button" className="linkish" onClick={onOpenUpcomingReleases}>View all →</button>
       </div>
 
-      {status === "loading" && <p className="panel__status">Loading…</p>}
+      {status === "loading" && <p className="panel__status">Loading upcoming releases…</p>}
       {status === "error" && <p className="panel__status panel__status--error">Couldn't load upcoming releases right now.</p>}
-      {status === "no_key" && steamUpcoming.length === 0 && (
+      {status === "no_key" && showEmpty && (
         <p className="panel__status">Upcoming releases aren't configured yet.</p>
       )}
-      {(status === "ready" || status === "no_key") && generalReleases.length === 0 && steamUpcoming.length === 0 && (
-        <p className="panel__status">Nothing found releasing in the next {WINDOW_DAYS} days.</p>
+      {showEmpty && status !== "error" && status !== "loading" && (
+        <p className="panel__status">Nothing releasing in the next {WINDOW_DAYS} days.</p>
       )}
 
-      {(steamUpcoming.length > 0 || generalReleases.length > 0) && (
+      {preview.length > 0 && (
         <ul className="release-calendar-list">
-          {steamUpcoming.map((game) => (
-            <li key={`steam-${game.appid}`} className="release-calendar-row">
-              <span className="release-calendar-row__countdown">{countdownLabel(daysUntil(game.releaseDate))}</span>
-              <span className="release-calendar-row__name">{game.name}</span>
-              <span className="tag tag--amber-outline">Steam Wishlist</span>
-              {ownedAppids.has(game.appid) && (
-                <span className="tag tag--lime-outline">In Library</span>
-              )}
-            </li>
-          ))}
-          {status === "ready" && generalReleases.map((game) => (
-            <li key={game.id} className="release-calendar-row">
-              <span className="release-calendar-row__countdown">{countdownLabel(daysUntil(game.released))}</span>
-              <span className="release-calendar-row__name">{game.name}</span>
-              {wishlistTitles.has(game.name.toLowerCase()) && (
-                <span className="tag tag--rose-outline">Wishlisted</span>
-              )}
-              {ownedNames.has(game.name.toLowerCase()) && (
-                <span className="tag tag--lime-outline">In Library</span>
-              )}
-            </li>
-          ))}
+          {preview.map((entry) => {
+            const days = daysUntil(entry.releaseDate);
+            const tags = buildStatusTags(entry, tagContext);
+
+            return (
+              <li
+                key={entry.id}
+                className={`release-calendar-row ${urgencyClass(days)}`}
+              >
+                <div className="release-calendar-row__when">
+                  <span className="release-calendar-row__countdown">{countdownLabel(days)}</span>
+                  <span className="release-calendar-row__date">{formatReleaseDate(entry.releaseDate)}</span>
+                </div>
+                <span className="release-calendar-row__name" title={entry.name}>{entry.name}</span>
+                <div className="release-calendar-row__tags">
+                  {tags.map((tag) => (
+                    <span key={tag.key} className={tag.className}>{tag.label}</span>
+                  ))}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

@@ -1,11 +1,7 @@
 // Overview's "Guild Pulse" — the last 14 days of real Guild-mate
 // activity (card adds, backlog changes, achievements unlocked,
-// wishlist adds), all already flowing through lib/guilds.js's existing
-// activity system (see fetchGuildPulse). Privacy is enforced server-side
-// by guild_activity's own RLS policy, not here — whatever this
-// component receives has already had opted-out members' rows removed
-// before it ever left the database, so there's no filtering to do on
-// this end.
+// wishlist adds), one event per horizontal slide in SlidingBanner
+// (same pattern as SteamPresenceCard on the Overview lane).
 
 import { useEffect, useState } from "react";
 import { fetchGuildPulse, describeActivity, collegeForPulseEvent, displayName } from "../lib/guilds";
@@ -13,6 +9,32 @@ import { relativeTime } from "./price/priceUtils";
 import MiniAvatar from "./MiniAvatar";
 import CollegeIcon from "./CollegeIcon";
 import SlidingBanner from "./SlidingBanner";
+
+function GuildPulseSlide({ entry }) {
+  const college = collegeForPulseEvent(entry.event_type);
+  const isCompletion = entry.event_type === "game_completed" || entry.event_type === "backlog_completed";
+
+  return (
+    <div className={`presence-card guild-pulse-slide ${isCompletion ? "guild-pulse-slide--special" : ""}`}>
+      <MiniAvatar profile={entry.profile} />
+      <div className="presence-card__body">
+        <span className="presence-card__title">
+          {isCompletion && <span aria-hidden="true">🏆 </span>}
+          <strong>{displayName(entry.profile)}</strong> {describeActivity(entry)}
+        </span>
+        <span className="presence-card__meta">
+          {entry.guilds?.name ? `${entry.guilds.name} · ` : ""}
+          {relativeTime(entry.created_at)}
+        </span>
+      </div>
+      {college && (
+        <span className={`guild-pulse__chip guild-pulse__chip--${college}`}>
+          <CollegeIcon collegeId={college} size={14} />
+        </span>
+      )}
+    </div>
+  );
+}
 
 export default function GuildPulseCard({ userId, onGoToGuilds }) {
   const [status, setStatus] = useState("loading");
@@ -34,54 +56,39 @@ export default function GuildPulseCard({ userId, onGoToGuilds }) {
       });
   }, [userId]);
 
-  if (status === "loading" || status === "error") return null;
+  if (status === "loading") {
+    return (
+      <div className="presence-card presence-card--empty guild-pulse-slide">
+        <p className="panel__status">Loading guild activity…</p>
+      </div>
+    );
+  }
+
+  if (status === "error") return null;
+
+  if (!inGuild) {
+    return (
+      <div className="presence-card presence-card--empty guild-pulse-slide guild-pulse-slide--cta">
+        <p className="panel__status">Join a Guild to see what your crew&apos;s been up to.</p>
+        <button type="button" className="quickdash-reset-btn" onClick={onGoToGuilds}>
+          Browse Guilds
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="panel guild-pulse">
-      <div className="panel__head">
-        <span className="panel__eyebrow">Guild Pulse · 14 days</span>
-      </div>
-
-      {!inGuild && (
-        <div className="guild-pulse__empty">
-          <p className="panel__status">Join a Guild to see what your crew's been up to.</p>
-          <button type="button" className="quickdash-reset-btn" onClick={onGoToGuilds}>
-            Browse Guilds
-          </button>
+    <SlidingBanner
+      items={events}
+      dotsLabel="Guild activity"
+      getItemKey={(entry) => entry.id}
+      emptyState={
+        <div className="presence-card presence-card--empty guild-pulse-slide">
+          <span className="presence-card__meta">Guild Pulse · 14 days</span>
+          <p>Quiet the last two weeks — nothing new from your Guilds yet.</p>
         </div>
-      )}
-
-      {inGuild && (
-        <SlidingBanner
-          items={events}
-          className="guild-pulse__list"
-          emptyState={<p className="panel__status">Quiet the last two weeks — nothing new from your Guilds yet.</p>}
-          renderItem={(entry) => {
-            const college = collegeForPulseEvent(entry.event_type);
-            const isCompletion = entry.event_type === "game_completed" || entry.event_type === "backlog_completed";
-            return (
-              <div className={`guild-pulse__row ${isCompletion ? "guild-pulse__row--special" : ""}`}>
-                <MiniAvatar profile={entry.profile} />
-                <div className="guild-pulse__row-body">
-                  <span className="guild-pulse__row-text">
-                    {isCompletion && <span aria-hidden="true">🏆 </span>}
-                    <strong>{displayName(entry.profile)}</strong> {describeActivity(entry)}
-                  </span>
-                  <span className="guild-pulse__row-meta">
-                    {entry.guilds?.name ? `${entry.guilds.name} · ` : ""}
-                    {relativeTime(entry.created_at)}
-                  </span>
-                </div>
-                {college && (
-                  <span className={`guild-pulse__chip guild-pulse__chip--${college}`}>
-                    <CollegeIcon collegeId={college} size={14} />
-                  </span>
-                )}
-              </div>
-            );
-          }}
-        />
-      )}
-    </div>
+      }
+      renderItem={(entry) => <GuildPulseSlide entry={entry} />}
+    />
   );
 }

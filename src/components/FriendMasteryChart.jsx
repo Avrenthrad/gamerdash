@@ -93,7 +93,7 @@ export default function FriendMasteryChart({ userId }) {
     const chart = createChart(containerRef.current, {
       width: containerRef.current.clientWidth,
       height: 160,
-      layout: { background: { color: "transparent" }, textColor: "#8C8B90" },
+      layout: { background: { color: "transparent" }, textColor: "#8C8B90", attributionLogo: false },
       grid: { vertLines: { color: "rgba(255,255,255,0.06)" }, horzLines: { color: "rgba(255,255,255,0.06)" } },
       timeScale: { borderColor: "rgba(255,255,255,0.12)" },
       rightPriceScale: { borderColor: "rgba(255,255,255,0.12)" },

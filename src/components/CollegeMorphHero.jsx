@@ -19,9 +19,7 @@ import { BADGE_COLOR } from "../lib/collegeColors";
 
 const HOLD_MS = 2400;
 const FADE_MS = 420;
-const CANVAS_SIZE = 220;
-const PARTICLE_COUNT = 26;
-const LINK_DISTANCE = 70;
+const ICON_SIZE = 112;
 
 const COLLEGE_ORDER = ["gaming", "tcg", "entertainment", "collectibles", "tabletop"];
 const LABELS = {
@@ -32,7 +30,7 @@ const LABELS = {
   tabletop: "Wartable",
 };
 
-export default function CollegeMorphHero() {
+export default function CollegeMorphHero({ focusCollegeId = null, className = "" }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [index, setIndex] = useState(0);
@@ -59,10 +57,24 @@ export default function CollegeMorphHero() {
 
   const currentCollege = COLLEGE_ORDER[index];
 
+  // External driver (e.g. Overview stat carousel) — crossfade to the
+  // requested College and pause the autonomous loop until released.
+  useEffect(() => {
+    if (!focusCollegeId) return;
+    const targetIndex = COLLEGE_ORDER.indexOf(focusCollegeId);
+    if (targetIndex < 0 || targetIndex === index) return;
+    setFadeOut(true);
+    const t = setTimeout(() => {
+      setIndex(targetIndex);
+      setFadeOut(false);
+    }, FADE_MS);
+    return () => clearTimeout(t);
+  }, [focusCollegeId, index]);
+
   // Hold -> fade out -> advance to next College -> fade in, looping.
   // Skipped entirely under reduced motion or while off-screen.
   useEffect(() => {
-    if (reducedMotion || !visible) return;
+    if (focusCollegeId || reducedMotion || !visible) return;
     if (!fadeOut) {
       const t = setTimeout(() => setFadeOut(true), HOLD_MS);
       return () => clearTimeout(t);
@@ -72,7 +84,7 @@ export default function CollegeMorphHero() {
       setFadeOut(false);
     }, FADE_MS);
     return () => clearTimeout(t);
-  }, [fadeOut, reducedMotion, visible]);
+  }, [fadeOut, reducedMotion, visible, focusCollegeId]);
 
   // Keeps the ambient particle color following whichever College is
   // current, read from the same CSS custom properties CollegeIcon uses.
@@ -83,41 +95,61 @@ export default function CollegeMorphHero() {
     if (rgb) colorRef.current = `${rgb[0]}, ${rgb[1]}, ${rgb[2]}`;
   }, [currentCollege]);
 
-  // Ambient particle field — free-drifting dots with faint links, the
-  // exact technique from CollectionConstellationBackground.jsx, just
-  // scoped to this canvas and with no shape it's trying to trace.
+  // Ambient particle field — fills the hero container edge-to-edge.
   useEffect(() => {
+    const container = containerRef.current;
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = CANVAS_SIZE * dpr;
-    canvas.height = CANVAS_SIZE * dpr;
+    if (!container || !canvas) return;
+
     const ctx = canvas.getContext("2d");
-    ctx.scale(dpr, dpr);
-
-    const particles = Array.from({ length: PARTICLE_COUNT }, () => ({
-      x: Math.random() * CANVAS_SIZE,
-      y: Math.random() * CANVAS_SIZE,
-      vx: (Math.random() - 0.5) * 0.16,
-      vy: (Math.random() - 0.5) * 0.16,
-    }));
-
+    let width = 0;
+    let height = 0;
+    let linkDistance = 90;
+    let particles = [];
     let rafId = null;
     let running = true;
+
+    function seedParticles(w, h) {
+      const count = Math.max(36, Math.min(110, Math.round((w * h) / 3800)));
+      linkDistance = Math.max(80, Math.min(168, Math.min(w, h) * 0.3));
+      particles = Array.from({ length: count }, () => ({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        vx: (Math.random() - 0.5) * 0.24,
+        vy: (Math.random() - 0.5) * 0.24,
+      }));
+    }
+
+    function resize() {
+      const rect = container.getBoundingClientRect();
+      width = Math.max(1, Math.floor(rect.width));
+      height = Math.max(1, Math.floor(rect.height));
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      seedParticles(width, height);
+    }
+
+    const resizeObserver = new ResizeObserver(() => resize());
+    resizeObserver.observe(container);
+    resize();
 
     function step() {
       if (!running) return;
       const rgb = colorRef.current;
-      ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+      ctx.clearRect(0, 0, width, height);
 
       if (!reducedMotion) {
         for (const p of particles) {
           p.x += p.vx;
           p.y += p.vy;
-          if (p.x < 0 || p.x > CANVAS_SIZE) p.vx *= -1;
-          if (p.y < 0 || p.y > CANVAS_SIZE) p.vy *= -1;
-          p.x = Math.max(0, Math.min(CANVAS_SIZE, p.x));
-          p.y = Math.max(0, Math.min(CANVAS_SIZE, p.y));
+          if (p.x < 0 || p.x > width) p.vx *= -1;
+          if (p.y < 0 || p.y > height) p.vy *= -1;
+          p.x = Math.max(0, Math.min(width, p.x));
+          p.y = Math.max(0, Math.min(height, p.y));
         }
       }
 
@@ -126,9 +158,9 @@ export default function CollegeMorphHero() {
           const a = particles[i];
           const b = particles[j];
           const dist = Math.hypot(a.x - b.x, a.y - b.y);
-          if (dist < LINK_DISTANCE) {
-            ctx.strokeStyle = `rgba(${rgb}, ${0.14 * (1 - dist / LINK_DISTANCE)})`;
-            ctx.lineWidth = 1;
+          if (dist < linkDistance) {
+            ctx.strokeStyle = `rgba(${rgb}, ${0.24 * (1 - dist / linkDistance)})`;
+            ctx.lineWidth = 1.15;
             ctx.beginPath();
             ctx.moveTo(a.x, a.y);
             ctx.lineTo(b.x, b.y);
@@ -137,10 +169,10 @@ export default function CollegeMorphHero() {
         }
       }
 
-      ctx.fillStyle = `rgba(${rgb}, 0.5)`;
+      ctx.fillStyle = `rgba(${rgb}, 0.62)`;
       for (const p of particles) {
         ctx.beginPath();
-        ctx.arc(p.x, p.y, 1.3, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, 1.75, 0, Math.PI * 2);
         ctx.fill();
       }
 
@@ -155,19 +187,16 @@ export default function CollegeMorphHero() {
 
     return () => {
       running = false;
+      resizeObserver.disconnect();
       if (rafId) cancelAnimationFrame(rafId);
     };
   }, [reducedMotion, visible]);
 
   return (
-    <div ref={containerRef} className="college-morph-hero">
-      <canvas
-        ref={canvasRef}
-        className="college-morph-hero__canvas"
-        style={{ width: CANVAS_SIZE, height: CANVAS_SIZE }}
-      />
+    <div ref={containerRef} className={`college-morph-hero${className ? ` ${className}` : ""}`}>
+      <canvas ref={canvasRef} className="college-morph-hero__canvas" aria-hidden="true" />
       <div className={`college-morph-hero__mark ${fadeOut ? "college-morph-hero__mark--out" : ""}`}>
-        <CollegeIcon collegeId={currentCollege} size={96} className="college-morph-hero__icon" />
+        <CollegeIcon collegeId={currentCollege} size={ICON_SIZE} className="college-morph-hero__icon" />
         <span className="college-morph-hero__label">{LABELS[currentCollege]}</span>
       </div>
     </div>

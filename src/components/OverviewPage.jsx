@@ -1,10 +1,5 @@
 // Overview — cross-College summary. Every card shows a real number or
-// an honest empty state — never a fabricated one. Entertainment,
-// Collectibles, and Tabletop all get the exact same "not built yet"
-// treatment as each other, since none of them have any real data
-// behind them yet — showing a fabricated count for two of the three
-// while the third got an honest empty state was a real inconsistency
-// caught in an earlier design pass, not something to repeat here.
+// an honest empty state — never a fabricated one.
 
 import { useEffect, useState } from "react";
 import { fetchOwnedGames } from "../lib/steam";
@@ -14,17 +9,67 @@ import { fetchCollectibles } from "../lib/collectibles";
 import { fetchCampaigns, fetchArmies } from "../lib/tabletop";
 import { fetchRecentActivityForUser, describeActivity } from "../lib/guilds";
 import SteamPresenceCard from "./SteamPresenceCard";
-import FriendsActivityCard from "./FriendsActivityCard";
+import OverviewStockChart from "./OverviewStockChart";
 import GuildPulseCard from "./GuildPulseCard";
-import CollegeIcon from "./CollegeIcon";
 import CollegeMorphHero from "./CollegeMorphHero";
 import HorizontalLane from "./mobile/HorizontalLane";
 
-const NOT_BUILT_COLLEGES = [];
+const TITLE_CYCLE_MS = 3200;
+const TITLE_PRIMARY = ["Five Colleges.", "Your Infinities."];
+const TITLE_GHOST = ["One vault.", "Lykodex"];
 
-// Animates 0 -> target once real data is in, instead of just swapping
-// the number in — the one deliberate "wow" moment on the app's front
-// page. Skips straight to the final value under reduced-motion.
+function OverviewCommandTitle() {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    const query = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    let timer = null;
+
+    function apply() {
+      if (timer) clearInterval(timer);
+      timer = null;
+      if (query?.matches) {
+        setIndex(0);
+        return;
+      }
+      timer = setInterval(() => setIndex((i) => (i + 1) % TITLE_PRIMARY.length), TITLE_CYCLE_MS);
+    }
+
+    apply();
+    query?.addEventListener("change", apply);
+    return () => {
+      if (timer) clearInterval(timer);
+      query?.removeEventListener("change", apply);
+    };
+  }, []);
+
+  return (
+    <h1 className="overview-command__title">
+      <span className="overview-command__title-line overview-command__title-line--cycle">
+        {TITLE_PRIMARY.map((phrase, i) => (
+          <span
+            key={phrase}
+            className={`overview-command__title-cycle-word ${i === index ? "overview-command__title-cycle-word--active" : ""}`}
+          >
+            {phrase}
+          </span>
+        ))}
+      </span>
+      <span className="overview-command__title-line overview-command__title-line--ghost overview-command__title-line--cycle">
+        {TITLE_GHOST.map((phrase, i) => (
+          <span
+            key={phrase}
+            className={`overview-command__title-cycle-word ${i === index ? "overview-command__title-cycle-word--active" : ""}`}
+          >
+            {phrase}
+          </span>
+        ))}
+      </span>
+    </h1>
+  );
+}
+
+// Animates 0 -> target once real data is in. Skips under reduced-motion.
 function useCountUp(target, active) {
   const [value, setValue] = useState(0);
 
@@ -57,7 +102,6 @@ export default function OverviewPage({
   linkedSteamId,
   selectedColleges,
   onOpenCollege,
-  onGoToFriends,
   onGoToGuilds,
 }) {
   const [gameCount, setGameCount] = useState(null);
@@ -93,9 +137,6 @@ export default function OverviewPage({
       });
   }, [isLoggedIn, userId, linkedSteamId]);
 
-  // Kept as its own effect/request, separate from the Promise.all
-  // above, so a Guild-activity hiccup can never take down the hero
-  // number or College tiles (and vice versa).
   useEffect(() => {
     if (!isLoggedIn || !userId) return;
     fetchRecentActivityForUser(userId, 8)
@@ -109,18 +150,13 @@ export default function OverviewPage({
   const heroReady = isLoggedIn && status === "ready";
   const totalCollected = (gameCount || 0) + (cardCount || 0) + (entertainmentCount || 0) + (collectiblesCount || 0) + (tabletopCount || 0);
 
-  // Only real, already-fetched numbers make the rotation — no invented
-  // stats. A count of 0 still counts as "real" (matches this page's
-  // existing honest-empty-state rule above), so it isn't filtered out;
-  // only Colleges the user hasn't turned on, or that never returned
-  // data (null), are skipped.
   const heroSlides = [
-    { key: "total", label: "Your collection", value: totalCollected, unit: "pieces collected across your Colleges" },
-    showGaming && gameCount !== null && { key: "gaming", label: "Gaming library", value: gameCount, unit: "games in your library" },
-    showTcg && cardCount !== null && { key: "tcg", label: "TCG collection", value: cardCount, unit: "cards collected" },
-    selectedColleges.includes("entertainment") && entertainmentCount !== null && { key: "entertainment", label: "Library", value: entertainmentCount, unit: "movies, shows, anime & books tracked" },
-    selectedColleges.includes("collectibles") && collectiblesCount !== null && { key: "collectibles", label: "Loot", value: collectiblesCount, unit: "items on your shelf" },
-    selectedColleges.includes("tabletop") && tabletopCount !== null && { key: "tabletop", label: "Wartable", value: tabletopCount, unit: "campaigns & armies" },
+    { key: "total", accent: "vault", label: "Your collection", value: totalCollected, unit: "pieces collected across your Colleges" },
+    showGaming && gameCount !== null && { key: "gaming", accent: "gaming", label: "Gaming library", value: gameCount, unit: "games in your library" },
+    showTcg && cardCount !== null && { key: "tcg", accent: "tcg", label: "TCG collection", value: cardCount, unit: "cards collected" },
+    selectedColleges.includes("entertainment") && entertainmentCount !== null && { key: "entertainment", accent: "entertainment", label: "Library", value: entertainmentCount, unit: "movies, shows, anime & books tracked" },
+    selectedColleges.includes("collectibles") && collectiblesCount !== null && { key: "collectibles", accent: "collectibles", label: "Loot", value: collectiblesCount, unit: "items on your shelf" },
+    selectedColleges.includes("tabletop") && tabletopCount !== null && { key: "tabletop", accent: "tabletop", label: "Wartable", value: tabletopCount, unit: "campaigns & armies" },
   ].filter(Boolean);
 
   const [slideIndex, setSlideIndex] = useState(0);
@@ -132,179 +168,136 @@ export default function OverviewPage({
       setSlideIndex((i) => (i + 1) % heroSlides.length);
     }, 4200);
     return () => clearInterval(timer);
-    // heroSlides is rebuilt every render, but its length/identity per
-    // College selection is what actually matters for the interval —
-    // depending on the array itself would restart the timer on every
-    // render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [heroReady, paused, heroSlides.length]);
 
-  // Clamp in case a College got deselected mid-rotation and shrank the list.
   const currentSlide = heroSlides[slideIndex % heroSlides.length] || heroSlides[0];
   const animatedValue = useCountUp(currentSlide?.value ?? 0, heroReady);
+  const morphFocusCollege = currentSlide?.accent && currentSlide.accent !== "vault" ? currentSlide.accent : null;
+  const activeCollegeId = heroReady ? morphFocusCollege : null;
+
+  function openActiveCollege() {
+    if (activeCollegeId) onOpenCollege(activeCollegeId);
+  }
 
   return (
     <div className="overview-page">
-      <div className="price-page__head">
-        <h1 className="price-page__title">Overview</h1>
-        <p className="price-page__subtitle">What's actually going on across your Colleges.</p>
-      </div>
-
-      <CollegeMorphHero />
-
-      {heroReady && currentSlide && (
+      <section className="overview-command" aria-label="Vault summary">
+        <CollegeMorphHero
+          focusCollegeId={morphFocusCollege}
+          className="college-morph-hero--command-stage"
+        />
         <div
-          className="overview-hero"
-          onMouseEnter={() => setPaused(true)}
-          onMouseLeave={() => setPaused(false)}
+          className={`overview-command__grid${activeCollegeId ? " overview-command__grid--nav" : ""}`}
+          data-college={activeCollegeId || undefined}
+          role={activeCollegeId ? "button" : undefined}
+          tabIndex={activeCollegeId ? 0 : undefined}
+          aria-label={activeCollegeId ? `Open ${currentSlide.label}` : undefined}
+          onClick={activeCollegeId ? openActiveCollege : undefined}
+          onKeyDown={
+            activeCollegeId
+              ? (e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    openActiveCollege();
+                  }
+                }
+              : undefined
+          }
         >
-          <span className="overview-hero__eyebrow">{currentSlide.label}</span>
-          <div className="overview-hero__value" key={currentSlide.key}>
-            <span className="overview-hero__aura" aria-hidden="true" />
-            <span className="overview-hero__number">{animatedValue.toLocaleString()}</span>
-            <span className="overview-hero__unit">{currentSlide.unit}</span>
+          <div className="overview-command__copy">
+            <span className="overview-command__eyebrow">Collection command</span>
+            <OverviewCommandTitle />
+            <p className="overview-command__subtitle">What&apos;s actually going on across your Colleges.</p>
+
+            {heroReady && currentSlide ? (
+              <div
+                className="overview-hero overview-hero--embedded"
+                data-accent={currentSlide.accent}
+                onMouseEnter={() => setPaused(true)}
+                onMouseLeave={() => setPaused(false)}
+              >
+                <span className="overview-hero__eyebrow">{currentSlide.label}</span>
+                <div className="overview-hero__value" key={currentSlide.key}>
+                  <span className="overview-hero__aura" aria-hidden="true" />
+                  <span className="overview-hero__number">{animatedValue.toLocaleString()}</span>
+                  <span className="overview-hero__unit">{currentSlide.unit}</span>
+                </div>
+
+                {heroSlides.length > 1 && (
+                  <div className="hero-card__dots" role="tablist" aria-label="Collection stat">
+                    {heroSlides.map((slide, i) => (
+                      <button
+                        key={slide.key}
+                        type="button"
+                        role="tab"
+                        aria-selected={i === slideIndex}
+                        aria-label={slide.label}
+                        data-accent={slide.accent}
+                        className={`hero-card__dot ${i === slideIndex ? "hero-card__dot--active" : ""}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSlideIndex(i);
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : isLoggedIn && status === "loading" ? (
+              <div className="overview-stat-skeleton" aria-busy="true" aria-label="Loading collection counts">
+                <span className="overview-stat-skeleton__eyebrow" />
+                <span className="overview-stat-skeleton__number" />
+                <span className="overview-stat-skeleton__unit" />
+              </div>
+            ) : isLoggedIn && status === "error" ? (
+              <p className="overview-command__hint overview-command__hint--error">
+                Couldn&apos;t load your counts right now — try refreshing.
+              </p>
+            ) : (
+              <p className="overview-command__hint">
+                Sign in from the header to see live collection counts rotate here — real numbers from your Colleges, nothing fabricated.
+              </p>
+            )}
           </div>
 
-          {heroSlides.length > 1 && (
-            <div className="hero-card__dots" role="tablist" aria-label="Collection stat">
-              {heroSlides.map((slide, i) => (
-                <button
-                  key={slide.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={i === slideIndex}
-                  aria-label={slide.label}
-                  className={`hero-card__dot ${i === slideIndex ? "hero-card__dot--active" : ""}`}
-                  onClick={() => setSlideIndex(i)}
-                />
+          <div className="overview-command__visual" aria-hidden="true" />
+        </div>
+
+        {tickerActivity.length > 0 && (
+          <div className="overview-ticker overview-ticker--inset">
+            <div className="overview-ticker__track">
+              {[...tickerActivity, ...tickerActivity].map((entry, i) => (
+                <span className="overview-ticker__item" key={`${entry.id}-${i}`}>
+                  <span className="overview-ticker__dot" aria-hidden="true" />
+                  {describeActivity(entry)}
+                </span>
               ))}
             </div>
-          )}
-
-          {tickerActivity.length > 0 && (
-            <div className="overview-ticker">
-              <div className="overview-ticker__track">
-                {[...tickerActivity, ...tickerActivity].map((entry, i) => (
-                  <span className="overview-ticker__item" key={`${entry.id}-${i}`}>
-                    <span className="overview-ticker__dot" aria-hidden="true" />
-                    {describeActivity(entry)}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </section>
 
       {isLoggedIn && (
-        <HorizontalLane label="Right now">
-          {showGaming && <SteamPresenceCard userId={userId} />}
-          <GuildPulseCard userId={userId} onGoToGuilds={onGoToGuilds} />
-          <FriendsActivityCard userId={userId} onGoToFriends={onGoToFriends} />
-        </HorizontalLane>
-      )}
-
-      {(showGaming ||
-        showTcg ||
-        selectedColleges.includes("entertainment") ||
-        selectedColleges.includes("collectibles") ||
-        selectedColleges.includes("tabletop") ||
-        NOT_BUILT_COLLEGES.some((c) => selectedColleges.includes(c.id))) && (
-        <HorizontalLane label="Colleges" className="overview-grid">
-          {showGaming && (
-            <button type="button" className="overview-card" onClick={() => onOpenCollege("gaming")}>
-              <span className="overview-card__icon"><CollegeIcon collegeId="gaming" size={22} /></span>
-              <span className="overview-card__label">Gaming</span>
-              {!linkedSteamId ? (
-                <span className="overview-card__empty">Link Steam to see your library here</span>
-              ) : status === "loading" ? (
-                <span className="overview-card__value">…</span>
-              ) : (
-                <>
-                  <span className="overview-card__value">{gameCount ?? 0}</span>
-                  <span className="overview-card__unit">games</span>
-                </>
-              )}
-            </button>
-          )}
-
-          {showTcg && (
-            <button type="button" className="overview-card" onClick={() => onOpenCollege("tcg")}>
-              <span className="overview-card__icon"><CollegeIcon collegeId="tcg" size={22} /></span>
-              <span className="overview-card__label">TCG</span>
-              {status === "loading" ? (
-                <span className="overview-card__value">…</span>
-              ) : cardCount ? (
-                <>
-                  <span className="overview-card__value">{cardCount}</span>
-                  <span className="overview-card__unit">cards</span>
-                </>
-              ) : (
-                <span className="overview-card__empty">No cards yet — add some in TCG</span>
-              )}
-            </button>
-          )}
-
-          {selectedColleges.includes("entertainment") && (
-            <button type="button" className="overview-card" onClick={() => onOpenCollege("entertainment")}>
-              <span className="overview-card__icon"><CollegeIcon collegeId="entertainment" size={22} /></span>
-              <span className="overview-card__label">Library</span>
-              {status === "loading" ? (
-                <span className="overview-card__value">…</span>
-              ) : entertainmentCount ? (
-                <>
-                  <span className="overview-card__value">{entertainmentCount}</span>
-                  <span className="overview-card__unit">tracked</span>
-                </>
-              ) : (
-                <span className="overview-card__empty">Nothing tracked yet — add a movie, show, anime, or book</span>
-              )}
-            </button>
-          )}
-
-          {selectedColleges.includes("collectibles") && (
-            <button type="button" className="overview-card" onClick={() => onOpenCollege("collectibles")}>
-              <span className="overview-card__icon"><CollegeIcon collegeId="collectibles" size={22} /></span>
-              <span className="overview-card__label">Loot</span>
-              {status === "loading" ? (
-                <span className="overview-card__value">…</span>
-              ) : collectiblesCount ? (
-                <>
-                  <span className="overview-card__value">{collectiblesCount}</span>
-                  <span className="overview-card__unit">on your shelf</span>
-                </>
-              ) : (
-                <span className="overview-card__empty">Nothing on your shelf yet — add an item</span>
-              )}
-            </button>
-          )}
-
-          {selectedColleges.includes("tabletop") && (
-            <button type="button" className="overview-card" onClick={() => onOpenCollege("tabletop")}>
-              <span className="overview-card__icon"><CollegeIcon collegeId="tabletop" size={22} /></span>
-              <span className="overview-card__label">Wartable</span>
-              {status === "loading" ? (
-                <span className="overview-card__value">…</span>
-              ) : tabletopCount ? (
-                <>
-                  <span className="overview-card__value">{tabletopCount}</span>
-                  <span className="overview-card__unit">campaigns &amp; armies</span>
-                </>
-              ) : (
-                <span className="overview-card__empty">Nothing yet — start a campaign or army</span>
-              )}
-            </button>
-          )}
-
-          {NOT_BUILT_COLLEGES.filter((c) => selectedColleges.includes(c.id)).map((college) => (
-            <div key={college.id} className="overview-card overview-card--disabled">
-              <span className="overview-card__icon">{college.icon}</span>
-              <span className="overview-card__label">{college.label}</span>
-              <span className="overview-card__lock" aria-hidden="true">🔒</span>
-              <span className="overview-card__empty">Coming soon</span>
+        <section className="overview-section" aria-label="Right now">
+          <p className="overview-section__eyebrow">Right now</p>
+          <HorizontalLane className="overview-lane">
+            {showGaming && (
+              <div className="overview-tile overview-tile--steam">
+                <div className="overview-tile__stack">
+                  <SteamPresenceCard userId={userId} linkedSteamId={linkedSteamId} />
+                  <OverviewStockChart
+                    userId={userId}
+                    linkedSteamId={linkedSteamId}
+                  />
+                </div>
+              </div>
+            )}
+            <div className="overview-tile overview-tile--guild">
+              <GuildPulseCard userId={userId} onGoToGuilds={onGoToGuilds} />
             </div>
-          ))}
-        </HorizontalLane>
+          </HorizontalLane>
+        </section>
       )}
     </div>
   );

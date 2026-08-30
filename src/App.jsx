@@ -758,7 +758,6 @@ export default function App() {
                 else if (collegeId === "collectibles") goTo("college-collectibles");
                 else if (collegeId === "tabletop") goTo("college-tabletop");
               }}
-              onGoToFriends={() => goTo("friends")}
               onGoToGuilds={() => goTo("guilds")}
             />
           )}
@@ -901,6 +900,7 @@ export default function App() {
               masteryScore={masteryScore}
               masteryLevel={masteryLevel}
               masteryBreakdown={masteryBreakdown}
+              masteryXp={masteryXp}
               wishlist={wishlist}
               linkedSteamId={linkedSteamId}
               userId={userId}
@@ -912,8 +912,8 @@ export default function App() {
               gridWidth={gridWidth}
               gridContainerRef={gridContainerRef}
               goTo={goTo}
-              setCustomizingLayout={setCustomizingLayout}
-              resetLayout={resetLayout}
+              profileDetails={profileDetails}
+              onRecomputeMastery={recomputeMastery}
             />
           )}
         </div>

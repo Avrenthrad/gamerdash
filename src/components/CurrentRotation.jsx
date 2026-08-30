@@ -121,11 +121,6 @@ export default function CurrentRotation({
           <h2 className="current-rotation__title">
             {showBacklogPreview ? "From Your Backlog" : "Current Rotation"}
           </h2>
-          <p className="current-rotation__subtitle">
-            {showBacklogPreview
-              ? "What's queued up and waiting."
-              : "The games you're actually touching. Everything else can wait."}
-          </p>
         </div>
         <div className="current-rotation__actions">
           {pins.length > 0 && backlogItems.length > 0 && (

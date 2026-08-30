@@ -5,42 +5,27 @@
 // component's own header comment for where its data comes from); no
 // invented ranks/reputation/missions/combat stats.
 
-import { lazy, Suspense } from "react";
 import ProfileHeading from "./ProfileHeading";
 import SteamPresenceCard from "./SteamPresenceCard";
 import CurrentRotation from "./CurrentRotation";
-import PriceSection from "./PriceSection";
-import LiveServiceSection from "./LiveServiceSection";
-import LibrarySection from "./LibrarySection";
-import FriendSection from "./FriendSection";
 import ContinuePlayingCard from "./ContinuePlayingCard";
-import NowTrendingCard from "./NowTrendingCard";
 import GuildSpotlightCard from "./GuildSpotlightCard";
 import RecentActivityCard from "./RecentActivityCard";
 import GamingMasteryContributionCard from "./GamingMasteryContributionCard";
 import ReleaseCalendarCard from "./ReleaseCalendarCard";
-import NewsAnnouncementsCard from "./NewsAnnouncementsCard";
-import PageLoadingFallback from "./PageLoadingFallback";
 import HorizontalLane from "./mobile/HorizontalLane";
-import { isMobileApp } from "../lib/platform";
-
-const GridLayout = lazy(() => import("react-grid-layout"));
-
-// The RGL grid only knows about the widgets below — a stray "friends"
-// entry can survive in someone's saved dashboardLayout from before
-// Friend Details got promoted to a fixed section (see below), and
-// react-grid-layout errors if a layout entry has no matching child.
-const CUSTOMIZABLE_WIDGET_KEYS = ["price", "liveservice", "library"];
 
 export default function GamingDashboard({
   isLoggedIn, avatarUrl, firstName, lastName, username, gdScore,
   masteryScore, masteryLevel, masteryBreakdown, wishlist, linkedSteamId, userId,
-  enabledGames, currency, customizingLayout, dashboardLayout,
-  setDashboardLayout, gridWidth, gridContainerRef, goTo,
-  setCustomizingLayout, resetLayout,
+  masteryXp,
+  customizingLayout: _customizingLayout,
+  dashboardLayout: _dashboardLayout,
+  setDashboardLayout: _setDashboardLayout,
+  gridWidth: _gridWidth,
+  gridContainerRef: _gridContainerRef,
+  goTo, profileDetails, onRecomputeMastery,
 }) {
-  const safeDashboardLayout = dashboardLayout.filter((item) => CUSTOMIZABLE_WIDGET_KEYS.includes(item.i));
-
   return (
     <>
       <ProfileHeading
@@ -52,16 +37,16 @@ export default function GamingDashboard({
         gdScore={gdScore}
         masteryScore={masteryScore}
         masteryLevel={masteryLevel}
-        wishlistCount={wishlist.length}
+        userId={userId}
+        linkedSteamId={linkedSteamId}
         onGoToSettings={() => goTo("settings")}
         onGoToLinking={() => goTo("linking")}
-        customizingLayout={customizingLayout}
-        onToggleCustomize={isMobileApp() ? undefined : () => setCustomizingLayout((v) => !v)}
-        onResetLayout={resetLayout}
+        onRecomputeMastery={onRecomputeMastery}
+        profileDetails={profileDetails}
       />
 
       <HorizontalLane label="Right now">
-        {isLoggedIn && <SteamPresenceCard linkedSteamId={linkedSteamId} />}
+        {isLoggedIn && <SteamPresenceCard userId={userId} linkedSteamId={linkedSteamId} />}
         <CurrentRotation
           wishlist={wishlist}
           linkedSteamId={linkedSteamId}
@@ -78,6 +63,7 @@ export default function GamingDashboard({
           <GamingMasteryContributionCard
             masteryScore={masteryScore}
             masteryLevel={masteryLevel}
+            masteryXp={masteryXp}
             masteryBreakdown={masteryBreakdown}
             onOpenLinking={() => goTo("linking")}
           />
@@ -108,73 +94,7 @@ export default function GamingDashboard({
             <p className="panel__status">Sign in to see real activity here.</p>
           </div>
         )}
-        <NowTrendingCard onOpenHypeCharts={() => goTo("hype-charts")} />
-        <NewsAnnouncementsCard linkedSteamId={linkedSteamId} />
       </HorizontalLane>
-
-      <FriendSection
-        isLoggedIn={isLoggedIn}
-        onSignIn={() => goTo("login", "login")}
-        onCreateAccount={() => goTo("login", "signup")}
-        linkedSteamId={linkedSteamId}
-        onGoToLinking={() => goTo("linking")}
-        userId={userId}
-      />
-
-      {customizingLayout ? (
-        <div className="dash-grid-wrap" ref={gridContainerRef}>
-          {gridWidth > 0 && (
-            <Suspense fallback={<PageLoadingFallback />}>
-              <GridLayout
-                className="dash-grid layout"
-                layout={safeDashboardLayout}
-                cols={12}
-                rowHeight={30}
-                width={gridWidth}
-                onLayoutChange={(layout) => setDashboardLayout(layout)}
-                draggableHandle=".dash-drag-handle"
-                isResizable
-                isDraggable
-              >
-                <div key="price" className="dash-grid-item">
-                  <span className="dash-drag-handle" title="Drag to move">⠿</span>
-                  <PriceSection wishlist={wishlist} onOpenFullPage={() => goTo("prices")} currency={currency} />
-                </div>
-                <div key="liveservice" className="dash-grid-item">
-                  <span className="dash-drag-handle" title="Drag to move">⠿</span>
-                  <LiveServiceSection enabledGames={enabledGames} />
-                </div>
-                <div key="library" className="dash-grid-item">
-                  <span className="dash-drag-handle" title="Drag to move">⠿</span>
-                  <LibrarySection
-                    isLoggedIn={isLoggedIn}
-                    onSignIn={() => goTo("login", "login")}
-                    onCreateAccount={() => goTo("login", "signup")}
-                    linkedSteamId={linkedSteamId}
-                    onGoToLinking={() => goTo("linking")}
-                    onGoToBacklog={() => goTo("backlog")}
-                    onGoToLibrary={() => goTo("library")}
-                  />
-                </div>
-              </GridLayout>
-            </Suspense>
-          )}
-        </div>
-      ) : (
-        <div className="dash-stack">
-          <PriceSection wishlist={wishlist} onOpenFullPage={() => goTo("prices")} currency={currency} />
-          <LiveServiceSection enabledGames={enabledGames} />
-          <LibrarySection
-            isLoggedIn={isLoggedIn}
-            onSignIn={() => goTo("login", "login")}
-            onCreateAccount={() => goTo("login", "signup")}
-            linkedSteamId={linkedSteamId}
-            onGoToLinking={() => goTo("linking")}
-            onGoToBacklog={() => goTo("backlog")}
-            onGoToLibrary={() => goTo("library")}
-          />
-        </div>
-      )}
     </>
   );
 }

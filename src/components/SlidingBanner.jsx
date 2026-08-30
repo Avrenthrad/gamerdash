@@ -1,21 +1,24 @@
-// Generic auto-rotating single-item banner — shows one item at a
-// time, cross-fading to the next on a timer. Same hold/fade state
-// machine as CollegeMorphHero.jsx's crossfade (proven pattern: hold,
-// fade out, advance, fade in), generalized here so both
-// SteamPresenceCard and GuildPulseCard can share it instead of each
-// re-implementing their own timer.
+// Auto-rotating banner — one item visible at a time, sliding horizontally
+// to the next on a timer. Shared by SteamPresenceCard and GuildPulseCard
+// so neither re-implements its own rotation logic.
 //
-// Deliberately dumb about content — it just holds an index and calls
-// renderItem(item, index); callers own what a "slide" looks like.
+// Deliberately dumb about content — holds an index and calls
+// renderItem(item, index); callers own what a slide looks like.
 
 import { useEffect, useRef, useState } from "react";
 
 const HOLD_MS = 3600;
-const FADE_MS = 380;
+const SLIDE_MS = 420;
 
-export default function SlidingBanner({ items, renderItem, emptyState = null, className = "" }) {
+export default function SlidingBanner({
+  items,
+  renderItem,
+  getItemKey,
+  emptyState = null,
+  className = "",
+  dotsLabel = "Items",
+}) {
   const [index, setIndex] = useState(0);
-  const [fadeOut, setFadeOut] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [visible, setVisible] = useState(true);
   const containerRef = useRef(null);
@@ -37,28 +40,19 @@ export default function SlidingBanner({ items, renderItem, emptyState = null, cl
     return () => observer.disconnect();
   }, []);
 
-  // Clamp whenever the underlying list shrinks (e.g. a friend went
-  // offline and dropped out) so index never points past the end.
   useEffect(() => {
     if (index >= items.length) setIndex(0);
   }, [items.length, index]);
 
   useEffect(() => {
     if (reducedMotion || !visible || paused || items.length < 2) return;
-    if (!fadeOut) {
-      const t = setTimeout(() => setFadeOut(true), HOLD_MS);
-      return () => clearTimeout(t);
-    }
-    const t = setTimeout(() => {
+    const timer = setInterval(() => {
       setIndex((i) => (i + 1) % items.length);
-      setFadeOut(false);
-    }, FADE_MS);
-    return () => clearTimeout(t);
-  }, [fadeOut, reducedMotion, visible, paused, items.length]);
+    }, HOLD_MS);
+    return () => clearInterval(timer);
+  }, [reducedMotion, visible, paused, items.length]);
 
   if (items.length === 0) return emptyState;
-
-  const item = items[index] || items[0];
 
   return (
     <div
@@ -67,23 +61,36 @@ export default function SlidingBanner({ items, renderItem, emptyState = null, cl
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      <div className={`sliding-banner__item ${fadeOut ? "sliding-banner__item--out" : ""}`}>
-        {renderItem(item, index)}
+      <div className="sliding-banner__viewport">
+        <div
+          className="sliding-banner__track"
+          style={{
+            transform: `translate3d(-${index * 100}%, 0, 0)`,
+            transition: reducedMotion ? "none" : `transform ${SLIDE_MS}ms var(--ease-standard)`,
+          }}
+        >
+          {items.map((item, i) => (
+            <div
+              key={getItemKey ? getItemKey(item, i) : i}
+              className="sliding-banner__slide"
+              aria-hidden={i !== index}
+            >
+              {renderItem(item, i)}
+            </div>
+          ))}
+        </div>
       </div>
 
-      {items.length > 1 && items.length <= 6 && (
-        <div className="sliding-banner__dots" role="tablist" aria-label="Items">
-          {items.map((_, i) => (
+      {items.length > 1 && items.length <= 8 && (
+        <div className="sliding-banner__dots" role="tablist" aria-label={dotsLabel}>
+          {items.map((item, i) => (
             <button
-              key={i}
+              key={getItemKey ? getItemKey(item, i) : i}
               type="button"
               role="tab"
               aria-selected={i === index}
               className={`sliding-banner__dot ${i === index ? "sliding-banner__dot--active" : ""}`}
-              onClick={() => {
-                setIndex(i);
-                setFadeOut(false);
-              }}
+              onClick={() => setIndex(i)}
             />
           ))}
         </div>

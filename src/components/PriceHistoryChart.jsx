@@ -31,7 +31,7 @@ export default function PriceHistoryChart({ snapshots, compact = false }) {
     const chart = createChart(containerRef.current, {
       width: containerRef.current.clientWidth,
       height,
-      layout: { background: { color: "transparent" }, textColor: "#8C8B90" },
+      layout: { background: { color: "transparent" }, textColor: "#8C8B90", attributionLogo: false },
       grid: {
         vertLines: { color: compact ? "transparent" : "rgba(255,255,255,0.06)" },
         horzLines: { color: compact ? "transparent" : "rgba(255,255,255,0.06)" },

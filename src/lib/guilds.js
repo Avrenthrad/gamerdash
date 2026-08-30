@@ -267,6 +267,35 @@ export async function fetchMyGuilds(userId) {
   return (data || []).map((row) => row.guilds).filter(Boolean);
 }
 
+// Guildmates who share a guild with the viewer but are not already
+// friends — used for the Overview mastery chart's red peer lines.
+export async function fetchGuildmateIds(userId, { excludeIds = [] } = {}) {
+  const exclude = new Set([userId, ...excludeIds]);
+  const myGuilds = await fetchMyGuilds(userId);
+  const guildIds = myGuilds.map((g) => g.id);
+  if (guildIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("guild_members")
+    .select("user_id")
+    .in("guild_id", guildIds);
+  if (error) throw error;
+  return [...new Set((data || []).map((row) => row.user_id).filter((id) => !exclude.has(id)))];
+}
+
+// Same guild-scoped guarantee as get_friends_mastery_history — see
+// get_guildmates_mastery_history in schema.sql.
+export async function fetchGuildmatesMasteryHistory(guildmateIds, sinceDays = 90) {
+  if (!guildmateIds || guildmateIds.length === 0) return [];
+  const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase.rpc("get_guildmates_mastery_history", {
+    p_ids: guildmateIds,
+    p_since: since,
+  });
+  if (error) throw error;
+  return data || [];
+}
+
 export async function fetchGuildActivity(guildId, limit = 30) {
   const { data, error } = await supabase
     .from("guild_activity")

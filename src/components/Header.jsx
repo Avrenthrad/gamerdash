@@ -14,15 +14,24 @@
 // - Below the header: the College tabs row (Overview + the 5 Colleges).
 
 import { useEffect, useRef, useState } from "react";
+import { isMobileApp } from "../lib/platform";
+import { checkIsLykodexDelegate } from "../lib/auth";
+import { useApp } from "../hooks/useApp";
 import LykodexLogo from "./LykodexLogo";
 import CollegeIcon from "./CollegeIcon";
 import { fetchRecentActivityForUser, describeActivity, displayName } from "../lib/guilds";
 import { fetchMyCelebrations } from "../lib/celebrations";
-import { fetchFriendRequests, acceptFriendRequest, declineFriendRequest } from "../lib/friends";
+import {
+  fetchFriendRequests,
+  fetchFriends,
+  acceptFriendRequest,
+  declineFriendRequest,
+} from "../lib/friends";
 import { fetchUnreadCount } from "../lib/messages";
 import { relativeTime } from "./price/priceUtils";
 import MiniAvatar from "./MiniAvatar";
 import UpdateCheckMenuItem from "./UpdateCheckMenuItem";
+import CommunityQuickLinks from "./CommunityQuickLinks";
 import { GAMING_VIEWS, TCG_VIEWS } from "../lib/navSections";
 
 // Top-level College tabs. Order matters — this is the fixed display
@@ -140,6 +149,32 @@ export default function Header({
     setAvatarBroken(false);
   }, [avatarUrl]);
 
+  const { actingAsLykodex, actAsLykodex, returnToMyAccount, profileDetails } = useApp();
+  const [isLykodexDelegate, setIsLykodexDelegate] = useState(false);
+  const [lykodexToggleStatus, setLykodexToggleStatus] = useState("idle"); // idle | working | error
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setIsLykodexDelegate(false);
+      return;
+    }
+    checkIsLykodexDelegate().then(setIsLykodexDelegate);
+  }, [isLoggedIn, actingAsLykodex]);
+
+  const showLykodexPersonaToggle = isLoggedIn && (isLykodexDelegate || actingAsLykodex);
+
+  async function handleLykodexPersonaToggle() {
+    setLykodexToggleStatus("working");
+    try {
+      if (actingAsLykodex) await returnToMyAccount();
+      else await actAsLykodex();
+      setLykodexToggleStatus("idle");
+    } catch (err) {
+      console.error("Failed to toggle Lykodex persona:", err);
+      setLykodexToggleStatus("error");
+    }
+  }
+
   // ----- notifications bell -----
   // Two genuinely different feeds, never mixed into one list: your own
   // celebratory milestones (100% achievements, finishing a backlog
@@ -155,6 +190,7 @@ export default function Header({
   // read, so it's tracked separately from the passive activity feed.
   const [friendRequests, setFriendRequests] = useState([]);
   const [friendRequestsReloadKey, setFriendRequestsReloadKey] = useState(0);
+  const [friends, setFriends] = useState([]);
   const lastSeenRef = useRef(
     typeof window !== "undefined" ? localStorage.getItem("gd-activity-last-seen") : null
   );
@@ -167,6 +203,7 @@ export default function Header({
       setCelebrations([]);
       setCelebrationsStatus("idle");
       setFriendRequests([]);
+      setFriends([]);
       return;
     }
     let cancelled = false;
@@ -200,6 +237,12 @@ export default function Header({
         setFriendRequests(rows.filter((r) => r.receiver_id === userId));
       })
       .catch((err) => console.error("Failed to load friend requests for notifications bell:", err));
+
+    fetchFriends(userId)
+      .then((rows) => {
+        if (!cancelled) setFriends(rows);
+      })
+      .catch((err) => console.error("Failed to load friends for account drawer:", err));
 
     return () => {
       cancelled = true;
@@ -334,6 +377,33 @@ export default function Header({
               </span>
             </span>
           </button>
+
+          {showLykodexPersonaToggle && (
+            <button
+              type="button"
+              className="lykodex-persona-toggle"
+              onClick={handleLykodexPersonaToggle}
+              disabled={lykodexToggleStatus === "working"}
+              aria-pressed={actingAsLykodex}
+              aria-label={actingAsLykodex ? "Return to my account" : "Act as Lykodex system account"}
+              title={
+                lykodexToggleStatus === "working"
+                  ? "Switching account…"
+                  : actingAsLykodex
+                    ? "Return to my account"
+                    : "Act as Lykodex"
+              }
+            >
+              <span className="lykodex-persona-toggle__track">
+                <span className="lykodex-persona-toggle__thumb">
+                  <LykodexLogo className="lykodex-persona-toggle__mark" alt="" />
+                </span>
+              </span>
+              <span className="lykodex-persona-toggle__label">
+                {lykodexToggleStatus === "working" ? "…" : actingAsLykodex ? "Lykodex" : "Me"}
+              </span>
+            </button>
+          )}
 
           </div>
 
@@ -540,7 +610,7 @@ export default function Header({
           )}
 
           {isLoggedIn ? (
-            <div className="dash-header__menu-wrap">
+            <div className="dash-header__menu-wrap dash-header__auth">
               <button
                 type="button"
                 className="dash-header__avatar-btn"
@@ -564,7 +634,7 @@ export default function Header({
               </button>
             </div>
           ) : (
-            <div className="dash-header__menu-wrap">
+            <div className="dash-header__menu-wrap dash-header__auth">
               <button
                 type="button"
                 className="dash-header__login-btn"
@@ -629,11 +699,9 @@ export default function Header({
         ))}
       </nav>
 
-      {/* Mobile-only fixed bottom nav — hidden on desktop via CSS. The
-          top College tabs row + header icon cluster above both get
-          hidden at the same breakpoint (see index.css); this replaces
-          them rather than adding on top, so mobile has exactly one
-          navigation surface, not two competing ones. */}
+      {/* Packaged mobile only — desktop web and Tauri use the top College
+          tabs row (or the account drawer on narrow viewports). */}
+      {isMobileApp() && (
       <nav className="mobile-tab-bar" aria-label="Primary">
         <button
           type="button"
@@ -651,35 +719,8 @@ export default function Header({
           <GridIcon />
           <span>Colleges</span>
         </button>
-        <button type="button" className="mobile-tab-bar__item" onClick={onOpenPalette}>
-          <SearchIcon />
-          <span>Search</span>
-        </button>
-        {isLoggedIn && (
-          <button type="button" className="mobile-tab-bar__item" onClick={() => handleAccountClick("inbox")}>
-            <span className="mobile-tab-bar__icon-wrap">
-              <InboxIcon />
-              {unreadDmCount > 0 && <span className="mobile-tab-bar__dot" aria-hidden="true" />}
-            </span>
-            <span>Inbox</span>
-          </button>
-        )}
-        <button
-          type="button"
-          className={`mobile-tab-bar__item ${openMenu === "settings" ? "mobile-tab-bar__item--active" : ""}`}
-          onClick={() => (isLoggedIn ? toggleMenu("settings") : onNavigateView("login", "login"))}
-        >
-          <span className="mobile-tab-bar__icon-wrap">
-            {isLoggedIn && avatarUrl && !avatarBroken ? (
-              <img src={avatarUrl} alt="" className="mobile-tab-bar__avatar" decoding="async" onError={() => setAvatarBroken(true)} />
-            ) : (
-              <DefaultAvatarIcon />
-            )}
-            {isLoggedIn && hasUnseenActivity && <span className="mobile-tab-bar__dot" aria-hidden="true" />}
-          </span>
-          <span>{isLoggedIn ? "Account" : "Login"}</span>
-        </button>
       </nav>
+      )}
 
       {/* Rendered OUTSIDE <header> deliberately — the header has
           backdrop-filter for the floating/blurred sticky look, and
@@ -766,29 +807,25 @@ export default function Header({
                   </>
                 )}
 
-                <span className="dash-drawer__section-label drawer-mobile-only">Friends &amp; Guilds</span>
-                <div className="dash-drawer__notifications-mobile drawer-mobile-only">
-                  {activity.length > 0 ? (
-                    activity.slice(0, 4).map((entry) => (
-                      <div key={entry.id} className="dash-header__notification-row">
-                        <span className="dash-header__notification-text" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                          <MiniAvatar profile={entry.profile} />
-                          <strong>{displayName(entry.profile)}</strong> {describeActivity(entry)}
-                        </span>
-                        <span className="dash-header__notification-meta">
-                          {entry.guilds?.name ? `${entry.guilds.name} · ` : ""}
-                          {relativeTime(entry.created_at)}
-                        </span>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="dash-header__search-empty">No activity yet — add a friend or join a Guild to see updates here.</p>
-                  )}
-                </div>
               </>
             )}
 
-            <span className="dash-drawer__section-label">Social</span>
+            <span className="dash-drawer__section-label drawer-mobile-only">Friends</span>
+            {isLoggedIn && friends.length > 0 && (
+              <div className="dash-drawer__friend-avatars drawer-mobile-only">
+                {friends.map((f) => (
+                  <button
+                    key={f.friend_id}
+                    type="button"
+                    className="dash-drawer__friend-avatar"
+                    aria-label={displayName(f.profile)}
+                    onClick={() => handleAccountClick("friends")}
+                  >
+                    <MiniAvatar profile={f.profile} />
+                  </button>
+                ))}
+              </div>
+            )}
             <button
               type="button"
               className="dash-drawer__item"
@@ -828,6 +865,8 @@ export default function Header({
                 >
                   Dashfeed Settings
                 </button>
+
+                <CommunityQuickLinks profileDetails={profileDetails} />
 
                 <div className="dash-drawer__divider" />
                 <button

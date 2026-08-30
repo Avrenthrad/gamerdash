@@ -1,14 +1,20 @@
-// Gaming dashboard — compact "why is my Mastery Score what it is"
-// preview. Reuses the exact same masteryScore/masteryBreakdown data
-// GameMasterySection already computes and persists (see
-// lib/gameMasteryData.js) — no separate fetch, no separate math, just
-// a smaller "at a glance" render of the same real numbers, with a link
-// to the full breakdown on Account Linking.
+// Gaming dashboard — compact Gaming Mastery preview with level XP
+// progress toward the next rank. Uses the same masteryScore /
+// masteryXp / masteryLevel data GameMasterySection persists (see
+// lib/gameMasteryData.js).
 
-const PLATFORM_LABELS = { xbox: "Xbox", playstation: "PlayStation", steam: "Steam" };
+import { levelFromXp } from "../lib/gameMastery";
 
-export default function GamingMasteryContributionCard({ masteryScore, masteryLevel, masteryBreakdown, onOpenLinking }) {
-  const hasData = (masteryBreakdown || []).length > 0;
+export default function GamingMasteryContributionCard({
+  masteryScore,
+  masteryLevel,
+  masteryXp,
+  masteryBreakdown,
+  onOpenLinking,
+}) {
+  const hasData = (masteryBreakdown || []).length > 0 || (masteryScore || 0) > 0;
+  const { xpIntoLevel, xpForNextLevel, progress } = levelFromXp(masteryXp || 0);
+  const xpRemaining = Math.max(0, xpForNextLevel - xpIntoLevel);
 
   return (
     <div className="panel hero-card">
@@ -19,7 +25,7 @@ export default function GamingMasteryContributionCard({ masteryScore, masteryLev
 
       {!hasData && (
         <p className="panel__status">
-          Link Steam, or enter Xbox/PlayStation numbers on Account Linking, to see your Mastery breakdown here.
+          Link Steam, or enter Xbox/PlayStation numbers on Account Linking, to see your Mastery progress here.
         </p>
       )}
 
@@ -29,17 +35,24 @@ export default function GamingMasteryContributionCard({ masteryScore, masteryLev
             <span className="hero-card__title">{Math.round(masteryScore)}</span>
             <span className="panel__status" style={{ margin: 0 }}>Level {masteryLevel}</span>
           </div>
-          <ul className="mastery-contribution__list">
-            {masteryBreakdown.map((entry) => (
-              <li key={entry.platform} className="mastery-contribution__row">
-                <span className="mastery-contribution__platform">{PLATFORM_LABELS[entry.platform] || entry.platform}</span>
-                <div className="mastery-contribution__bar">
-                  <div className="mastery-contribution__bar-fill" style={{ width: `${Math.min(100, entry.normalized / 10)}%` }} />
-                </div>
-                <span className="mastery-contribution__score">{Math.round(entry.normalized)}</span>
-              </li>
-            ))}
-          </ul>
+
+          <div
+            className="mastery-xp-bar mastery-contribution__xp-bar"
+            role="progressbar"
+            aria-valuenow={Math.round(progress * 100)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`${xpRemaining.toLocaleString()} XP to level ${masteryLevel + 1}`}
+          >
+            <div className="mastery-xp-bar__fill" style={{ width: `${Math.min(100, progress * 100)}%` }} />
+          </div>
+          <p className="mastery-contribution__xp-note">
+            <span className="mastery-contribution__xp-remaining">{xpRemaining.toLocaleString()} XP</span>
+            {" "}to Level {masteryLevel + 1}
+            <span className="mastery-contribution__xp-meta">
+              {" "}· {xpIntoLevel.toLocaleString()} / {xpForNextLevel.toLocaleString()} this level
+            </span>
+          </p>
         </>
       )}
     </div>
