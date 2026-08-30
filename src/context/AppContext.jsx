@@ -27,13 +27,15 @@ import {
 import { AppContext } from "./appContextInstance";
 import { initialWishlist } from "../data/wishlist";
 import { DEFAULT_DASHBOARD_LAYOUT } from "../data/dashboardLayout";
-import { isPackagedApp } from "../lib/platform";
+import { isPackagedApp, isTauri } from "../lib/platform";
 import { requestUpfrontPermissions } from "../lib/requestPermissions";
 import { DEFAULT_PLATFORM_ORDER } from "../data/platformOrder";
 import { supabase, supabaseConfigured } from "../lib/supabaseClient";
 import { signOut as supabaseSignOut, requestLykodexSession } from "../lib/auth";
 import { subscribeToPresence } from "../lib/presence";
-import { completeXboxLink, consumeXboxOAuthCallback } from "../lib/xboxOAuth";
+import { completeXboxLink, consumeXboxOAuthCallback, parseXboxOAuthRedirectUrl } from "../lib/xboxOAuth";
+import { App as CapacitorApp } from "@capacitor/app";
+import { onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import {
   fetchProfile,
   upsertProfile,
@@ -757,16 +759,13 @@ export function AppProvider({ children }) {
     }
   }, [isLoggedIn, goTo]);
 
-  // Completes the Xbox Live sign-in once a real session is confirmed —
-  // see the boot effect above for why the code itself was captured
-  // earlier. Routes to Account Linking either way so the result (a
-  // real Gamerscore, or a real error) is visible where the person
-  // started the sign-in from.
-  useEffect(() => {
-    if (!isLoggedIn || !pendingXboxCallbackRef.current) return;
-    const callback = pendingXboxCallbackRef.current;
-    pendingXboxCallbackRef.current = null;
-
+  // Shared by both ways a real Xbox OAuth callback reaches this app —
+  // the web query-string path below and the packaged-app deep-link
+  // effect further down — so completing the sign-in behaves
+  // identically either way. Routes to Account Linking either way so
+  // the result (a real Gamerscore, or a real error) is visible where
+  // the person started the sign-in from.
+  const completeXboxOAuth = useCallback((callback) => {
     if (callback.error) {
       setXboxLinkStatus("error");
       setXboxLinkResult({ error: callback.error });
@@ -787,7 +786,56 @@ export function AppProvider({ children }) {
         setXboxLinkResult({ error: err.message });
         goTo("linking");
       });
-  }, [isLoggedIn, goTo]);
+  }, [goTo]);
+
+  // Completes the Xbox Live sign-in once a real session is confirmed —
+  // see the boot effect above for why the code itself was captured
+  // earlier (plain web only — Microsoft redirects back to this app's
+  // own URL with ?code=...).
+  useEffect(() => {
+    if (!isLoggedIn || !pendingXboxCallbackRef.current) return;
+    const callback = pendingXboxCallbackRef.current;
+    pendingXboxCallbackRef.current = null;
+    completeXboxOAuth(callback);
+  }, [isLoggedIn, completeXboxOAuth]);
+
+  // Packaged-app (Tauri/Capacitor) Xbox OAuth callback — Microsoft was
+  // sent to this app's own lykodex://xbox-callback scheme instead of a
+  // same-window redirect (see xboxOAuth.js's xboxRedirectUri/
+  // startXboxSignIn), and the OS hands the resulting URL back here the
+  // same way Discord/Twitch's does (see oauthRedirect.js) — handled
+  // directly in this component instead of there since completing it
+  // needs a real completeXboxLink() call and this component's own
+  // goTo, not just a Supabase setSession. No boot-time race to worry
+  // about here (unlike the web path above): Xbox sign-in only ever
+  // starts from Account Linking, well after a real session exists.
+  useEffect(() => {
+    if (!isPackagedApp()) return;
+
+    function handleUrl(url) {
+      const callback = parseXboxOAuthRedirectUrl(url);
+      if (callback) completeXboxOAuth(callback);
+    }
+
+    if (isTauri()) {
+      let unlisten;
+      let cancelled = false;
+      onOpenUrl((urls) => urls.forEach(handleUrl)).then((fn) => {
+        if (cancelled) fn();
+        else unlisten = fn;
+      });
+      return () => {
+        cancelled = true;
+        unlisten?.();
+      };
+    }
+
+    let subscription;
+    CapacitorApp.addListener("appUrlOpen", ({ url }) => handleUrl(url)).then((sub) => {
+      subscription = sub;
+    });
+    return () => subscription?.remove();
+  }, [completeXboxOAuth]);
 
   // Every goTo() push a new hash entry onto the browser's real history
   // stack, so "back" almost always means "wherever the hash was before

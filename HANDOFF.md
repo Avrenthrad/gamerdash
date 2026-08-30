@@ -134,6 +134,51 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-30 — **Fixed CORS preflight blocking Xbox/PSN linking on
+  packaged builds, then built real Xbox desktop/mobile support.**
+  Two related fixes:
+
+  1. **CORS preflight bug (`api/_cors.js`, `api/pricing.js`).** Xbox/
+     PSN linking POSTs a real `Authorization: Bearer <token>` header —
+     a non-simple CORS request that triggers a browser preflight
+     `OPTIONS` first. `allowCors()` only ever set
+     `Access-Control-Allow-Origin`, with no `-Headers`/`-Methods` and
+     no `OPTIONS` short-circuit in the handler, so the preflight
+     failed and the browser blocked the real request before it was
+     ever sent. Never surfaced on web (`API_BASE` is `""` there — same
+     origin, no preflight at all), only cross-origin, i.e. packaged
+     builds where `API_BASE` is the real deployed URL. Confirmed live:
+     desktop PSN link attempt failed with "Failed to fetch". Fixed by
+     adding `Access-Control-Allow-Headers`/`-Methods` to every
+     response and an early `OPTIONS` → `204` return in the handler.
+
+  2. **Real Xbox sign-in on packaged builds** (`src/lib/xboxOAuth.js`,
+     `src/context/AppContext.jsx`, `AccountLinkingPage.jsx`). Xbox
+     previously only worked on web — needed a real same-window
+     redirect back from `login.live.com`, which a packaged webview
+     can't do. Now mirrors Discord/Twitch's existing packaged-app
+     pattern (see `lib/auth.js`'s `OAUTH_CALLBACK_URL`): a distinct
+     `lykodex://xbox-callback` scheme, `xboxRedirectUri()` returns
+     that instead of the web origin when `isPackagedApp()`,
+     `startXboxSignIn()` opens the sign-in URL in the system browser
+     (Tauri's `plugin-shell` / Capacitor's `Browser`) instead of
+     navigating the webview, and a new dedicated deep-link effect in
+     `AppContext.jsx` (separate from `oauthRedirect.js`'s generic one,
+     since completing Xbox needs a real `completeXboxLink()` call, not
+     just a Supabase `setSession`) parses the callback and reuses the
+     same completion logic (`completeXboxOAuth`) as the web path.
+
+     **Blocked on one external step, not code** — Microsoft will
+     reject the packaged-app flow until `lykodex://xbox-callback` is
+     registered in the Azure app as a redirect URI under a **"Mobile
+     and desktop applications"** platform (the existing "Web" platform
+     entry stays as-is for the web flow) — same app registration, same
+     client secret, just one more redirect URI added. Do this before
+     testing on desktop; the web flow is unaffected either way.
+
+     **Not yet tested live** on desktop or mobile — same caveat as the
+     rest of this Xbox/PSN work until the Azure step above is done.
+
 - 2026-08-30 — **Google + Apple sign-in: hidden again, deferred.**
   Briefly wired these up (Login page already had them in
   `oauthProviders`, gated on live `enabledProviders`; added matching

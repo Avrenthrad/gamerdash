@@ -33,7 +33,7 @@ import { useState, useEffect } from "react";
 import { importSteamWishlist } from "../lib/wishlistImport";
 import { linkIdentity, unlinkProviderIdentity, getLinkedProviders, syncDiscordLink, removeDiscordLink } from "../lib/auth";
 import { supabase } from "../lib/supabaseClient";
-import { getXboxSignInUrl, fetchLiveGamerscore, unlinkXbox } from "../lib/xboxOAuth";
+import { getXboxSignInUrl, startXboxSignIn, fetchLiveGamerscore, unlinkXbox } from "../lib/xboxOAuth";
 import { linkPsnAccount, fetchLiveTrophies, unlinkPsn } from "../lib/psnAuth";
 import { importXboxLibrary, importPsnLibrary } from "../lib/libraryImport";
 import { useApp } from "../hooks/useApp";
@@ -373,11 +373,11 @@ function XboxLiveCard() {
       )}
       {checkStatus === "unlinked" && (
         signInUrl ? (
-          <button type="button" className="price-search__button" onClick={() => { window.location.href = signInUrl; }} style={{ alignSelf: "flex-start" }}>
+          <button type="button" className="price-search__button" onClick={startXboxSignIn} style={{ alignSelf: "flex-start" }}>
             Sign in with Microsoft
           </button>
         ) : (
-          <p className="panel__status">Xbox sign-in isn't configured yet — use the Gamertag field below in the meantime.</p>
+          <p className="panel__status">Xbox sign-in isn't configured yet.</p>
         )
       )}
     </div>

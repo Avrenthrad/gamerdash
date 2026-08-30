@@ -6,23 +6,38 @@
 // tokens this app never wants to hand to the browser — this file only
 // builds the consent URL and calls that proxy.
 //
-// Web-only for now: the redirect-based OAuth flow needs a real
-// same-window browser redirect back to this app, which packaged
-// (Tauri/Capacitor) builds can't do the way a normal web tab can (see
-// lib/auth.js's signInWithOAuth comment for the same constraint on
-// Discord/Twitch) — packaged-app support isn't built yet.
-
+// Packaged (Tauri/Capacitor) support: same custom-URL-scheme mechanism
+// as Discord/Twitch (see lib/auth.js's signInWithOAuth /
+// OAUTH_CALLBACK_URL comment) — a packaged build can't do a same-
+// window redirect back from an external OAuth page the way a plain
+// web tab can, so Microsoft is sent to this app's own scheme instead,
+// and the OS hands the resulting URL back via Tauri's deep-link plugin
+// / Capacitor's appUrlOpen (see AppContext.jsx's dedicated Xbox
+// deep-link effect — this isn't routed through oauthRedirect.js since
+// completing it needs a real completeXboxLink() call, not just
+// applying a Supabase session). Registering this scheme is a one-time
+// Azure step: add it as a redirect URI under a "Mobile and desktop
+// applications" platform on the same app registration already used
+// for the web "Web" platform redirect — the existing client secret
+// still applies app-wide, regardless of which platform the redirect
+// URI itself is registered under.
 import { supabase } from "./supabaseClient";
 import { API_BASE } from "./apiBase";
+import { isPackagedApp, isTauri } from "./platform";
+import { open as openInSystemBrowser } from "@tauri-apps/plugin-shell";
+import { Browser } from "@capacitor/browser";
 
 const XBOX_OAUTH_STATE = "xbox-link";
 const XBOX_SCOPES = "Xboxlive.signin Xboxlive.offline_access";
+export const XBOX_OAUTH_CALLBACK_URL = "lykodex://xbox-callback";
 
 // The redirect_uri Microsoft sends the user back to must exactly match
 // what's registered in the Azure app AND what's sent in the token
 // exchange - using the app's own root (no path) since this is a
 // hash-routed SPA with no server-side rewrite rules for other paths.
+// Packaged builds use the custom scheme instead (see file header).
 export function xboxRedirectUri() {
+  if (isPackagedApp()) return XBOX_OAUTH_CALLBACK_URL;
   return `${window.location.origin}/`;
 }
 
@@ -58,6 +73,52 @@ export function consumeXboxOAuthCallback() {
   if (error) return { error: params.get("error_description") || error };
   if (!code) return null;
   return { code };
+}
+
+// Same shape as consumeXboxOAuthCallback above, but for a full
+// lykodex://xbox-callback URL the OS hands back to a packaged app
+// (see AppContext.jsx's deep-link effect) rather than a query string
+// on this app's own window.location. Returns null for any URL that
+// isn't actually this callback (the deep-link listener sees every
+// lykodex:// URL, including Supabase's own auth-callback one).
+export function parseXboxOAuthRedirectUrl(url) {
+  if (!url.startsWith(XBOX_OAUTH_CALLBACK_URL)) return null;
+  const queryIndex = url.indexOf("?");
+  if (queryIndex === -1) return null;
+
+  const params = new URLSearchParams(url.slice(queryIndex + 1));
+  const state = params.get("state");
+  if (state !== XBOX_OAUTH_STATE) return null;
+
+  const error = params.get("error");
+  if (error) return { error: params.get("error_description") || error };
+  const code = params.get("code");
+  if (!code) return null;
+  return { code };
+}
+
+// Opens the real Microsoft sign-in page — a plain link works on the
+// web (a normal same-window navigation), but a packaged app has to
+// hand it to the system/in-app browser instead, exactly like
+// Discord/Twitch's signInWithOAuth (see lib/auth.js). Returns false
+// if getXboxSignInUrl() couldn't build a URL (client ID not
+// configured) so the caller can show its existing "not configured"
+// message.
+export async function startXboxSignIn() {
+  const url = getXboxSignInUrl();
+  if (!url) return false;
+
+  if (isPackagedApp()) {
+    if (isTauri()) {
+      await openInSystemBrowser(url);
+    } else {
+      await Browser.open({ url });
+    }
+    return true;
+  }
+
+  window.location.href = url;
+  return true;
 }
 
 async function callXboxService(mode, body) {
