@@ -134,6 +134,53 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-30 — **Replaced crude placeholder brand icons with real
+  logos** (Discord/Twitch/YouTube/App Store/Google Play/Steam sourced
+  from Simple Icons, MIT-licensed real vector reproductions; Xbox/
+  PlayStation hand-approximated since Simple Icons doesn't carry
+  either — PlayStation's Simple Icons entry is actually the wrong real
+  logo, the old PS-button glyph rather than the current brand mark, so
+  that one specifically needed hand-building anyway). Found and fixed
+  a real construction bug in YouTube's icon along the way (was
+  double-layering the shape instead of using its built-in cutout).
+
+  Also fixed a real regression from the earlier Xbox Gamerscore field
+  removal: `PlatformQuickLinks.jsx`'s "is Xbox/PlayStation linked"
+  check still read the old self-reported profile columns, so the
+  Overview/Gaming icon row showed both as "not linked" for anyone
+  who'd switched to real Xbox Live sign-in / PSN sync. Added narrow
+  `is_xbox_linked()`/`is_psn_linked()` RPCs (both token tables have no
+  client-readable RLS policy at all — service_role only — so this is
+  the safe way for the client to check link status without touching
+  token values) and wired the icon row to them. Committed `570434a`.
+
+- 2026-08-30 — **Daily automatic Mastery recompute for linked Xbox/PSN
+  accounts.** New Vercel Cron (`vercel.json`, `0 4 * * *` — same time
+  as the existing pg_cron `mastery_score_history` snapshot) hits
+  `api/pricing.js`'s new `handleMasteryCron` once a day for every user
+  with `xbox_tokens` or `psn_tokens` linked, refreshing real
+  Gamerscore/trophy counts automatically instead of only updating when
+  someone clicks "Recompute" themselves. Protected by a new
+  `CRON_SECRET` env var (not yet set in Vercel — **needed before this
+  actually runs**, see `.env.example`). Refactored the per-user
+  gamerscore/trophies logic in `handleXbox`/`handlePsn` into shared
+  `getLiveXboxGamerscore`/`getLiveTrophies` helpers so both the
+  on-demand endpoints and this cron share the exact same refresh-if-
+  needed logic. Steam is deliberately NOT re-fetched by this cron
+  (whatever Steam contribution was last computed is carried forward
+  from the existing `mastery_breakdown` rather than dropped) — only
+  Xbox/PSN are in scope, per the request. Manual "Recompute Gaming
+  Mastery" still refreshes all three fresh. Self-reported manual entry
+  for both Xbox Gamerscore and PlayStation trophies was removed from
+  `GameMasterySection.jsx` once both real integrations were confirmed
+  working end-to-end — no manual entry left for any of Steam/Xbox/
+  PlayStation. Committed `f9d799b`, `ea0fd5c`.
+
+  **Not yet verified**: the actual cron firing on schedule (needs
+  `CRON_SECRET` set in Vercel first, then waiting for the next 4am UTC
+  run, or triggering it manually with the right bearer token to
+  confirm before then).
+
 - 2026-08-30 — **Xbox Live sign-in and PSN trophy sync both confirmed
   working end-to-end** by the user (real Gamerscore/real trophy counts
   actually showing up). Cleanup once that was confirmed: removed the
