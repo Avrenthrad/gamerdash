@@ -134,6 +134,18 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-30 — **Riftbound's tab removed from TCG College** (user's
+  call, given the proxy block below made it a dead end for users).
+  `RIFTBOUND_FEATURES`/`RiftboundSummary` removed from
+  `TcgHomePage.jsx` rather than kept as unreachable dead code (a
+  leading-underscore rename to dodge `no-unused-vars` broke
+  react-hooks' rules-of-hooks check). Recoverable from commit
+  `6694bd4` (the original TCG College build), or just re-add a
+  `GAME_TABS` entry + summary component matching the existing pattern,
+  once the proxy issue below is actually fixed. `RiftboundSearchPage.jsx`,
+  `lib/riftbound.js`, the DB tables, etc. are all untouched and still
+  fully wired — only the tab entry point is gone. Committed `5ce6898`.
+
 - 2026-08-30 — **Riftbound search/lookup is currently NON-FUNCTIONAL
   in production** — found live-testing the TCG College work below.
   `api/pricing.js`'s `handleRiftbound` gets a real 403 from Riftcodex
