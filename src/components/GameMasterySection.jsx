@@ -1,26 +1,15 @@
 // Game Mastery Score — cross-platform "Gamerscore equivalent" section
-// of Account Linking. Steam and Xbox are both fully live now (real
-// unlocked achievements / real Gamerscore via Xbox Live sign-in — see
-// lib/gameMasteryData.js). PlayStation trophy counts are still
-// self-reported here — real live PSN trophy sync exists (PsnCard in
-// AccountLinkingPage.jsx) and wins automatically when linked, but this
-// manual entry stays as the honest fallback for anyone who doesn't
-// want to link.
+// of Account Linking. Steam, Xbox, and PlayStation are all fully live
+// now (real unlocked achievements / real Gamerscore via Xbox Live
+// sign-in / real trophy counts via PSN sync — see
+// lib/gameMasteryData.js). No manual entry left for any of the three
+// — confirmed all working end-to-end before removing the last of it
+// (PlayStation's).
 
-import { useEffect, useState } from "react";
-import {
-  fetchMasteryInputs, savePsTrophyCounts,
-} from "../lib/gameMasteryData";
-import { PS_TROPHY_TIERS, PS_TROPHY_TIER_POINTS, levelFromXp } from "../lib/gameMastery";
+import { useState } from "react";
+import { levelFromXp } from "../lib/gameMastery";
 
-const TIER_LABELS = { bronze: "Bronze", silver: "Silver", gold: "Gold", platinum: "Platinum" };
 const PLATFORM_LABELS = { xbox: "Xbox", playstation: "PlayStation", steam: "Steam" };
-
-function emptyCounts() {
-  const counts = {};
-  PS_TROPHY_TIERS.forEach((tier) => { counts[tier] = ""; });
-  return counts;
-}
 
 function relativeAsOf(iso) {
   if (!iso) return null;
@@ -31,7 +20,6 @@ function relativeAsOf(iso) {
 }
 
 export default function GameMasterySection({
-  userId,
   linkedSteamId,
   masteryScore,
   masteryXp,
@@ -40,49 +28,7 @@ export default function GameMasterySection({
   masteryComputedAt,
   onRecomputeMastery,
 }) {
-  const [psCounts, setPsCounts] = useState(emptyCounts());
-  const [psStatus, setPsStatus] = useState("idle");
   const [recomputing, setRecomputing] = useState(false);
-
-  useEffect(() => {
-    if (!userId) return;
-    fetchMasteryInputs(userId)
-      .then((inputs) => {
-        if (!inputs) return;
-        if (inputs.ps_trophy_counts) {
-          const counts = emptyCounts();
-          PS_TROPHY_TIERS.forEach((tier) => {
-            // Only a plain number is the current (post-rarity-removal)
-            // shape — an older nested { rarity: count } object from
-            // before this change is silently skipped rather than
-            // rendered as "[object Object]", since there's no honest
-            // way to collapse rarity-weighted sub-counts back into a
-            // single tier count without asking the person to re-enter.
-            const v = inputs.ps_trophy_counts?.[tier];
-            if (typeof v === "number") counts[tier] = String(v);
-          });
-          setPsCounts(counts);
-        }
-      })
-      .catch((err) => console.error("Failed to load Game Mastery inputs:", err));
-  }, [userId]);
-
-  async function handleSavePs(e) {
-    e.preventDefault();
-    setPsStatus("saving");
-    const counts = {};
-    PS_TROPHY_TIERS.forEach((tier) => {
-      counts[tier] = Math.max(0, Number(psCounts[tier]) || 0);
-    });
-    try {
-      await savePsTrophyCounts(userId, counts);
-      await onRecomputeMastery();
-      setPsStatus("saved");
-    } catch (err) {
-      console.error("Failed to save PlayStation trophy counts:", err);
-      setPsStatus("error");
-    }
-  }
 
   async function handleRecompute() {
     setRecomputing(true);
@@ -145,7 +91,7 @@ export default function GameMasterySection({
         </>
       ) : (
         <p className="panel__status">
-          No Mastery data yet — link Steam/Xbox/PlayStation above, or enter PlayStation trophies below, then recompute.
+          No Mastery data yet — link Steam, Xbox, or PlayStation above, then recompute.
         </p>
       )}
 
@@ -158,30 +104,6 @@ export default function GameMasterySection({
           Steam isn't linked — link it above to include your real achievement data here.
         </p>
       )}
-
-      <details style={{ marginTop: "14px" }}>
-        <summary className="panel__status" style={{ cursor: "pointer" }}>Enter PlayStation trophies</summary>
-        <p className="panel__status" style={{ fontSize: "11px" }}>
-          Read these straight off your own PSN trophy case — just the count per tier, no rarity breakdown needed.
-        </p>
-        <div className="mastery-ps-grid">
-          {PS_TROPHY_TIERS.map((tier) => (
-            <div key={tier} className="mastery-ps-grid__row">
-              <span>{TIER_LABELS[tier]} ({PS_TROPHY_TIER_POINTS[tier]}pt each)</span>
-              <input
-                type="number"
-                min="0"
-                value={psCounts[tier]}
-                onChange={(e) => setPsCounts((prev) => ({ ...prev, [tier]: e.target.value }))}
-              />
-            </div>
-          ))}
-        </div>
-        <button type="button" className="price-search__button" onClick={handleSavePs} disabled={psStatus === "saving"} style={{ marginTop: "8px" }}>
-          {psStatus === "saving" ? "Saving…" : "Save trophy counts"}
-        </button>
-        {psStatus === "error" && <p className="panel__status panel__status--error">Couldn't save — try again.</p>}
-      </details>
     </div>
   );
 }
