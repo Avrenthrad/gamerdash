@@ -134,6 +134,30 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-30 — **Fixed two real, pre-existing OAuth bugs surfaced while
+  testing Xbox Live sign-in** (neither was caused by that work, both
+  had just never been exercised/noticed before):
+  1. Supabase's Authentication > URL Configuration Site URL/Redirect
+     URLs still pointed at `gamerdash.vercel.app` (the project's name
+     before the Lykodex rename) — every Supabase-mediated OAuth
+     (Discord, Twitch) redirected there and 404'd once that old
+     deployment was gone. **Fixed by the user directly in the Supabase
+     dashboard** (not a code change) — updated to
+     `https://lykodex.vercel.app`.
+  2. Once #1 was fixed, Discord/Twitch redirected back correctly but
+     landed the app in a logged-out state. Root cause: `supabaseClient.js`
+     created the client with zero explicit `auth` config, so it rode
+     whatever `flowType` supabase-js defaults to. Captured a real
+     post-redirect URL and confirmed the actual response comes back as
+     `#access_token=...&refresh_token=...` (implicit-flow shape) — if
+     the client expects PKCE's `?code=` instead, it never looks at the
+     hash at all, so a genuinely valid session sits unused. Fixed by
+     pinning `flowType: "implicit"` explicitly in `createClient()`.
+     Committed `3299df3`.
+
+  **Not yet confirmed working end-to-end** — waiting on the user to
+  retest Discord/Twitch sign-in now that both fixes are live.
+
 - 2026-08-30 — **Added real Xbox Live sign-in + real PSN trophy sync.**
   Both confirmed against actual working community implementations
   (OpenXbox/xbox-webapi-python, achievements-app/psn-api) before
