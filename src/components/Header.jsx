@@ -31,6 +31,7 @@ import { fetchUnreadCount } from "../lib/messages";
 import { relativeTime } from "./price/priceUtils";
 import MiniAvatar from "./MiniAvatar";
 import UpdateCheckMenuItem from "./UpdateCheckMenuItem";
+import DownloadDesktopMenuItem from "./DownloadDesktopMenuItem";
 import CommunityQuickLinks from "./CommunityQuickLinks";
 import { GAMING_VIEWS, TCG_VIEWS } from "../lib/navSections";
 
@@ -879,6 +880,7 @@ export default function Header({
                 >
                   Log out
                 </button>
+                <DownloadDesktopMenuItem />
               </>
             ) : (
               <>

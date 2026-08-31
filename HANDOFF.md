@@ -134,6 +134,21 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-30 — **"Download desktop app" in the account drawer, web
+  only.** New `DownloadDesktopMenuItem.jsx`, placed right after Log
+  out in `Header.jsx`'s account drawer (`isPackagedApp()` gate is the
+  exact inverse of `UpdateCheckMenuItem`'s, which is packaged-only —
+  no point offering an already-installed person a link to install).
+  The installer's own filename embeds its version
+  (`Lykodex_0.1.NN_x64-setup.exe`, bumped every release — see
+  `.github/workflows/release-desktop.yml`), so there's no stable
+  static URL to hardcode; fetches GitHub's real "latest release" API
+  at click time instead and opens whichever `.exe` asset is actually
+  there. Confirmed live: the repo is genuinely public (`"private":
+  false`), so the unauthenticated API call and the asset's own
+  download URL both just work, no token needed — verified against the
+  real endpoint (currently resolves to `desktop-v0.1.77`).
+
 - 2026-08-30 — **Mastery recompute at each person's own local
   midnight, across all 5 Colleges, not just once daily UTC for
   Xbox/PSN.** Three parts:
