@@ -665,6 +665,16 @@ export default function AccountLinkingPage({
         </>
       )}
 
+      {!isOnboarding && HANDLE_PLATFORMS.map((platform) => (
+        <PlatformHandleCard
+          key={platform.id}
+          platform={platform}
+          values={handles}
+          onSaved={saveHandles}
+          onRecomputeMastery={onRecomputeMastery}
+        />
+      ))}
+
       {providersLoaded && (
         <>
           <OAuthProviderCard
@@ -684,16 +694,6 @@ export default function AccountLinkingPage({
               list. Re-add here once that infrastructure is done. */}
         </>
       )}
-
-      {!isOnboarding && HANDLE_PLATFORMS.map((platform) => (
-        <PlatformHandleCard
-          key={platform.id}
-          platform={platform}
-          values={handles}
-          onSaved={saveHandles}
-          onRecomputeMastery={onRecomputeMastery}
-        />
-      ))}
 
       {isOnboarding && (
         <div className="onboarding-actions">
