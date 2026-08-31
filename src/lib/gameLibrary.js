@@ -21,6 +21,13 @@ export async function fetchGameLibrary(userId) {
 }
 
 export async function addToGameLibrary(userId, title, platform, steamAppid = null, parentTitle = null) {
+  // ignoreDuplicates is required, not optional: without it Supabase
+  // issues an ON CONFLICT DO UPDATE, which needs an UPDATE RLS policy
+  // to check visibility of the pre-existing row — and this table
+  // deliberately has none (see the file header: there's no status
+  // field, nothing here ever needs updating). Without the flag this
+  // fails outright with "violates row-level security policy (USING
+  // expression)" on every already-owned title, confirmed live.
   const { data, error } = await supabase
     .from("game_library_items")
     .upsert(
@@ -31,7 +38,7 @@ export async function addToGameLibrary(userId, title, platform, steamAppid = nul
         steam_appid: steamAppid ? String(steamAppid) : null,
         parent_title: parentTitle || null,
       },
-      { onConflict: "user_id,platform,title" }
+      { onConflict: "user_id,platform,title", ignoreDuplicates: true }
     )
     .select();
   if (error) throw error;
