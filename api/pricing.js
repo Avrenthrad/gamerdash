@@ -635,7 +635,10 @@ async function xboxFetchLibrary(userhash, xstsToken, xuid) {
       Authorization: `XBL3.0 x=${userhash};${xstsToken}`,
     },
   });
-  if (!res.ok) throw new Error(`Xbox Live title history request failed (${res.status})`);
+  if (!res.ok) {
+    const bodyText = await res.text().catch(() => "");
+    throw new Error(`Xbox Live title history request failed (${res.status})${bodyText ? `: ${bodyText.slice(0, 300)}` : ""}`);
+  }
   const data = await res.json();
   return (data.titles || []).map((t) => ({
     titleId: t.titleId,
@@ -1008,7 +1011,10 @@ async function getLivePsnPresence(adminClient, userId) {
 async function psnFetchLibrary(accessToken, accountId) {
   const url = `https://m.np.playstation.com/api/gamelist/v2/users/${accountId}/titles?limit=500`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-  if (!res.ok) throw new Error(`PSN game list request failed (${res.status})`);
+  if (!res.ok) {
+    const bodyText = await res.text().catch(() => "");
+    throw new Error(`PSN game list request failed (${res.status})${bodyText ? `: ${bodyText.slice(0, 300)}` : ""}`);
+  }
   const data = await res.json();
   return (data.titles || []).map((t) => ({
     titleId: t.titleId,
