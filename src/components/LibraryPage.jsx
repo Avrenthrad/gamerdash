@@ -1,6 +1,9 @@
-// Library — the real, dedicated version of Collections. Applies the
-// stat-card visual language from a recent design pass, but only with
-// data Lykodex actually has.
+// Gaming Collection (file/route still named "Library" internally,
+// see navSections.js — user-facing text only was the intended scope
+// of the rename that gave this page its real heading) — the real,
+// dedicated version of Collections. Applies the stat-card visual
+// language from a recent design pass, but only with data Lykodex
+// actually has.
 //
 // Deliberately does NOT include some things a mockup for this page
 // showed: a whole-library completion split — our real Backlog system
@@ -28,6 +31,7 @@
 import { useEffect, useState } from "react";
 import { fetchOwnedGames, steamHeaderArt } from "../lib/steam";
 import { fetchBacklog } from "../lib/backlog";
+import { fetchGameLibrary } from "../lib/gameLibrary";
 import { fetchPlatformPlaytime } from "../lib/crossPlatformActivity";
 import UnderConstructionOverlay from "./UnderConstructionOverlay";
 import { AccountGatePanel } from "./AccountGate";
@@ -47,6 +51,13 @@ export default function LibraryPage({
   const [backlogCount, setBacklogCount] = useState(null);
   const [status, setStatus] = useState("idle");
   const [otherPlatformGames, setOtherPlatformGames] = useState([]);
+  // Real, full Xbox/PlayStation library from game_library_items — see
+  // lib/gameLibrary.js. Filled in by the "Import Library to Gaming
+  // Collection" buttons on Account Linking, not fetched from Xbox/PSN
+  // live on every page load the way Steam's games are (that live
+  // 3-endpoint scan is fine for one account; the full library import
+  // is the one-time real full-history pull).
+  const [libraryItems, setLibraryItems] = useState([]);
 
   useEffect(() => {
     if (!linkedSteamId) return;
@@ -85,6 +96,13 @@ export default function LibraryPage({
       .catch((err) => console.error("Cross-platform playtime fetch failed:", err));
   }, [userId]);
 
+  useEffect(() => {
+    if (!userId) return;
+    fetchGameLibrary(userId)
+      .then(setLibraryItems)
+      .catch((err) => console.error("Game library fetch failed:", err));
+  }, [userId]);
+
   const totalGames = games.length;
   const steamPlaytimeHours = Math.round(games.reduce((sum, g) => sum + (g.playtime_forever || 0), 0) / 60);
   const xboxPlaytimeHours = Math.round(
@@ -99,7 +117,7 @@ export default function LibraryPage({
     <div className="price-page">
       <div className="price-page__head">
         <button type="button" className="back-link" onClick={onBack}>← Back</button>
-        <h1 className="price-page__title">Library</h1>
+        <h1 className="price-page__title">Gaming Collection</h1>
         <p className="price-page__subtitle">Your real Steam library, real playtime, sorted honestly.</p>
       </div>
 
@@ -230,11 +248,48 @@ export default function LibraryPage({
         </>
       )}
 
+      {isLoggedIn && libraryItems.length > 0 && (
+        <div className="library-most-played" style={{ marginTop: "24px" }}>
+          <span className="feed-col__label">Xbox &amp; PlayStation Library ({libraryItems.length})</span>
+          <p className="panel__status" style={{ fontSize: "11px", marginBottom: "10px" }}>
+            Your real, full title history — imported from Account Linking's "Import Library to
+            Gaming Collection" buttons, not just what's been observed since linking Discord.
+          </p>
+          <table className="library-table">
+            <thead>
+              <tr>
+                <th scope="col">Game</th>
+                <th scope="col">Platform</th>
+              </tr>
+            </thead>
+            <tbody>
+              {libraryItems.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.title}</td>
+                  <td><PlatformTag platform={item.platform} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {isLoggedIn && libraryItems.length === 0 && (
+        <p className="panel__status" style={{ marginTop: "24px" }}>
+          No Xbox or PlayStation library imported yet —{" "}
+          <button type="button" className="steam-sync-link" onClick={onGoToLinking}>
+            link an account and import your library on Account Linking
+          </button>
+          .
+        </p>
+      )}
+
       {isLoggedIn && otherPlatformGames.length > 0 && (
         <div className="library-most-played" style={{ marginTop: "24px" }}>
-          <span className="feed-col__label">Xbox &amp; PlayStation</span>
+          <span className="feed-col__label">Recently Active (Xbox &amp; PlayStation)</span>
           <p className="panel__status" style={{ fontSize: "11px", marginBottom: "10px" }}>
-            Tracked since you linked Discord — not your full historical library.
+            Real playtime observed since you linked Discord — not the full library above, just
+            what's actually been played recently.
           </p>
           <ul className="backlog-list">
             {otherPlatformGames.map((g) => (

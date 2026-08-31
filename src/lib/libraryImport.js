@@ -1,33 +1,29 @@
-// Xbox/PSN library import — adds real owned/played games to the
-// existing Backlog (backlog_items already has a real `platform`
-// column, see lib/backlog.js), the same target Steam manually-added
-// games land in, not the Wishlist (these are things a person already
-// owns, not things they want). Mirrors lib/wishlistImport.js's
-// batch-with-progress shape.
+// Xbox/PSN library import — adds real owned/played games to Gaming
+// Collection's real game_library_items table (see lib/gameLibrary.js
+// for why that's a separate table from Backlog, not the same one this
+// used to write to: bulk-importing someone's full Xbox/PSN library
+// into Backlog's 4-state model silently defaulted every imported game
+// to status "backlog" (not yet played), which is wrong for games
+// they've already finished). Not the Wishlist either — these are
+// things a person already owns, not things they want. Mirrors
+// lib/wishlistImport.js's batch-with-progress shape.
 //
-// De-duplicates against the person's EXISTING backlog by title
-// (case-insensitive) before inserting anything — backlog_items has no
-// unique constraint to fall back on, unlike wishlist's
-// unique(user_id, title), so this file is the only thing preventing a
-// second import (or a title someone already added by hand) from
-// creating a duplicate row.
+// De-duplication is enforced at the DB level now (game_library_items
+// has a real unique(user_id, platform, title) index) — addToGameLibrary
+// silently no-ops a repeat, so this file doesn't need to check for
+// existing rows itself the way the old Backlog-targeting version did.
 
-import { fetchBacklog, addToBacklog } from "./backlog";
+import { addToGameLibrary } from "./gameLibrary";
 import { fetchXboxLibrary } from "./xboxOAuth";
 import { fetchPsnLibrary } from "./psnAuth";
 
 async function importGames(userId, games, platform, onProgress) {
-  const existing = await fetchBacklog(userId);
-  const existingTitles = new Set(existing.map((item) => item.title.toLowerCase()));
-
   let added = 0;
   for (let i = 0; i < games.length; i++) {
     onProgress?.(i + 1, games.length);
     const name = games[i].name;
-    if (!name || existingTitles.has(name.toLowerCase())) continue;
-    await addToBacklog(userId, name, null, platform);
-    existingTitles.add(name.toLowerCase());
-    added += 1;
+    if (!name) continue;
+    if (await addToGameLibrary(userId, name, platform)) added += 1;
   }
   return { total: games.length, added };
 }

@@ -111,7 +111,7 @@ export default function EntertainmentHomePage({ onBack, isLoggedIn, userId, onSi
     <div className="price-page">
       <div className="price-page__head">
         <button type="button" className="back-link" onClick={onBack}>← Back to Overview</button>
-        <h1 className="price-page__title">Library</h1>
+        <h1 className="price-page__title">Library Collection</h1>
         <p className="price-page__subtitle">
           Real movies, TV, anime, and books — via TMDB, AniList, and Open Library.
         </p>

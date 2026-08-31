@@ -17,7 +17,7 @@ export const GAMING_SIDEBAR_ITEMS = [
   { id: "backlog", label: "Backlog" },
   { id: "prices", label: "Market" },
   { id: "achievements", label: "Achievements" },
-  { id: "library", label: "Library" },
+  { id: "library", label: "Gaming Collection" },
 ];
 
 // Views that belong to the Gaming College — used to decide whether

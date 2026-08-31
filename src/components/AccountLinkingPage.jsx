@@ -349,7 +349,7 @@ function XboxLiveCard() {
           </p>
           <div className="backlog-card__actions">
             <button type="button" className="linking-row__connect" onClick={handleImportLibrary} disabled={importStatus === "importing"}>
-              {importStatus === "importing" ? "Importing…" : "Import Library to Backlog"}
+              {importStatus === "importing" ? "Importing…" : "Import Library to Gaming Collection"}
             </button>
             <button type="button" className="linking-row__connect" onClick={handleUnlink} disabled={unlinking}>
               {unlinking ? "Disconnecting…" : "Disconnect Xbox Live"}
@@ -460,7 +460,7 @@ function PsnCard() {
           </p>
           <div className="backlog-card__actions">
             <button type="button" className="linking-row__connect" onClick={handleImportLibrary} disabled={importStatus === "importing"}>
-              {importStatus === "importing" ? "Importing…" : "Import Library to Backlog"}
+              {importStatus === "importing" ? "Importing…" : "Import Library to Gaming Collection"}
             </button>
             <button type="button" className="linking-row__connect" onClick={handleUnlink} disabled={unlinking}>
               {unlinking ? "Disconnecting…" : "Disconnect PlayStation"}

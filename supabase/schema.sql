@@ -2562,13 +2562,60 @@ $$;
 revoke execute on function public.is_psn_linked() from public, anon;
 grant execute on function public.is_psn_linked() to authenticated;
 
--- ---------- Per-user timezone (for midnight-local-time cron jobs) ----------
+-- ---------- Per-user timezone (captured, not yet used by the cron) ----------
 -- Applied in production via add_profiles_timezone migration. Captured
 -- client-side (see AppContext.jsx) from the browser's own
 -- Intl.DateTimeFormat().resolvedOptions().timeZone on login — an IANA
 -- name (e.g. "Australia/Sydney"), not a raw UTC offset, so it stays
--- correct across daylight saving changes. Used by api/pricing.js's
--- mastery-cron (now hourly, see vercel.json) to recompute each
--- person's Mastery Score at their own local midnight rather than one
--- fixed UTC time for everyone.
+-- correct across daylight saving changes. api/pricing.js's
+-- mastery-cron runs once daily for everyone at one fixed UTC time
+-- (see vercel.json) — an hourly, per-person-local-midnight version of
+-- this cron was tried and reverted: Vercel's Hobby plan hard-rejects
+-- any cron expression that would run more than once a day, and it
+-- silently blocked every deployment until reverted. This column is
+-- kept captured and current for whenever a Pro-plan upgrade makes
+-- real per-timezone precision possible to build.
+
+-- ---------- Gaming Collection's real owned-games library ----------
+-- One flat list of every game a person owns on Xbox/PlayStation/
+-- Steam, each tagged with its platform — no status/completion
+-- tracking at all (that's backlog_items' job, a deliberately separate
+-- list for games someone's actively deciding to play next). Xbox/PSN's
+-- "Import Library" buttons on Account Linking write here now (see
+-- lib/libraryImport.js) instead of backlog_items — bulk-importing a
+-- person's full owned library into backlog_items would've silently
+-- defaulted every single imported game to status 'backlog' (not yet
+-- played), which is wrong for games they've already finished. Steam's
+-- own owned-games list isn't stored here at all — LibraryPage.jsx
+-- still live-fetches that directly from Steam's Web API on every
+-- load, same as before this table existed.
+create table public.game_library_items (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  title text not null,
+  platform text not null,
+  steam_appid text,
+  added_at timestamptz default now()
+);
+
+alter table public.game_library_items enable row level security;
+
+create policy "Users can view their own game library"
+  on public.game_library_items for select
+  using (auth.uid() = user_id);
+
+create policy "Users can add to their own game library"
+  on public.game_library_items for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can remove their own game library items"
+  on public.game_library_items for delete
+  using (auth.uid() = user_id);
+
+create index game_library_items_user_id_idx on public.game_library_items (user_id);
+-- Exact-case match is intentional, not a shortcut: titles come
+-- consistently from each import API's own casing, and the same game
+-- appearing once per platform (e.g. "Portal 2" for both Xbox and
+-- Steam) is two real, distinct rows, not a duplicate to collapse.
+create unique index game_library_items_user_platform_title_idx on public.game_library_items (user_id, platform, title);
 alter table public.profiles add column if not exists timezone text;

@@ -134,6 +134,65 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-31 — **College "collection" pages renamed (user-visible text
+  only, per request) + Xbox/PSN library import now targets a real
+  Gaming Collection, not Backlog.**
+
+  1. **Renames**: `LibraryPage.jsx` (Gaming's own owned-games page,
+     confusingly ALSO titled "Library" before this — a real collision
+     with the Library College's own home page, both literally titled
+     "Library") → **"Gaming Collection"**; `navSections.js`'s matching
+     sidebar item too. `EntertainmentHomePage.jsx` (the real Library
+     College home) → **"Library Collection"**. `CollectiblesHomePage.jsx`
+     (Loot) → **"Loot Collection"**. Left `BacklogPage.jsx` ("Backlog /
+     To Be Played") alone — genuinely a different feature (status-
+     tracked to-play list, not "everything owned"). Left TCG's per-game
+     "My Collection" pages (Magic/Pokemon/Yugioh/etc.) and Wartable
+     alone too — judgment calls, not explicitly requested.
+
+  2. **New `game_library_items` table** (migration applied live,
+     mirrored in `schema.sql`) + `lib/gameLibrary.js` — a flat "you own
+     this, on this platform" list with **no status/completion
+     tracking at all**, deliberately separate from `backlog_items`
+     (4-state Backlog/Playing/Completed/Dropped model): bulk-importing
+     someone's full Xbox/PSN library into Backlog would've silently
+     defaulted every single imported game to status "backlog" (not yet
+     played), which is wrong for games they've already finished.
+     `lib/libraryImport.js`'s `importXboxLibrary`/`importPsnLibrary`
+     now write here instead — Account Linking's buttons relabeled
+     "Import Library to Gaming Collection". `addToGameLibrary` upserts
+     with `ignoreDuplicates` against a real `unique(user_id, platform,
+     title)` index (exact-case match is intentional — the same game
+     owned on two platforms is two real rows, not a duplicate to
+     collapse) and returns whether it was a genuinely new row, so the
+     import progress count doesn't double-count re-imports.
+
+  3. **`LibraryPage.jsx` (Gaming Collection) now shows the real
+     imported Xbox/PSN library**, not just the old Discord-presence-
+     observed subset — that limited section (only covers time played
+     since Discord was linked, honestly caveated in its own copy) is
+     kept as a separate "Recently Active" section, distinct from the
+     new full "Xbox & PlayStation Library" list sourced from
+     `game_library_items`.
+
+  Verified live in a real logged-in dev session (842-game real Steam
+  library rendered correctly under the new heading; the empty-state
+  message for un-imported Xbox/PSN showed correctly too) before
+  shipping.
+
+  **Found and fixed in passing**: `Header.jsx` referenced `GAMING_VIEWS`
+  without importing it — a real `ReferenceError` crashing the entire
+  app on every load, unrelated to this work (Cursor's concurrent
+  changes to that file). Fixed the missing import locally, but
+  **Header.jsx's own commit is being left to Cursor** — their
+  concurrent rework of the Mastery Score popover in that same file is
+  substantial and looks complete, and my one-line fix + the "Recompute"
+  → "Refresh" label rename (also requested) are both sitting inside
+  that same uncommitted diff, too entangled to cleanly extract via
+  patch surgery. Confirm before either of you commits Header.jsx that
+  the `import { GAMING_VIEWS } from "../lib/navSections";` line is
+  still in there.
+
 - 2026-08-30 — **"Download desktop app" in the account drawer, web
   only.** New `DownloadDesktopMenuItem.jsx`, placed right after Log
   out in `Header.jsx`'s account drawer (`isPackagedApp()` gate is the

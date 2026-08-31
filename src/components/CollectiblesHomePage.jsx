@@ -94,7 +94,7 @@ export default function CollectiblesHomePage({ onBack, isLoggedIn, userId, onSig
       <div className="price-page">
         <div className="price-page__head">
           <button type="button" className="back-link" onClick={onBack}>← Back to Overview</button>
-          <h1 className="price-page__title">Loot</h1>
+          <h1 className="price-page__title">Loot Collection</h1>
           <p className="price-page__subtitle">Your real shelf — Pops, statues, LEGO, hardware, and more.</p>
         </div>
         <div className="backlog-add">
