@@ -851,39 +851,6 @@ export function AppProvider({ children }) {
     return () => subscription?.remove();
   }, [completeXboxOAuth]);
 
-  // Completes the real "Sign in through Steam" link once a real
-  // session is confirmed — same shape as the Xbox web-path effect
-  // above, web-only for now (see steamAuth.js's file header for why).
-  // Verification only returns a SteamID64 (or throws) — it doesn't
-  // import the wishlist itself, same as Xbox/PSN's linking not
-  // bundling their library import; AccountLinkingPage's own "Import
-  // Steam Wishlist" button (or the existing "Resync Steam wishlist"
-  // on the Prices page) is still the actual import step. Mirrors the
-  // same recomputeMastery(steamId).then(recomputeOverallMastery) call
-  // the old manual-entry onLinkSteam wrapper made in App.jsx, so
-  // linking still triggers a fresh Mastery snapshot the same way.
-  useEffect(() => {
-    if (!isLoggedIn || !pendingSteamCallbackRef.current) return;
-    const params = pendingSteamCallbackRef.current;
-    pendingSteamCallbackRef.current = null;
-
-    setSteamLinkStatus("linking");
-    verifySteamOpenIdCallback(params)
-      .then((steamId) => {
-        setLinkedSteamId(steamId);
-        setSteamLinkStatus("success");
-        setSteamLinkResult({ steamId });
-        recomputeMastery(steamId).then(recomputeOverallMastery);
-        goTo("linking");
-      })
-      .catch((err) => {
-        console.error("Steam sign-in failed:", err);
-        setSteamLinkStatus("error");
-        setSteamLinkResult({ error: err.message });
-        goTo("linking");
-      });
-  }, [isLoggedIn, goTo, recomputeMastery, recomputeOverallMastery]);
-
   // Every goTo() push a new hash entry onto the browser's real history
   // stack, so "back" almost always means "wherever the hash was before
   // this one" — using the browser's own history instead of a hardcoded
@@ -1084,6 +1051,47 @@ export function AppProvider({ children }) {
       console.error("Failed to recompute Overall Mastery:", err);
     }
   }, [userId, masteryScore]);
+
+  // Completes the real "Sign in through Steam" link once a real
+  // session is confirmed — same shape as the Xbox web-path effect
+  // above, web-only for now (see steamAuth.js's file header for why).
+  // Verification only returns a SteamID64 (or throws) — it doesn't
+  // import the wishlist itself, same as Xbox/PSN's linking not
+  // bundling their library import; AccountLinkingPage's own "Import
+  // Steam Wishlist" button (or the existing "Resync Steam wishlist"
+  // on the Prices page) is still the actual import step. Mirrors the
+  // same recomputeMastery(steamId).then(recomputeOverallMastery) call
+  // the old manual-entry onLinkSteam wrapper made in App.jsx, so
+  // linking still triggers a fresh Mastery snapshot the same way.
+  //
+  // Must stay below recomputeMastery/recomputeOverallMastery's own
+  // declarations above — referencing them any earlier in this
+  // component's dependency array (evaluated eagerly during render,
+  // unlike the effect body itself) is a genuine temporal-dead-zone
+  // ReferenceError on every single render, not just when this effect
+  // actually fires. Confirmed live: crashed the whole app immediately
+  // on both web and desktop the one time this got placed too early.
+  useEffect(() => {
+    if (!isLoggedIn || !pendingSteamCallbackRef.current) return;
+    const params = pendingSteamCallbackRef.current;
+    pendingSteamCallbackRef.current = null;
+
+    setSteamLinkStatus("linking");
+    verifySteamOpenIdCallback(params)
+      .then((steamId) => {
+        setLinkedSteamId(steamId);
+        setSteamLinkStatus("success");
+        setSteamLinkResult({ steamId });
+        recomputeMastery(steamId).then(recomputeOverallMastery);
+        goTo("linking");
+      })
+      .catch((err) => {
+        console.error("Steam sign-in failed:", err);
+        setSteamLinkStatus("error");
+        setSteamLinkResult({ error: err.message });
+        goTo("linking");
+      });
+  }, [isLoggedIn, goTo, recomputeMastery, recomputeOverallMastery]);
 
   // ---------- value (memoized so consumers don't re-render for nothing) ----------
   const value = useMemo(
