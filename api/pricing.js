@@ -1225,6 +1225,19 @@ const CRUNCHYROLL_BASE = "https://beta-api.crunchyroll.com";
 // not a Lykodex-issued credential.
 const CRUNCHYROLL_ETP_RT_AUTH_HEADER = "Basic bm9haWhkZXZtXzZpeWcwYThsMHE6";
 
+// Pulls just the etp_rt value out of whatever the person pasted —
+// "etp_rt=<value>", "etp_rt = <value>" (a stray space after the "="
+// is an easy thing to type and isn't valid inside an HTTP cookie
+// value — sent verbatim it truncates to an empty etp_rt and
+// Crunchyroll rejects it as invalid_grant even when the real cookie
+// value is fine), a full multi-cookie DevTools copy, or a trailing
+// semicolon — and rebuilds a clean "etp_rt=<value>" Cookie header
+// regardless of formatting.
+function normalizeEtpRtCookie(raw) {
+  const match = /etp_rt\s*=\s*([^;\s]+)/i.exec(raw || "");
+  return match ? `etp_rt=${match[1]}` : null;
+}
+
 async function crunchyrollExchangeCookieForTokens(cookie, deviceId) {
   const res = await fetch(`${CRUNCHYROLL_BASE}/auth/v1/token`, {
     method: "POST",
@@ -1299,8 +1312,9 @@ async function handleCrunchyroll(req, searchParams, res) {
     if (mode === "link") {
       if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
       const { userId, adminClient } = await verifyCallerAndGetAdminClient(req);
-      const { cookie } = req.body || {};
-      if (!cookie || !cookie.includes("etp_rt=")) {
+      const { cookie: rawCookie } = req.body || {};
+      const cookie = normalizeEtpRtCookie(rawCookie);
+      if (!cookie) {
         return res.status(400).json({ error: "Missing or invalid cookie — it must include etp_rt=" });
       }
 
