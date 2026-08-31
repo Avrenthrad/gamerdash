@@ -134,6 +134,57 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-09-01 — **Real Crunchyroll account linking (unofficial, cookie-
+  based) — first of a planned batch (Crunchyroll done, Kindle and
+  Audible next).** Researched which streaming/media services actually
+  have a real, workable path before building anything (never guessed
+  an API here either):
+  - **Netflix/Disney+/Prime Video: genuine dead end.** No public API,
+    and unlike Xbox/PSN/Crunchyroll, no established community library
+    reverse-engineers personal viewing history for these either —
+    confirmed via real research, not assumed. Not being pursued.
+  - **Crunchyroll: built.** No public API/OAuth at all —
+    `crunchyroll_tokens` table (RLS, service_role only) +
+    `api/pricing.js`'s `handleCrunchyroll` (mirrors `handlePsn`'s exact
+    shape) exchange the person's own `etp_rt` session cookie
+    (extracted from their own browser, same shape as PSN's npsso) at
+    `beta-api.crunchyroll.com/auth/v1/token` — confirmed against
+    HarshitKumar9030/crunchyroll-api's actual working source.
+    `CrunchyrollCard` on Account Linking mirrors `PsnCard`.
+  - **New `media_library_items` table** + `lib/mediaLibrary.js`/
+    `mediaLibraryImport.js` — Library College's equivalent of Gaming's
+    `game_library_items`: a flat "you have this, from this source"
+    list, no status forced onto bulk-imported real watch history
+    (`entertainment_entries`' completed/watching/want_to_watch model
+    would've silently mis-tagged everything, same reasoning as why
+    Xbox/PSN library import doesn't write to Backlog).
+  - **Kindle: confirmed buildable but more fragile** —
+    [Xetera/kindle-api](https://github.com/Xetera/kindle-api) is real
+    and cookie-based (same PSN-style shape), but needs to work around
+    Amazon's active anti-bot TLS fingerprinting — the least stable of
+    this batch, not built yet.
+  - **Audible: confirmed buildable, bigger trust ask, not built yet**
+    — no OAuth alternative exists (checked: Amazon's real "Login with
+    Amazon" service only offers `profile`/`profile:user_id`/
+    `postal_code` scopes, nothing for any Amazon media library). The
+    real path (mkb79/Audible, actively maintained) needs the person's
+    actual Amazon password submitted through the server (not a session
+    token like everything else here), Amazon's login CAPTCHA/2FA, and
+    RSA device-registration request-signing for every call after —
+    user explicitly confirmed proceeding with this trade-off knowingly
+    when asked directly.
+
+  **Verified structurally live** (renders correctly, no crash) — the
+  actual Crunchyroll token exchange isn't tested against a real
+  account yet, same as Xbox/PSN's first pass.
+
+  **Still to do**: Kindle, Audible, and — once all three exist —
+  restructuring Account Linking into per-College sections (explicitly
+  requested), each section hidden entirely for Colleges the user
+  hasn't opted into via `selectedColleges` (also explicitly
+  requested). Not started yet — deferred until there's more than one
+  Library-College integration to actually organize.
+
 - 2026-08-31 — **Mastery tier system (Bronze/Silver/Gold/Platinum/
   Diamond) + Guild Mastery Score (average of all members) + primary
   guild assignment.** Three real pieces:
