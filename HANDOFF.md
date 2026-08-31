@@ -134,6 +134,13 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-30 — **Real Xbox desktop sign-in confirmed working
+  end-to-end** (client ID env var → deep-link argv forwarding →
+  public-client token exchange, the three entries below) — real
+  Gamerscore now showing after linking on the desktop app. The whole
+  Xbox desktop/mobile support chain is done; no longer "not yet tested
+  live."
+
 - 2026-08-30 — **Fixed "Public clients can't send a client secret" on
   desktop Xbox sign-in.** Confirmed live: after the deep-link fix
   below, sign-in reached the real token exchange but Microsoft
