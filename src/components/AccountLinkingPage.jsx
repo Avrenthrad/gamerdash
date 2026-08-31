@@ -288,7 +288,7 @@ function XboxLiveCard() {
         setImportMessage(`Importing… ${current} of ${totalCount}`)
       );
       setImportStatus("done");
-      setImportMessage(`Added ${added} of ${total} games to your Backlog.`);
+      setImportMessage(`Added ${added} of ${total} games to your Gaming Collection.`);
     } catch (err) {
       console.error("Xbox library import failed:", err);
       setImportStatus("error");
@@ -397,7 +397,7 @@ function PsnCard() {
         setImportMessage(`Importing… ${current} of ${totalCount}`)
       );
       setImportStatus("done");
-      setImportMessage(`Added ${added} of ${total} games to your Backlog.`);
+      setImportMessage(`Added ${added} of ${total} games to your Gaming Collection.`);
     } catch (err) {
       console.error("PSN library import failed:", err);
       setImportStatus("error");
