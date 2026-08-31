@@ -95,6 +95,13 @@ export function mergeLibraryByTitle({ steamGames = [], libraryItems = [], platfo
       playtimeMinutes: 0,
       imgIconUrl: null,
       parentTitle: item.parent_title || null,
+      // Real: when this row was imported into Gaming Collection.
+      // Steam has no purchase-date field at all in the live playtime
+      // fetch (GetOwnedGames doesn't expose one — confirmed while
+      // building this page, see this file's header), so only Xbox/PSN
+      // rows carry this; Steam entries below are left undated rather
+      // than given a fabricated one.
+      addedAt: item.added_at || null,
     });
   }
 
@@ -124,6 +131,7 @@ export function mergeLibraryByTitle({ steamGames = [], libraryItems = [], platfo
         steamAppid: null,
         imgIconUrl: null,
         dlc: [],
+        addedAt: null,
       });
     }
     return map.get(key);
@@ -149,6 +157,9 @@ export function mergeLibraryByTitle({ steamGames = [], libraryItems = [], platfo
         parent.playtimeMinutes[entry.platform] || 0,
         entry.playtimeMinutes
       );
+    }
+    if (entry.addedAt && (!parent.addedAt || new Date(entry.addedAt) > new Date(parent.addedAt))) {
+      parent.addedAt = entry.addedAt;
     }
   }
 

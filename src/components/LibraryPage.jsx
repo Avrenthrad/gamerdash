@@ -68,6 +68,7 @@ export default function LibraryPage({
   const [libraryItems, setLibraryItems] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [platformFilter, setPlatformFilter] = useState(() => new Set(FILTER_PLATFORMS));
+  const [sortMode, setSortMode] = useState("playtime"); // "playtime" | "recent"
   const [platformLinked, setPlatformLinked] = useState({
     steam: false,
     xbox: false,
@@ -148,18 +149,35 @@ export default function LibraryPage({
       steamGames,
       libraryItems,
       platformPlaytime: otherPlatformGames,
-    }).sort((a, b) => b.totalPlaytimeMinutes - a.totalPlaytimeMinutes),
+    }),
     [steamGames, libraryItems, otherPlatformGames]
   );
 
   const filteredLibrary = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
-    return unifiedLibrary.filter((game) => {
+    const filtered = unifiedLibrary.filter((game) => {
       if (query && !game.title.toLowerCase().includes(query)) return false;
       if (!game.platforms.some((p) => platformFilter.has(p))) return false;
       return true;
     });
-  }, [searchTerm, unifiedLibrary, platformFilter]);
+
+    const sorted = [...filtered];
+    if (sortMode === "recent") {
+      // Real: when each title was actually added to Gaming Collection
+      // (game_library_items.added_at, via mergeLibraryByTitle). Steam
+      // has no purchase-date field to draw on at all (see
+      // gameLibrary.js), so undated Steam-only entries sort to the
+      // bottom rather than being given a fabricated date.
+      sorted.sort((a, b) => {
+        const aTime = a.addedAt ? new Date(a.addedAt).getTime() : -Infinity;
+        const bTime = b.addedAt ? new Date(b.addedAt).getTime() : -Infinity;
+        return bTime - aTime;
+      });
+    } else {
+      sorted.sort((a, b) => b.totalPlaytimeMinutes - a.totalPlaytimeMinutes);
+    }
+    return sorted;
+  }, [searchTerm, unifiedLibrary, platformFilter, sortMode]);
 
   function togglePlatformFilter(platform) {
     setPlatformFilter((prev) => {
@@ -362,7 +380,25 @@ export default function LibraryPage({
             <span className="feed-col__label">
               {searchTerm.trim() ? `Search results (${filteredLibrary.length})` : `Full Library (${filteredLibrary.length})`}
             </span>
-            <details className="library-platform-filter">
+            <div className="library-full-header__controls">
+              <div className="backlog-status-tabs">
+                <button
+                  type="button"
+                  className={`quickdash-reset-btn ${sortMode === "playtime" ? "quickdash-reset-btn--active" : ""}`}
+                  onClick={() => setSortMode("playtime")}
+                >
+                  Most Played
+                </button>
+                <button
+                  type="button"
+                  className={`quickdash-reset-btn ${sortMode === "recent" ? "quickdash-reset-btn--active" : ""}`}
+                  onClick={() => setSortMode("recent")}
+                  title="Sorted by when each title was added to Gaming Collection — Steam has no real purchase-date data to sort by, so undated Steam titles sort last."
+                >
+                  Recently Added
+                </button>
+              </div>
+              <details className="library-platform-filter">
               <summary className="library-platform-filter__summary">
                 Platforms{platformFilter.size < FILTER_PLATFORMS.length ? ` (${platformFilter.size})` : ""}
               </summary>
@@ -380,7 +416,8 @@ export default function LibraryPage({
                   </li>
                 ))}
               </ul>
-            </details>
+              </details>
+            </div>
           </div>
           <table className="library-table">
             <thead>
