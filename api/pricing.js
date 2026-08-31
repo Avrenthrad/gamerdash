@@ -632,6 +632,14 @@ async function xboxFetchLibrary(userhash, xstsToken, xuid) {
       "x-xbl-client-name": "XboxApp",
       "x-xbl-client-type": "UWA",
       "x-xbl-client-version": "39.39.22001.0",
+      // Node's built-in fetch sends "Accept-Language: *" when nothing
+      // overrides it, and titlehub (unlike the gamerscore/presence
+      // endpoints above) validates this header strictly and rejects
+      // the wildcard outright — confirmed live: "Request contains
+      // Accept-Language header with invalid locale value: *". The
+      // real xbox-webapi-python reference always sets a real locale
+      // here for exactly this reason.
+      "Accept-Language": "en-US",
       Authorization: `XBL3.0 x=${userhash};${xstsToken}`,
     },
   });
@@ -1009,14 +1017,29 @@ async function getLivePsnPresence(adminClient, userId) {
 // actual working getUserPlayedGames implementation — same Bearer
 // token as trophy/presence fetching, different (gamelist) endpoint.
 async function psnFetchLibrary(accessToken, accountId) {
-  const url = `https://m.np.playstation.com/api/gamelist/v2/users/${accountId}/titles?limit=500`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-  if (!res.ok) {
-    const bodyText = await res.text().catch(() => "");
-    throw new Error(`PSN game list request failed (${res.status})${bodyText ? `: ${bodyText.slice(0, 300)}` : ""}`);
+  // limit is capped server-side at 200 — confirmed live: "invalid
+  // request, requested limit=500 allowed limit=200". Paginate via
+  // offset (the response's own nextOffset/totalItemCount, matching
+  // achievements-app/psn-api's UserPlayedGamesResponse shape) since a
+  // real library can exceed 200 titles.
+  const PAGE_LIMIT = 200;
+  let offset = 0;
+  const allTitles = [];
+  for (;;) {
+    const url = `https://m.np.playstation.com/api/gamelist/v2/users/${accountId}/titles?limit=${PAGE_LIMIT}&offset=${offset}`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!res.ok) {
+      const bodyText = await res.text().catch(() => "");
+      throw new Error(`PSN game list request failed (${res.status})${bodyText ? `: ${bodyText.slice(0, 300)}` : ""}`);
+    }
+    const data = await res.json();
+    allTitles.push(...(data.titles || []));
+    const total = data.totalItemCount ?? allTitles.length;
+    if (allTitles.length >= total || !data.titles?.length) break;
+    offset += PAGE_LIMIT;
   }
-  const data = await res.json();
-  return (data.titles || []).map((t) => ({
+
+  return allTitles.map((t) => ({
     titleId: t.titleId,
     name: t.name,
     imageUrl: t.imageUrl || null,
