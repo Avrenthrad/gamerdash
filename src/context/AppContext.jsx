@@ -34,6 +34,7 @@ import { supabase, supabaseConfigured } from "../lib/supabaseClient";
 import { signOut as supabaseSignOut, requestLykodexSession } from "../lib/auth";
 import { subscribeToPresence } from "../lib/presence";
 import { completeXboxLink, consumeXboxOAuthCallback, parseXboxOAuthRedirectUrl } from "../lib/xboxOAuth";
+import { consumeSteamOpenIdCallback, verifySteamOpenIdCallback } from "../lib/steamAuth";
 import { App as CapacitorApp } from "@capacitor/app";
 import { onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import {
@@ -373,6 +374,10 @@ export function AppProvider({ children }) {
   // idle | linking | success | error
   const [xboxLinkStatus, setXboxLinkStatus] = useState("idle");
   const [xboxLinkResult, setXboxLinkResult] = useState(null);
+  const pendingSteamCallbackRef = useRef(null);
+  // idle | linking | success | error
+  const [steamLinkStatus, setSteamLinkStatus] = useState("idle");
+  const [steamLinkResult, setSteamLinkResult] = useState(null);
 
   // ---------- derived ----------
   const effectivePlatformOrder = useMemo(
@@ -731,6 +736,15 @@ export function AppProvider({ children }) {
     const xboxCallback = consumeXboxOAuthCallback();
     if (xboxCallback) pendingXboxCallbackRef.current = xboxCallback;
 
+    // Real "Sign in through Steam" callback (see lib/steamAuth.js) —
+    // same shape as the Xbox one just above: Steam redirects back
+    // here with a batch of real ?openid.* params, captured and
+    // stripped immediately regardless of login state, verified in the
+    // effect below once a real session exists (setLinkedSteamId needs
+    // somewhere to actually write the result).
+    const steamCallback = consumeSteamOpenIdCallback();
+    if (steamCallback) pendingSteamCallbackRef.current = steamCallback;
+
     return () => window.removeEventListener("hashchange", syncFromHash);
   }, []);
 
@@ -837,6 +851,39 @@ export function AppProvider({ children }) {
     return () => subscription?.remove();
   }, [completeXboxOAuth]);
 
+  // Completes the real "Sign in through Steam" link once a real
+  // session is confirmed — same shape as the Xbox web-path effect
+  // above, web-only for now (see steamAuth.js's file header for why).
+  // Verification only returns a SteamID64 (or throws) — it doesn't
+  // import the wishlist itself, same as Xbox/PSN's linking not
+  // bundling their library import; AccountLinkingPage's own "Import
+  // Steam Wishlist" button (or the existing "Resync Steam wishlist"
+  // on the Prices page) is still the actual import step. Mirrors the
+  // same recomputeMastery(steamId).then(recomputeOverallMastery) call
+  // the old manual-entry onLinkSteam wrapper made in App.jsx, so
+  // linking still triggers a fresh Mastery snapshot the same way.
+  useEffect(() => {
+    if (!isLoggedIn || !pendingSteamCallbackRef.current) return;
+    const params = pendingSteamCallbackRef.current;
+    pendingSteamCallbackRef.current = null;
+
+    setSteamLinkStatus("linking");
+    verifySteamOpenIdCallback(params)
+      .then((steamId) => {
+        setLinkedSteamId(steamId);
+        setSteamLinkStatus("success");
+        setSteamLinkResult({ steamId });
+        recomputeMastery(steamId).then(recomputeOverallMastery);
+        goTo("linking");
+      })
+      .catch((err) => {
+        console.error("Steam sign-in failed:", err);
+        setSteamLinkStatus("error");
+        setSteamLinkResult({ error: err.message });
+        goTo("linking");
+      });
+  }, [isLoggedIn, goTo, recomputeMastery, recomputeOverallMastery]);
+
   // Every goTo() push a new hash entry onto the browser's real history
   // stack, so "back" almost always means "wherever the hash was before
   // this one" — using the browser's own history instead of a hardcoded
@@ -928,6 +975,7 @@ export function AppProvider({ children }) {
   }, [personalSessionCache]);
 
   const clearXboxLinkResult = useCallback(() => setXboxLinkResult(null), []);
+  const clearSteamLinkResult = useCallback(() => setSteamLinkResult(null), []);
 
   // The only setter that should ever mark accent as customized — used
   // exclusively by the Account Settings swatch row. Everywhere else
@@ -1062,6 +1110,9 @@ export function AppProvider({ children }) {
       xboxLinkStatus,
       xboxLinkResult,
       clearXboxLinkResult,
+      steamLinkStatus,
+      steamLinkResult,
+      clearSteamLinkResult,
 
       // profile
       avatarUrl,
@@ -1161,6 +1212,9 @@ export function AppProvider({ children }) {
       xboxLinkStatus,
       xboxLinkResult,
       clearXboxLinkResult,
+      steamLinkStatus,
+      steamLinkResult,
+      clearSteamLinkResult,
       avatarUrl,
       firstName,
       lastName,

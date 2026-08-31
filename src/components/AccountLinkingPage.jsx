@@ -1,27 +1,29 @@
 // Account linking screen — connect gaming and streaming platforms.
 //
-// Genuinely working pieces: Steam (public-profile wishlist sync),
-// Discord + Twitch (real OAuth via Supabase's own built-in provider
-// support — see lib/auth.js for why that one specifically isn't
-// blocked on deployment the way a directly-registered OAuth app is:
-// Supabase's OAuth callback is its own fixed domain, not ours), and
-// now Xbox Live + PlayStation Network — both real, live-synced
-// Gamerscore/trophy data, not self-reported:
+// Genuinely working pieces: Discord + Twitch (real OAuth via
+// Supabase's own built-in provider support — see lib/auth.js for why
+// that one specifically isn't blocked on deployment the way a
+// directly-registered OAuth app is: Supabase's OAuth callback is its
+// own fixed domain, not ours), Xbox Live + PlayStation Network (both
+// real, live-synced Gamerscore/trophy data, not self-reported), and
+// Steam:
 //   - Xbox: real Microsoft OAuth ("Sign in with Microsoft") -> Xbox
 //     Live's own XSTS token exchange (see lib/xboxOAuth.js).
 //   - PlayStation: a real npsso-token-based session (see
 //     lib/psnAuth.js) — unofficial (Sony has no public OAuth app
 //     registration path) but real, the same mechanism every PSN
 //     trophy tracker uses.
+//   - Steam: real "Sign in through Steam" (OpenID 2.0, see
+//     lib/steamAuth.js) rather than the old "paste your SteamID64 and
+//     we trust it" — Valve's OpenID provider proves real ownership
+//     with no app registration needed at all, unlike everything else
+//     on this page.
 //
 // Nintendo still has no public API for a person's own library at all
 // (confirmed while researching it) — it keeps the real self-reported
-// handle field pattern (Friend Code + Username) below. Xbox/PlayStation
-// ALSO still show their self-reported handle fields even once linked —
-// that's the honest fallback for someone who chooses not to sign in
-// (or whose link expires), not a second competing mechanism; whichever
-// is actually available wins when Gaming Mastery recomputes (see
-// lib/gameMasteryData.js).
+// handle field pattern (Friend Code + Username) below; whichever of
+// self-reported vs. real-linked data is actually available wins when
+// Gaming Mastery recomputes (see lib/gameMasteryData.js).
 //
 // Removed entirely: Destiny 2 (real working Bungie OAuth, but paused
 // on a Bungie-registered redirect URL — dropped from this screen per
@@ -35,6 +37,7 @@ import { linkIdentity, unlinkProviderIdentity, getLinkedProviders, syncDiscordLi
 import { supabase } from "../lib/supabaseClient";
 import { getXboxSignInUrl, startXboxSignIn, fetchLiveGamerscore, unlinkXbox } from "../lib/xboxOAuth";
 import { linkPsnAccount, fetchLiveTrophies, unlinkPsn } from "../lib/psnAuth";
+import { startSteamSignIn } from "../lib/steamAuth";
 import { importXboxLibrary, importPsnLibrary } from "../lib/libraryImport";
 import { useApp } from "../hooks/useApp";
 import GameMasterySection from "./GameMasterySection";
@@ -513,7 +516,6 @@ export default function AccountLinkingPage({
   onFinishOnboarding,
   userId,
   linkedSteamId,
-  onLinkSteam,
   onUnlinkSteam,
   onAddToWishlist,
   masteryScore,
@@ -523,7 +525,7 @@ export default function AccountLinkingPage({
   masteryComputedAt,
   onRecomputeMastery,
 }) {
-  const [input, setInput] = useState("");
+  const { steamLinkResult, clearSteamLinkResult } = useApp();
   const [status, setStatus] = useState("idle"); // idle | loading | done | error
   const [message, setMessage] = useState("");
 
@@ -580,26 +582,27 @@ export default function AccountLinkingPage({
     refreshLinkedProviders();
   }, []);
 
-  async function handleLink(e) {
-    e.preventDefault();
-    if (!input.trim()) return;
+  // Linking itself now happens via real "Sign in through Steam" (see
+  // AppContext.jsx's Steam completion effect) — this just imports the
+  // wishlist for an already-linked account, same as Xbox/PSN's
+  // separate explicit "Import Library" buttons rather than bundling
+  // import into the link step itself.
+  async function handleImportWishlist() {
     setStatus("loading");
     setMessage("");
 
     try {
-      const { steamId, total, added } = await importSteamWishlist(
-        input.trim(),
+      const { total, added } = await importSteamWishlist(
+        linkedSteamId,
         onAddToWishlist,
         (current, totalCount) => setMessage(`Importing… ${current} of ${totalCount}`)
       );
-      onLinkSteam(steamId);
       setStatus("done");
-      setMessage(`Linked and imported ${added} of ${total} games from your Steam wishlist.`);
-      setInput("");
+      setMessage(`Imported ${added} of ${total} games from your Steam wishlist.`);
     } catch (err) {
-      console.error("Steam link failed:", err);
+      console.error("Steam wishlist import failed:", err);
       setStatus("error");
-      setMessage(err.message || "Couldn't link that Steam profile — make sure your wishlist is public.");
+      setMessage(err.message || "Couldn't import your Steam wishlist — make sure it's set to public.");
     }
   }
 
@@ -619,35 +622,37 @@ export default function AccountLinkingPage({
       </div>
 
       <div className="steam-link-card">
-        <h2 className="settings-card__title">Steam wishlist sync</h2>
+        <h2 className="settings-card__title">Steam</h2>
+        {steamLinkResult?.error && (
+          <p className="panel__status panel__status--error">
+            Sign-in failed: {steamLinkResult.error}
+            <button type="button" className="game-popup__close" onClick={clearSteamLinkResult} aria-label="Dismiss" style={{ marginLeft: "8px" }}>✕</button>
+          </p>
+        )}
         {linkedSteamId ? (
           <>
             <p className="settings-card__note">
-              Linked — SteamID64 <code>{linkedSteamId}</code>. Your wishlist stays synced; head to the
-              Prices page any time and hit "Resync Steam wishlist" to pull in new additions.
+              Linked — SteamID64 <code>{linkedSteamId}</code>. Import your wishlist any time below, or
+              head to the Prices page and hit "Resync Steam wishlist" to pull in new additions.
             </p>
-            <button type="button" className="linking-row__connect" onClick={onUnlinkSteam}>
-              Unlink Steam
-            </button>
+            <div className="backlog-card__actions">
+              <button type="button" className="linking-row__connect" onClick={handleImportWishlist} disabled={status === "loading"}>
+                {status === "loading" ? "Importing…" : "Import Steam Wishlist"}
+              </button>
+              <button type="button" className="linking-row__connect" onClick={onUnlinkSteam}>
+                Unlink Steam
+              </button>
+            </div>
           </>
         ) : (
           <>
             <p className="settings-card__note">
-              Paste your Steam profile URL, SteamID64, or vanity name — your wishlist needs to be
-              set to public on Steam for this to work.
+              Sign in through Steam to link your real account — your wishlist needs to be set to
+              public on Steam afterward for it to sync.
             </p>
-            <form className="price-search" onSubmit={handleLink}>
-              <input
-                className="price-search__input"
-                type="text"
-                placeholder="steamcommunity.com/id/yourname"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-              />
-              <button type="submit" className="price-search__button" disabled={status === "loading"}>
-                {status === "loading" ? "Linking…" : "Link & import"}
-              </button>
-            </form>
+            <button type="button" className="price-search__button" onClick={startSteamSignIn} style={{ alignSelf: "flex-start" }}>
+              Sign in through Steam
+            </button>
           </>
         )}
         {message && (

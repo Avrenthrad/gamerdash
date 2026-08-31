@@ -267,7 +267,6 @@ export default function App() {
             variant="onboarding"
             userId={userId}
             linkedSteamId={linkedSteamId}
-            onLinkSteam={setLinkedSteamId}
             onUnlinkSteam={() => setLinkedSteamId(null)}
             onAddToWishlist={addToWishlist}
             onFinishOnboarding={finishOnboarding}
@@ -307,10 +306,6 @@ export default function App() {
               <AccountLinkingPage
                 userId={userId}
                 linkedSteamId={linkedSteamId}
-                onLinkSteam={(steamId) => {
-                  setLinkedSteamId(steamId);
-                  recomputeMastery(steamId).then(recomputeOverallMastery);
-                }}
                 onUnlinkSteam={() => {
                   setLinkedSteamId(null);
                   recomputeMastery(null).then(recomputeOverallMastery);

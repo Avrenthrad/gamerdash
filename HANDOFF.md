@@ -134,6 +134,41 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-30 — **Real "Sign in through Steam" replaces the old
+  "paste your SteamID64 and we trust it" flow.** Steam's OpenID 2.0
+  provider (`steamcommunity.com/openid/login`) is the only account-
+  linking mechanism Valve actually offers — genuinely simpler to set
+  up than everything else on this page: no app registration, no
+  client ID/secret, no Supabase dashboard step at all. New
+  `src/lib/steamAuth.js` (client: builds the redirect, reads the
+  callback) + `api/steam.js`'s new `verifyOpenId` mode (server: re-
+  posts the exact params Steam signed back to it with
+  `openid.mode=check_authentication`, only trusts the SteamID64 in
+  `openid.claimed_id` if Steam confirms `is_valid:true` — the redirect
+  alone is trivially forgeable client-side, this is the actual proof).
+  Wired into `AppContext.jsx` the same shape as Xbox's web callback
+  (boot-time capture → complete once a session exists), including the
+  same `recomputeMastery(steamId).then(recomputeOverallMastery)` call
+  the old manual-entry `onLinkSteam` wrapper made, so linking still
+  triggers a fresh Mastery snapshot. `AccountLinkingPage.jsx`'s Steam
+  card now shows a "Sign in through Steam" button when unlinked, and a
+  separate explicit "Import Steam Wishlist" button once linked
+  (dropped the old bundled "link & import" — matches Xbox/PSN's
+  already-separate link vs. import buttons instead of being the odd
+  one out). Removed the now-dead `onLinkSteam` prop from
+  `AccountLinkingPage.jsx`/`App.jsx`/`PreviewGallery.jsx` — the actual
+  link now happens in `AppContext.jsx` directly.
+
+  **Web-only for now** — Steam's OpenID realm/return_to must be a real
+  http(s) URL it can validate; unlike Xbox/Discord's OAuth2
+  redirect_uri, there's no app-registration step anywhere to register
+  a custom `lykodex://` scheme as an allowed destination. Packaged-app
+  support would need a real hosted bounce-back page (sign in via the
+  system browser to a real https:// page, which then hands off to
+  `lykodex://` itself) and isn't built yet.
+
+  **Not yet tested live.**
+
 - 2026-08-30 — **Real Xbox desktop sign-in confirmed working
   end-to-end** (client ID env var → deep-link argv forwarding →
   public-client token exchange, the three entries below) — real

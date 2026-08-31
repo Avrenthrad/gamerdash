@@ -19,6 +19,7 @@
 //                           fetch("/api/steam?steamid=...&mode=friendList")                 -> a person's real Steam friends (public profiles only)
 //                           fetch("/api/steam?steamids=id1,id2,...&mode=playerSummaries")    -> live online/in-game status for up to 100 people
 //                           fetch("/api/steam?appid=...&mode=news")                          -> real dev-posted announcements/patch notes for one app
+//                           fetch("/api/steam?openid.*=...&mode=verifyOpenId")                -> verify a real "Sign in through Steam" callback, see lib/steamAuth.js
 
 import { allowCors } from "./_cors.js";
 
@@ -26,6 +27,46 @@ export default async function handler(req, res) {
   allowCors(res);
   const apiKey = process.env.STEAM_API_KEY;
   const { steamid, appid, mode } = req.query;
+
+  // Real "Sign in through Steam" verification (see lib/steamAuth.js) —
+  // the browser redirect's ?openid.* params are trivially forgeable
+  // client-side on their own, so this is the actual proof: re-post the
+  // exact params Steam signed back to it with openid.mode switched to
+  // check_authentication, and only trust the SteamID64 in
+  // openid.claimed_id if Steam itself confirms is_valid:true. No API
+  // key needed for this call — it's a different, keyless endpoint of
+  // Steam's own OpenID provider, not the Steam Web API.
+  if (mode === "verifyOpenId") {
+    const params = { ...req.query };
+    delete params.mode;
+    if (!params["openid.claimed_id"] || !params["openid.sig"]) {
+      return res.status(400).json({ error: "Missing OpenID response parameters" });
+    }
+
+    try {
+      const body = new URLSearchParams({ ...params, "openid.mode": "check_authentication" });
+      const steamRes = await fetch("https://steamcommunity.com/openid/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: body.toString(),
+      });
+      // Steam's response here is plain key:value lines, not JSON.
+      const text = await steamRes.text();
+      if (!text.includes("is_valid:true")) {
+        return res.status(400).json({ error: "Steam sign-in couldn't be verified" });
+      }
+
+      const claimedId = params["openid.claimed_id"];
+      const steamIdMatch = /\/openid\/id\/(\d{17})$/.exec(claimedId);
+      if (!steamIdMatch) {
+        return res.status(400).json({ error: "Couldn't read a SteamID64 from the sign-in response" });
+      }
+
+      return res.status(200).json({ steamId: steamIdMatch[1] });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
 
   // Current player count is a public Steam endpoint — no key, no
   // steamid, just an appid. Kept in the same proxy since Steam still

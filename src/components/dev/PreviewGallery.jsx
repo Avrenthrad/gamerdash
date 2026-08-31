@@ -300,7 +300,6 @@ export default function PreviewGallery() {
             <AccountLinkingPage
               variant="onboarding"
               linkedSteamId={null}
-              onLinkSteam={noop("onLinkSteam")}
               onUnlinkSteam={noop("onUnlinkSteam")}
               onAddToWishlist={noop("onAddToWishlist")}
               onFinishOnboarding={noop("onFinishOnboarding")}
@@ -318,7 +317,6 @@ export default function PreviewGallery() {
             <AccountLinkingPage
               variant="onboarding"
               linkedSteamId="76561190000000000"
-              onLinkSteam={noop("onLinkSteam")}
               onUnlinkSteam={noop("onUnlinkSteam")}
               onAddToWishlist={noop("onAddToWishlist")}
               onFinishOnboarding={noop("onFinishOnboarding")}
