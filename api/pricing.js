@@ -40,7 +40,8 @@
 
 import { allowCors } from "./_cors.js";
 import { createClient } from "@supabase/supabase-js";
-import { computeXboxScore, computePsScore, computeMasteryScore, accountXpFromMastery, levelFromXp } from "../src/lib/gameMastery.js";
+import { computeXboxScore, computePsScore, computeSteamScore, computeMasteryScore, accountXpFromMastery, levelFromXp } from "../src/lib/gameMastery.js";
+import { computeOverallScore } from "../src/lib/overallMastery.js";
 
 const XBXPRICES_BASE = "https://xbxprices.com/api/v2";
 const CHEAPSHARK_ALLOWED_ENDPOINTS = ["games", "deals", "stores"];
@@ -1050,19 +1051,99 @@ async function handlePsn(req, searchParams, res) {
   }
 }
 
-// ---------- Daily Mastery recompute (Xbox/PSN only) ----------
-// Vercel Cron (see vercel.json, "0 4 * * *" — same 4am UTC time as the
-// existing pg_cron mastery_score_history snapshot, so the two stay in
-// sync) hits this once a day for every user who has xbox_tokens or
-// psn_tokens linked, refreshing their live Gamerscore/trophy counts
-// automatically instead of waiting for them to click "Recompute"
-// themselves. Steam is deliberately NOT re-fetched here — this cron
-// only targets the Xbox/PSN part of the score; the manual "Recompute
-// Gaming Mastery" button still combines all three fresh. Whatever
-// Steam contribution was last computed is carried forward unchanged
-// (read from the existing mastery_breakdown) rather than silently
-// dropped from the combined score.
-async function recomputeMasteryForUserServerSide(adminClient, userId) {
+// ---------- Midnight-local-time Mastery recompute (all 5 Colleges) ----------
+// Vercel Cron (see vercel.json, "0 * * * *" — hourly) hits this every
+// hour; isLocalMidnightHour below is what actually gates real work to
+// once per person per day, at THEIR local midnight rather than one
+// fixed UTC time for everyone — profiles.timezone is a real IANA name
+// (e.g. "Australia/Sydney"), captured client-side from the browser's
+// own Intl.DateTimeFormat().resolvedOptions().timeZone (see
+// AppContext.jsx), so this stays correct across daylight saving
+// without needing a raw UTC-offset column that would silently drift.
+//
+// hourCycle: "h23" rather than the less strictly specified
+// hour12: false — confirmed live (Node): both return "00" for
+// midnight today, but h23 is the one actually guaranteed by ECMA-402
+// to never fall back to "24".
+function isLocalMidnightHour(timezone) {
+  try {
+    const hour = new Intl.DateTimeFormat("en-US", { timeZone: timezone, hourCycle: "h23", hour: "numeric" }).format(new Date());
+    return hour === "0" || hour === "00";
+  } catch {
+    return false; // invalid/unrecognized timezone string — skip this user rather than crash the whole run
+  }
+}
+
+const GAMES_TO_SCAN = 15; // same bound as gameMasteryData.js's client-side gatherSteamAchievements
+
+async function steamFetchOwnedGames(steamId) {
+  const apiKey = process.env.STEAM_API_KEY;
+  const url = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key=${apiKey}&steamid=${encodeURIComponent(steamId)}&format=json&include_appinfo=1`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Steam owned-games request failed (${res.status})`);
+  const data = await res.json();
+  return data.response?.games || [];
+}
+
+async function steamFetchAchievements(steamId, appId) {
+  const apiKey = process.env.STEAM_API_KEY;
+  const url = `https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${encodeURIComponent(appId)}&key=${apiKey}&steamid=${encodeURIComponent(steamId)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Steam achievements request failed (${res.status})`);
+  const data = await res.json();
+  return data.playerstats?.achievements || [];
+}
+
+async function steamFetchGlobalAchievementPercentages(appId) {
+  const url = `https://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/?gameid=${encodeURIComponent(appId)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Steam global achievement percentages request failed (${res.status})`);
+  const data = await res.json();
+  return data.achievementpercentages?.achievements || [];
+}
+
+// Real Steam Mastery contribution, server-side — same three genuine
+// Steam Web API endpoints and same top-15-most-played-games bound as
+// gameMasteryData.js's gatherSteamAchievements (a browser-only file,
+// not importable here — see its own header for why). Kept as its own
+// function since the cron needs this without a real Supabase session
+// to call the client's own /api/steam proxy through.
+async function getLiveSteamMasteryRaw(steamId) {
+  const games = await steamFetchOwnedGames(steamId);
+  const topGames = [...games]
+    .sort((a, b) => (b.playtime_forever || 0) - (a.playtime_forever || 0))
+    .slice(0, GAMES_TO_SCAN);
+
+  const perGame = await Promise.all(
+    topGames.map(async (game) => {
+      try {
+        const [achievements, percentages] = await Promise.all([
+          steamFetchAchievements(steamId, game.appid),
+          steamFetchGlobalAchievementPercentages(game.appid),
+        ]);
+        const unlocked = achievements.filter((a) => a.achieved === 1);
+        return unlocked.map((a) => {
+          const percentEntry = percentages.find((p) => p.name === a.apiname);
+          return { unlockPercent: percentEntry ? Number(percentEntry.percent) : null };
+        });
+      } catch {
+        return []; // no achievements on this game, or a private/edge-case response — skip it
+      }
+    })
+  );
+
+  const achievements = perGame.flat();
+  return { raw: computeSteamScore(achievements), gamesScanned: topGames.length, achievementsCounted: achievements.length };
+}
+
+// Recomputes Gaming Mastery (Steam + Xbox + PlayStation) fresh,
+// server-side, for the hourly midnight-local-time cron below.
+// Unlike the old once-daily-for-everyone version of this cron, Steam
+// is now genuinely re-fetched here too when linked — falling back to
+// whatever was last computed only on a fetch failure, not skipped
+// outright, since this now runs at each person's own local midnight
+// rather than one shared fixed time.
+async function recomputeMasteryForUserServerSide(adminClient, userId, linkedSteamId) {
   const { data: profile } = await adminClient.from("profiles").select("mastery_breakdown").eq("id", userId).maybeSingle();
   const { data: inputs } = await adminClient.from("mastery_inputs").select("*").eq("user_id", userId).maybeSingle();
 
@@ -1072,7 +1153,20 @@ async function recomputeMasteryForUserServerSide(adminClient, userId) {
   const existingSteam = Array.isArray(profile?.mastery_breakdown)
     ? profile.mastery_breakdown.find((e) => e.platform === "steam")
     : null;
-  if (existingSteam) {
+
+  if (linkedSteamId) {
+    try {
+      const { raw, gamesScanned, achievementsCounted } = await getLiveSteamMasteryRaw(linkedSteamId);
+      rawScores.steam = raw;
+      sources.steam = { source: "live_steam_api", asOf: new Date().toISOString(), gamesScanned, achievementsCounted };
+    } catch (err) {
+      console.error(`pricing (mastery-cron): Steam fetch failed for user ${userId}`, err);
+      if (existingSteam) {
+        rawScores.steam = existingSteam.raw;
+        sources.steam = { source: existingSteam.source, asOf: existingSteam.asOf, gamesScanned: existingSteam.gamesScanned, achievementsCounted: existingSteam.achievementsCounted };
+      }
+    }
+  } else if (existingSteam) {
     rawScores.steam = existingSteam.raw;
     sources.steam = { source: existingSteam.source, asOf: existingSteam.asOf, gamesScanned: existingSteam.gamesScanned, achievementsCounted: existingSteam.achievementsCounted };
   }
@@ -1104,7 +1198,7 @@ async function recomputeMasteryForUserServerSide(adminClient, userId) {
   }
 
   const combined = computeMasteryScore(rawScores);
-  if (!combined) return "no_data";
+  if (!combined) return null;
 
   const accountXp = accountXpFromMastery(combined.masteryScore);
   const { level } = levelFromXp(accountXp);
@@ -1118,7 +1212,49 @@ async function recomputeMasteryForUserServerSide(adminClient, userId) {
     mastery_computed_at: new Date().toISOString(),
   }).eq("id", userId);
   if (error) throw error;
-  return "updated";
+  return combined.masteryScore;
+}
+
+// Recombines Overall Mastery (all 5 Colleges) using the just-refreshed
+// Gaming score plus whatever the other 4 Colleges' contributions
+// already are — deliberately NOT re-gathering TCG/Library/Loot/
+// Wartable's own raw data server-side (that would mean re-implementing
+// four more Colleges' worth of data-gathering here, duplicating
+// mtg.js/entertainment.js/collectibles.js/tabletop.js). Those 4 only
+// change when a person edits their own collection/backlog/campaigns
+// directly in the app, which already triggers a fresh combine right
+// then (see AppContext.jsx) — there's no external drift for them the
+// way there is for Gaming's real third-party platforms, so carrying
+// their last-computed raw values forward and only replacing Gaming's
+// is the correct behavior here, not a shortcut. Reuses
+// overall_mastery_breakdown's own stored `raw` field per College
+// (see overallMastery.js's computeOverallScore) as the source of
+// truth for those 4, rather than re-deriving them.
+async function recomputeOverallMasteryServerSide(adminClient, userId, freshGamingScore) {
+  const { data: profile } = await adminClient.from("profiles").select("overall_mastery_breakdown").eq("id", userId).maybeSingle();
+  const existingBreakdown = Array.isArray(profile?.overall_mastery_breakdown) ? profile.overall_mastery_breakdown : [];
+
+  const collegeScores = {};
+  for (const entry of existingBreakdown) {
+    if (entry?.college) collegeScores[entry.college] = entry.raw;
+  }
+  if (freshGamingScore != null) collegeScores.gaming = freshGamingScore;
+
+  const combined = computeOverallScore(collegeScores);
+  if (!combined) return false;
+
+  const accountXp = accountXpFromMastery(combined.overallScore);
+  const { level } = levelFromXp(accountXp);
+
+  const { error } = await adminClient.from("profiles").update({
+    overall_mastery_score: combined.overallScore,
+    overall_mastery_xp: accountXp,
+    overall_mastery_level: level,
+    overall_mastery_breakdown: combined.breakdown,
+    overall_mastery_computed_at: new Date().toISOString(),
+  }).eq("id", userId);
+  if (error) throw error;
+  return true;
 }
 
 async function handleMasteryCron(req, res) {
@@ -1126,7 +1262,7 @@ async function handleMasteryCron(req, res) {
   const cronSecret = process.env.CRON_SECRET;
   // No CRON_SECRET configured = refuse entirely, rather than allow an
   // unauthenticated public trigger of a job that writes to every
-  // linked user's profile.
+  // user's profile.
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return res.status(401).json({ error: "Unauthorized" });
   }
@@ -1138,20 +1274,26 @@ async function handleMasteryCron(req, res) {
   }
   const adminClient = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
 
-  const [{ data: xboxRows }, { data: psnRows }] = await Promise.all([
-    adminClient.from("xbox_tokens").select("user_id"),
-    adminClient.from("psn_tokens").select("user_id"),
-  ]);
-  const userIds = [...new Set([...(xboxRows || []).map((r) => r.user_id), ...(psnRows || []).map((r) => r.user_id)])];
+  // Every profile with a real timezone on file — not just Xbox/PSN-
+  // linked ones, since Overall Mastery recombination is worth doing
+  // for anyone with real data in any College, and isLocalMidnightHour
+  // below already makes this a cheap no-op for everyone else this run.
+  const { data: profiles, error: profilesError } = await adminClient.from("profiles").select("id, timezone, linked_steam_id").not("timezone", "is", null);
+  if (profilesError) return res.status(500).json({ error: profilesError.message });
 
-  const results = { total: userIds.length, updated: 0, noData: 0, failed: 0 };
-  for (const userId of userIds) {
+  const dueNow = (profiles || []).filter((p) => isLocalMidnightHour(p.timezone));
+
+  const results = { total: (profiles || []).length, dueThisHour: dueNow.length, gamingUpdated: 0, overallUpdated: 0, noData: 0, failed: 0 };
+  for (const profile of dueNow) {
     try {
-      const outcome = await recomputeMasteryForUserServerSide(adminClient, userId);
-      if (outcome === "updated") results.updated += 1;
+      const freshGamingScore = await recomputeMasteryForUserServerSide(adminClient, profile.id, profile.linked_steam_id);
+      if (freshGamingScore != null) results.gamingUpdated += 1;
       else results.noData += 1;
+
+      const overallUpdated = await recomputeOverallMasteryServerSide(adminClient, profile.id, freshGamingScore);
+      if (overallUpdated) results.overallUpdated += 1;
     } catch (err) {
-      console.error(`pricing (mastery-cron): failed for user ${userId}`, err);
+      console.error(`pricing (mastery-cron): failed for user ${profile.id}`, err);
       results.failed += 1;
     }
   }

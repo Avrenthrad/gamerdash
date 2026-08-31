@@ -748,6 +748,32 @@ export function AppProvider({ children }) {
     return () => window.removeEventListener("hashchange", syncFromHash);
   }, []);
 
+  // Captures the browser's own real IANA timezone (not a raw UTC
+  // offset, so it stays correct across daylight saving) on every real
+  // login — api/pricing.js's hourly mastery-cron uses this to know
+  // when it's actually midnight for this specific person, rather than
+  // firing at one fixed UTC time for everyone. A plain update, not an
+  // upsert-only-if-changed check — cheap enough to just always keep
+  // current, and self-heals if a person's system timezone changes.
+  useEffect(() => {
+    if (!isLoggedIn || !userId || !supabaseConfigured) return;
+    let timezone;
+    try {
+      timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch (err) {
+      console.error("Failed to detect timezone:", err);
+      return;
+    }
+    if (!timezone) return;
+    supabase
+      .from("profiles")
+      .update({ timezone })
+      .eq("id", userId)
+      .then(({ error }) => {
+        if (error) console.error("Failed to save timezone:", error);
+      });
+  }, [isLoggedIn, userId]);
+
   // ---------- effects: boot splash ----------
   useEffect(() => {
     const fadeTimer = setTimeout(() => setSplashFading(true), 1300);

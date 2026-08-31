@@ -2561,3 +2561,14 @@ returns boolean language sql security definer set search_path = public stable as
 $$;
 revoke execute on function public.is_psn_linked() from public, anon;
 grant execute on function public.is_psn_linked() to authenticated;
+
+-- ---------- Per-user timezone (for midnight-local-time cron jobs) ----------
+-- Applied in production via add_profiles_timezone migration. Captured
+-- client-side (see AppContext.jsx) from the browser's own
+-- Intl.DateTimeFormat().resolvedOptions().timeZone on login — an IANA
+-- name (e.g. "Australia/Sydney"), not a raw UTC offset, so it stays
+-- correct across daylight saving changes. Used by api/pricing.js's
+-- mastery-cron (now hourly, see vercel.json) to recompute each
+-- person's Mastery Score at their own local midnight rather than one
+-- fixed UTC time for everyone.
+alter table public.profiles add column if not exists timezone text;
