@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from "react";
 import LykodexLogo from "./LykodexLogo";
+import GlitchLykodexLogo from "./GlitchLykodexLogo";
 import OAuthMark from "./OAuthMark";
 import { signUp, signIn, signInWithOAuth, fetchEnabledOAuthProviders } from "../lib/auth";
 import { supabaseConfigured } from "../lib/supabaseClient";
@@ -266,7 +267,7 @@ export default function LoginPage({ onLoginSuccess, initialMode }) {
       <div className="auth-stage">
         <section className="auth-panel">
           <div className="auth-card">
-            <LykodexLogo className="auth-card__logo" />
+            <LykodexLogo className="auth-card__logo" transparent />
 
             <div className="auth-tabs" role="tablist" aria-label="Account">
               <button
@@ -371,6 +372,9 @@ export default function LoginPage({ onLoginSuccess, initialMode }) {
 
         <aside className="auth-hero" aria-hidden="true">
           <CollectionConstellationBackground />
+          <div className="auth-hero__brand" aria-hidden="true">
+            <GlitchLykodexLogo size={148} alt="" />
+          </div>
           <div className="auth-hero__overlay">
             <span className="auth-hero__eyebrow">Collection constellation</span>
             <p className="auth-hero__title">

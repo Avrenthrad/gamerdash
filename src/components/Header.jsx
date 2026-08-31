@@ -16,6 +16,8 @@
 import { useEffect, useRef, useState } from "react";
 import { isMobileApp } from "../lib/platform";
 import { checkIsLykodexDelegate } from "../lib/auth";
+import { GAMING_VIEWS, TCG_VIEWS } from "../lib/navSections";
+import { tierFromScore } from "../lib/masteryTiers";
 import { useApp } from "../hooks/useApp";
 import LykodexLogo from "./LykodexLogo";
 import CollegeIcon from "./CollegeIcon";
@@ -33,7 +35,7 @@ import MiniAvatar from "./MiniAvatar";
 import UpdateCheckMenuItem from "./UpdateCheckMenuItem";
 import DownloadDesktopMenuItem from "./DownloadDesktopMenuItem";
 import CommunityQuickLinks from "./CommunityQuickLinks";
-import { GAMING_VIEWS, TCG_VIEWS } from "../lib/navSections";
+import { accountXpFromMastery, levelFromXp } from "../lib/overallMastery";
 
 // Top-level College tabs. Order matters — this is the fixed display
 // order regardless of which ones a person actually selected during
@@ -52,6 +54,13 @@ const COLLEGES = [
 // The 5 real Colleges the Mastery Score dropdown breaks down by —
 // same set as COLLEGES minus the "Overview" pseudo-entry.
 const MASTERY_COLLEGES = COLLEGES.filter((c) => c.id !== "overview");
+
+function collegeMasteryMeta(entry) {
+  if (!entry) return null;
+  const xp = accountXpFromMastery(entry.normalized);
+  const { level } = levelFromXp(xp);
+  return { level, xp };
+}
 
 function DefaultAvatarIcon() {
   return (
@@ -123,6 +132,7 @@ export default function Header({
   isLoggedIn,
   avatarUrl,
   overallMasteryScore = 0,
+  overallMasteryXp = 0,
   overallMasteryLevel = 0,
   overallMasteryBreakdown = [],
   overallMasteryComputedAt,
@@ -141,6 +151,7 @@ export default function Header({
   // what that drawer used to list.
   const [openMenu, setOpenMenu] = useState(null);
   const [recomputingMastery, setRecomputingMastery] = useState(false);
+  const masteryTier = tierFromScore(overallMasteryScore);
   // Tracks a broken/failed avatar image load so we fall back to the
   // default icon instead of showing a broken-image glyph. Reset
   // whenever the URL itself changes (new upload, re-hydrate) so a
@@ -546,9 +557,12 @@ export default function Header({
                 title="Mastery Score — combines a real score from each College"
               >
                 <span className="dash-header__score-label">Mastery Score</span>
-                <span className="dash-header__score-value">
-                  {Math.round(overallMasteryScore).toLocaleString()}
-                </span>
+                <div className="dash-header__score-meta">
+                  <span className="dash-header__score-level">Lvl {overallMasteryLevel || 0}</span>
+                  <span className="dash-header__score-value">
+                    {Math.round(overallMasteryScore).toLocaleString()}
+                  </span>
+                </div>
               </button>
 
               {openMenu === "mastery" && (
@@ -557,28 +571,45 @@ export default function Header({
                     <span className="dash-header__mastery-total-value">
                       {Math.round(overallMasteryScore).toLocaleString()}
                     </span>
-                    <span className="dash-header__mastery-total-label">Level {overallMasteryLevel}</span>
+                    <div className="dash-header__mastery-total-meta">
+                      <span>Level {overallMasteryLevel || 0}</span>
+                      <span>{Math.round(overallMasteryXp || 0).toLocaleString()} XP</span>
+                      <span
+                        className="tag tag--platform"
+                        style={{ color: masteryTier.color, borderColor: masteryTier.color }}
+                      >
+                        {masteryTier.label}
+                      </span>
+                    </div>
                   </div>
 
-                  {overallMasteryBreakdown.length === 0 ? (
+                  <div className="dash-header__mastery-breakdown">
+                    {MASTERY_COLLEGES.map((c) => {
+                      const entry = overallMasteryBreakdown.find((b) => b.college === c.id);
+                      const meta = collegeMasteryMeta(entry);
+                      return (
+                        <div key={c.id} className="dash-header__mastery-row">
+                          <CollegeIcon collegeId={c.id} size={16} />
+                          <span className="dash-header__mastery-row-label">{c.label}</span>
+                          <span className="dash-header__mastery-row-stats">
+                            {meta ? (
+                              <>
+                                <span className="dash-header__mastery-row-level">Lvl {meta.level}</span>
+                                <span className="dash-header__mastery-row-xp">{meta.xp.toLocaleString()} XP</span>
+                              </>
+                            ) : (
+                              <span className="dash-header__mastery-row-empty">—</span>
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {overallMasteryBreakdown.length === 0 && (
                     <p className="dash-header__search-empty">
                       Nothing tracked yet — add real progress in any College to start building this.
                     </p>
-                  ) : (
-                    <div className="dash-header__mastery-breakdown">
-                      {MASTERY_COLLEGES.map((c) => {
-                        const entry = overallMasteryBreakdown.find((b) => b.college === c.id);
-                        return (
-                          <div key={c.id} className="dash-header__mastery-row">
-                            <CollegeIcon collegeId={c.id} size={16} />
-                            <span className="dash-header__mastery-row-label">{c.label}</span>
-                            <span className="dash-header__mastery-row-value">
-                              {entry ? Math.round(entry.normalized) : "—"}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
                   )}
 
                   {overallMasteryComputedAt && (
@@ -591,14 +622,7 @@ export default function Header({
                     onClick={handleRecomputeOverallMastery}
                     disabled={recomputingMastery}
                   >
-                    {recomputingMastery ? "Recomputing…" : "Recompute"}
-                  </button>
-                  <button
-                    type="button"
-                    className="dash-header__popover-item"
-                    onClick={() => handleAccountClick("linking")}
-                  >
-                    View Gaming Mastery breakdown →
+                    {recomputingMastery ? "Refreshing…" : "Refresh"}
                   </button>
                 </div>
               )}

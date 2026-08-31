@@ -456,6 +456,22 @@ button { font-family: inherit; }
   color: var(--red);
 }
 
+.dash-header__score-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 10px;
+  width: 100%;
+}
+
+.dash-header__score-level {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
 .dash-header__score--interactive {
   cursor: pointer;
   transition: border-color 0.15s ease;
@@ -476,7 +492,8 @@ button { font-family: inherit; }
 .dash-header__mastery-total {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 12px;
   padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
 }
@@ -485,6 +502,15 @@ button { font-family: inherit; }
   font-family: var(--font-display);
   font-size: 28px;
   font-weight: 700;
+}
+
+.dash-header__mastery-total-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .dash-header__mastery-total-label {
@@ -508,6 +534,32 @@ button { font-family: inherit; }
 .dash-header__mastery-row-label {
   flex: 1;
   font-size: 13px;
+}
+
+.dash-header__mastery-row-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  min-width: 72px;
+}
+
+.dash-header__mastery-row-level {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.dash-header__mastery-row-xp {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
+}
+
+.dash-header__mastery-row-empty {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-muted);
 }
 
 .dash-header__mastery-row-value {
@@ -1358,6 +1410,27 @@ button { font-family: inherit; }
   opacity: 0.85;
 }
 
+/* Centerpiece — Lykodex logo in the middle of the five College nodes */
+.auth-hero__brand {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  top: 34%;
+  width: 148px;
+  height: 148px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: glitch-jitter 3.8s infinite steps(1);
+}
+
+.auth-hero .constellation-bg__node {
+  z-index: 3;
+}
+
+.auth-hero__brand .glitch-lykodex-logo__base {
+  filter: drop-shadow(0 0 36px color-mix(in srgb, var(--accent) 42%, transparent));
+}
+
 /* Not a plate. An opaque rounded card here punched a hole in the
    constellation and buried two of the five Colleges the headline is
    naming — this is a scrim that fades upward into the field instead,
@@ -1787,6 +1860,12 @@ button { font-family: inherit; }
   .auth-hero .constellation-bg__node,
   .auth-hero__overlay {
     display: none;
+  }
+
+  .auth-hero__brand {
+    top: 30%;
+    width: 120px;
+    height: 120px;
   }
 
   .auth-panel {
@@ -8430,6 +8509,79 @@ html[data-mode="light"] .overview-tile {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-secondary);
+}
+
+/* Glitch brand mark — Lykodex logo on auth hero */
+.glitch-lykodex-logo {
+  position: relative;
+  width: var(--glitch-size, 112px);
+  height: var(--glitch-size, 112px);
+  flex-shrink: 0;
+}
+
+.glitch-lykodex-logo img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.glitch-lykodex-logo__base {
+  z-index: 2;
+  filter: drop-shadow(0 0 22px color-mix(in srgb, var(--accent) 35%, transparent));
+}
+
+.glitch-lykodex-logo__layer {
+  z-index: 1;
+  opacity: 0;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.glitch-lykodex-logo__layer--red {
+  filter: drop-shadow(2px 0 0 #e8283d);
+  animation: glitch-red 3.8s infinite steps(1);
+}
+
+.glitch-lykodex-logo__layer--cyan {
+  filter: drop-shadow(-2px 0 0 #5aa9e6);
+  animation: glitch-cyan 3.8s infinite steps(1);
+}
+
+@keyframes glitch-red {
+  0%, 92%, 100% { opacity: 0; transform: translate(0, 0); clip-path: inset(0 0 100% 0); }
+  93% { opacity: 0.75; transform: translate(3px, -1px); clip-path: inset(12% 0 58% 0); }
+  94% { opacity: 0; transform: translate(0, 0); clip-path: inset(0 0 100% 0); }
+  96% { opacity: 0.65; transform: translate(-2px, 2px); clip-path: inset(48% 0 22% 0); }
+  97% { opacity: 0; transform: translate(0, 0); clip-path: inset(0 0 100% 0); }
+}
+
+@keyframes glitch-cyan {
+  0%, 91%, 100% { opacity: 0; transform: translate(0, 0); clip-path: inset(0 0 100% 0); }
+  92% { opacity: 0.7; transform: translate(-3px, 1px); clip-path: inset(8% 0 62% 0); }
+  93% { opacity: 0; transform: translate(0, 0); clip-path: inset(0 0 100% 0); }
+  95% { opacity: 0.6; transform: translate(2px, -2px); clip-path: inset(52% 0 18% 0); }
+  96% { opacity: 0; transform: translate(0, 0); clip-path: inset(0 0 100% 0); }
+}
+
+@keyframes glitch-jitter {
+  0%, 92%, 100% { transform: translate(-50%, -50%); }
+  93% { transform: translate(calc(-50% + 1px), -50%); }
+  94% { transform: translate(calc(-50% - 1px), calc(-50% + 1px)); }
+  96% { transform: translate(-50%, calc(-50% - 1px)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-hero__brand {
+    animation: none;
+    transform: translate(-50%, -50%);
+  }
+
+  .glitch-lykodex-logo__layer--red,
+  .glitch-lykodex-logo__layer--cyan {
+    animation: none;
+  }
 }
 
 /* ---------- Desktop auto-update banner ---------- */

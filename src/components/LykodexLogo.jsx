@@ -10,7 +10,8 @@
 // styles.
 
 import logo from "../assets/logo.png";
+import logoMark from "../assets/logo-mark.png";
 
-export default function LykodexLogo({ className = "", alt = "Lykodex" }) {
-  return <img src={logo} alt={alt} className={className} decoding="async" />;
+export default function LykodexLogo({ className = "", alt = "Lykodex", transparent = false }) {
+  return <img src={transparent ? logoMark : logo} alt={alt} className={className} decoding="async" />;
 }

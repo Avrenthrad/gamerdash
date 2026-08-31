@@ -117,6 +117,7 @@ export default function App() {
     masteryComputedAt,
     recomputeMastery,
     overallMasteryScore,
+    overallMasteryXp,
     overallMasteryLevel,
     overallMasteryBreakdown,
     overallMasteryComputedAt,
@@ -283,6 +284,7 @@ export default function App() {
           isLoggedIn={isLoggedIn}
           avatarUrl={avatarUrl}
           overallMasteryScore={overallMasteryScore}
+          overallMasteryXp={overallMasteryXp}
           overallMasteryLevel={overallMasteryLevel}
           overallMasteryBreakdown={overallMasteryBreakdown}
           overallMasteryComputedAt={overallMasteryComputedAt}
