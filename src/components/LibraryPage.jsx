@@ -28,61 +28,85 @@
 // historical library — and the UI says so, rather than presenting it
 // as equivalent to Steam's complete server-side playtime record.
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchOwnedGames, steamHeaderArt } from "../lib/steam";
 import { fetchBacklog } from "../lib/backlog";
-import { fetchGameLibrary } from "../lib/gameLibrary";
+import { fetchGameLibrary, mergeLibraryByTitle } from "../lib/gameLibrary";
 import { fetchPlatformPlaytime } from "../lib/crossPlatformActivity";
+import { importSteamLibrary, importXboxLibrary, importPsnLibrary } from "../lib/libraryImport";
+import { fetchLiveGamerscore } from "../lib/xboxOAuth";
+import { fetchLiveTrophies } from "../lib/psnAuth";
 import UnderConstructionOverlay from "./UnderConstructionOverlay";
 import { AccountGatePanel } from "./AccountGate";
+import { LibraryGameCard, LibraryGameRow, PlatformTag } from "./LibraryGameCard";
 
-const PLATFORM_LABELS = { xbox: "Xbox", playstation: "PlayStation" };
+const PLATFORM_LABELS = { steam: "Steam", xbox: "Xbox", playstation: "PlayStation" };
+const IMPORT_PLATFORMS = [
+  { id: "steam", label: "Steam", icon: "/icons/platforms/steam.svg" },
+  { id: "xbox", label: "Xbox", icon: "/icons/platforms/xbox.svg" },
+  { id: "playstation", label: "PlayStation", icon: "/icons/platforms/playstation.png" },
+];
 
-function PlatformTag({ platform }) {
-  const label = platform === "steam" ? "Steam" : PLATFORM_LABELS[platform] || platform;
-  return <span className={`tag tag--platform tag--platform-${platform}`}>{label}</span>;
+function formatPlaytime(minutes) {
+  if (!minutes) return null;
+  const hours = Math.round(minutes / 60);
+  return hours > 0 ? `${hours.toLocaleString()}h` : "<1h";
 }
 
 export default function LibraryPage({
   onBack, isLoggedIn, onSignIn, onCreateAccount, userId,
   linkedSteamId, onGoToLinking, onGoToBacklog, gdScore,
 }) {
-  const [games, setGames] = useState([]);
+  const [steamGames, setSteamGames] = useState([]);
   const [backlogCount, setBacklogCount] = useState(null);
-  const [status, setStatus] = useState("idle");
+  const [steamStatus, setSteamStatus] = useState("idle");
   const [otherPlatformGames, setOtherPlatformGames] = useState([]);
-  // Real, full Xbox/PlayStation library from game_library_items — see
-  // lib/gameLibrary.js. Filled in by the "Import Library to Gaming
-  // Collection" buttons on Account Linking, not fetched from Xbox/PSN
-  // live on every page load the way Steam's games are (that live
-  // 3-endpoint scan is fine for one account; the full library import
-  // is the one-time real full-history pull).
   const [libraryItems, setLibraryItems] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [platformLinked, setPlatformLinked] = useState({
+    steam: false,
+    xbox: false,
+    playstation: false,
+  });
+  const [importState, setImportState] = useState({});
+  const [importMessage, setImportMessage] = useState("");
+
+  const reloadLibraryItems = useCallback(() => {
+    if (!userId) return Promise.resolve();
+    return fetchGameLibrary(userId)
+      .then(setLibraryItems)
+      .catch((err) => console.error("Game library fetch failed:", err));
+  }, [userId]);
 
   useEffect(() => {
-    if (!linkedSteamId) return;
-    setStatus("loading");
+    if (!linkedSteamId) {
+      setSteamGames([]);
+      setSteamStatus("idle");
+      return;
+    }
+    setSteamStatus("loading");
 
     fetchOwnedGames(linkedSteamId)
       .then((list) => {
         const sorted = [...list].sort((a, b) => (b.playtime_forever || 0) - (a.playtime_forever || 0));
-        setGames(sorted);
-        setStatus("ready");
+        setSteamGames(sorted);
+        setSteamStatus("ready");
       })
       .catch((err) => {
         console.error("Library fetch failed:", err);
-        setStatus("error");
+        setSteamStatus("error");
       });
+  }, [linkedSteamId]);
 
-    if (userId) {
-      fetchBacklog(userId)
-        .then((rows) => setBacklogCount(rows.length))
-        .catch((err) => {
-          console.error("Backlog count fetch failed:", err);
-          setBacklogCount(null);
-        });
-    }
-  }, [linkedSteamId, userId]);
+  useEffect(() => {
+    if (!userId) return;
+    fetchBacklog(userId)
+      .then((rows) => setBacklogCount(rows.length))
+      .catch((err) => {
+        console.error("Backlog count fetch failed:", err);
+        setBacklogCount(null);
+      });
+  }, [userId]);
 
   useEffect(() => {
     if (!userId) return;
@@ -97,14 +121,42 @@ export default function LibraryPage({
   }, [userId]);
 
   useEffect(() => {
-    if (!userId) return;
-    fetchGameLibrary(userId)
-      .then(setLibraryItems)
-      .catch((err) => console.error("Game library fetch failed:", err));
-  }, [userId]);
+    reloadLibraryItems();
+  }, [reloadLibraryItems]);
 
-  const totalGames = games.length;
-  const steamPlaytimeHours = Math.round(games.reduce((sum, g) => sum + (g.playtime_forever || 0), 0) / 60);
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    setPlatformLinked((prev) => ({ ...prev, steam: Boolean(linkedSteamId) }));
+
+    Promise.allSettled([fetchLiveGamerscore(), fetchLiveTrophies()])
+      .then(([xboxResult, psnResult]) => {
+        setPlatformLinked({
+          steam: Boolean(linkedSteamId),
+          xbox: xboxResult.status === "fulfilled",
+          playstation: psnResult.status === "fulfilled",
+        });
+      });
+  }, [isLoggedIn, linkedSteamId]);
+
+  const unifiedLibrary = useMemo(
+    () => mergeLibraryByTitle({
+      steamGames,
+      libraryItems,
+      platformPlaytime: otherPlatformGames,
+    }).sort((a, b) => b.totalPlaytimeMinutes - a.totalPlaytimeMinutes),
+    [steamGames, libraryItems, otherPlatformGames]
+  );
+
+  const filteredLibrary = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return unifiedLibrary;
+    return unifiedLibrary.filter((game) => game.title.toLowerCase().includes(query));
+  }, [searchTerm, unifiedLibrary]);
+
+  const totalGames = unifiedLibrary.length;
+  const steamPlaytimeHours = Math.round(
+    steamGames.reduce((sum, g) => sum + (g.playtime_forever || 0), 0) / 60
+  );
   const xboxPlaytimeHours = Math.round(
     otherPlatformGames.filter((r) => r.platform === "xbox").reduce((sum, r) => sum + (r.total_minutes || 0), 0) / 60
   );
@@ -113,183 +165,204 @@ export default function LibraryPage({
   );
   const totalPlaytimeHours = steamPlaytimeHours + xboxPlaytimeHours + playstationPlaytimeHours;
 
+  async function handleImport(platformId) {
+    if (!userId) return;
+    setImportState((prev) => ({ ...prev, [platformId]: "importing" }));
+    setImportMessage("");
+
+    const onProgress = (current, total) => {
+      setImportMessage(`Importing ${PLATFORM_LABELS[platformId]}… ${current} of ${total}`);
+    };
+
+    try {
+      let result;
+      if (platformId === "steam") {
+        if (!linkedSteamId) throw new Error("Link Steam on Account Linking first.");
+        result = await importSteamLibrary(userId, linkedSteamId, onProgress);
+      } else if (platformId === "xbox") {
+        result = await importXboxLibrary(userId, onProgress);
+      } else {
+        result = await importPsnLibrary(userId, onProgress);
+      }
+
+      await reloadLibraryItems();
+      if (platformId === "steam" && linkedSteamId) {
+        const list = await fetchOwnedGames(linkedSteamId);
+        setSteamGames([...list].sort((a, b) => (b.playtime_forever || 0) - (a.playtime_forever || 0)));
+        setSteamStatus("ready");
+      }
+
+      setImportState((prev) => ({ ...prev, [platformId]: "done" }));
+      setImportMessage(`Added ${result.added} of ${result.total} ${PLATFORM_LABELS[platformId]} games to your collection.`);
+    } catch (err) {
+      console.error(`${platformId} library import failed:`, err);
+      setImportState((prev) => ({ ...prev, [platformId]: "error" }));
+      setImportMessage(err.message || "Couldn't import your library right now.");
+    }
+  }
+
   return (
     <div className="price-page">
       <div className="price-page__head">
         <button type="button" className="back-link" onClick={onBack}>← Back</button>
         <h1 className="price-page__title">Gaming Collection</h1>
-        <p className="price-page__subtitle">Your real Steam library, real playtime, sorted honestly.</p>
+        <p className="price-page__subtitle">Your owned games across Steam, Xbox, and PlayStation — tagged by platform.</p>
       </div>
 
-      {(!isLoggedIn || !linkedSteamId) && <UnderConstructionOverlay />}
+      {!isLoggedIn && <UnderConstructionOverlay />}
 
       {!isLoggedIn && (
         <AccountGatePanel message="Sign in to see your game library." onSignIn={onSignIn} onCreateAccount={onCreateAccount} />
       )}
 
-      {isLoggedIn && !linkedSteamId && (
-        <p className="panel__status">
-          No Steam account linked yet —{" "}
-          <button type="button" className="steam-sync-link" onClick={onGoToLinking}>link one on Account Linking</button>{" "}
-          to see your library.
-        </p>
-      )}
-
-      {isLoggedIn && linkedSteamId && status === "ready" && (
-        <div className="backlog-summary">
-          <div className="panel__stat">
-            <span className="panel__stat-value">{totalGames}</span>
-            <span className="panel__stat-label">Games</span>
+      {isLoggedIn && (
+        <>
+          <div className="backlog-summary">
+            <div className="panel__stat">
+              <span className="panel__stat-value">{totalGames}</span>
+              <span className="panel__stat-label">Games</span>
+            </div>
+            <div className="panel__stat">
+              <span className="panel__stat-value">{totalPlaytimeHours.toLocaleString()}h</span>
+              <span className="panel__stat-label">Total playtime</span>
+              {(xboxPlaytimeHours > 0 || playstationPlaytimeHours > 0 || steamPlaytimeHours > 0) && (
+                <span className="panel__stat-sub">
+                  {steamPlaytimeHours > 0 ? `${steamPlaytimeHours.toLocaleString()}h Steam` : ""}
+                  {xboxPlaytimeHours > 0 ? `${steamPlaytimeHours > 0 ? " · " : ""}${xboxPlaytimeHours.toLocaleString()}h Xbox` : ""}
+                  {playstationPlaytimeHours > 0 ? ` · ${playstationPlaytimeHours.toLocaleString()}h PlayStation` : ""}
+                </span>
+              )}
+            </div>
+            {backlogCount != null && (
+              <div className="panel__stat">
+                <span className="panel__stat-value">{backlogCount}</span>
+                <span className="panel__stat-label">In Backlog</span>
+              </div>
+            )}
+            <div className="panel__stat">
+              <span className="panel__stat-value">{gdScore?.toLocaleString() ?? 0}</span>
+              <span className="panel__stat-label">GD Score</span>
+            </div>
           </div>
-          <div className="panel__stat">
-            <span className="panel__stat-value">{totalPlaytimeHours.toLocaleString()}h</span>
-            <span className="panel__stat-label">Total playtime</span>
-            {(xboxPlaytimeHours > 0 || playstationPlaytimeHours > 0) && (
-              <span className="panel__stat-sub">
-                {steamPlaytimeHours.toLocaleString()}h Steam
-                {xboxPlaytimeHours > 0 ? ` · ${xboxPlaytimeHours.toLocaleString()}h Xbox` : ""}
-                {playstationPlaytimeHours > 0 ? ` · ${playstationPlaytimeHours.toLocaleString()}h PlayStation` : ""}
-              </span>
+
+          <div className="backlog-add library-collection-tools">
+            <form
+              className="price-search"
+              onSubmit={(e) => e.preventDefault()}
+            >
+              <input
+                className="price-search__input"
+                type="text"
+                placeholder="Search your library…"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <button type="submit" className="price-search__button">Search</button>
+            </form>
+
+            <div className="library-import-row">
+              {IMPORT_PLATFORMS.map((platform) => {
+                const linked = platformLinked[platform.id];
+                const importing = importState[platform.id] === "importing";
+                return (
+                  <button
+                    key={platform.id}
+                    type="button"
+                    className="quickdash-reset-btn library-import-btn"
+                    disabled={!linked || importing}
+                    onClick={() => handleImport(platform.id)}
+                    title={linked ? `Import your ${platform.label} library` : `Link ${platform.label} on Account Linking first`}
+                  >
+                    <img src={platform.icon} alt="" className="library-import-btn__icon" decoding="async" />
+                    {importing ? `Importing ${platform.label}…` : `Import ${platform.label} library`}
+                  </button>
+                );
+              })}
+            </div>
+
+            {!platformLinked.steam && !platformLinked.xbox && !platformLinked.playstation && (
+              <p className="panel__status">
+                No platforms linked yet —{" "}
+                <button type="button" className="steam-sync-link" onClick={onGoToLinking}>link accounts on Account Linking</button>{" "}
+                to import your libraries.
+              </p>
+            )}
+
+            {importMessage && (
+              <p className={`panel__status ${Object.values(importState).includes("error") ? "panel__status--error" : ""}`}>
+                {importMessage}
+              </p>
             )}
           </div>
-          {backlogCount != null && (
-            <div className="panel__stat">
-              <span className="panel__stat-value">{backlogCount}</span>
-              <span className="panel__stat-label">In Backlog</span>
-            </div>
-          )}
-          <div className="panel__stat">
-            <span className="panel__stat-value">{gdScore?.toLocaleString() ?? 0}</span>
-            <span className="panel__stat-label">GD Score</span>
-          </div>
-        </div>
-      )}
 
-      {isLoggedIn && (
-        <button type="button" className="quickdash-reset-btn" onClick={onGoToBacklog} style={{ marginTop: "16px" }}>
-          View your Backlog / To Be Played →
-        </button>
-      )}
-
-      {isLoggedIn && linkedSteamId && status === "loading" && <p className="panel__status">Loading your library…</p>}
-      {isLoggedIn && linkedSteamId && status === "error" && <p className="panel__status panel__status--error">Couldn't load your library right now.</p>}
-      {isLoggedIn && linkedSteamId && status === "ready" && games.length === 0 && (
-        <p className="panel__status">No games found on this Steam profile — is it set to public?</p>
-      )}
-
-      {isLoggedIn && linkedSteamId && status === "ready" && games.length > 0 && (
-        <>
-          <div className="library-most-played">
-            <span className="feed-col__label">Most Played</span>
-            <ul className="backlog-list">
-              {games.slice(0, 6).map((g) => (
-                <li key={g.appid} className="backlog-card">
-                  <img
-                    src={steamHeaderArt(g.appid)}
-                    alt=""
-                    className="backlog-card__thumb"
-                    decoding="async"
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      if (g.img_icon_url) {
-                        e.target.src = `https://media.steampowered.com/steamcommunity/public/images/apps/${g.appid}/${g.img_icon_url}.jpg`;
-                      } else {
-                        e.target.style.display = "none";
-                      }
-                    }}
-                  />
-                  <div className="backlog-card__info">
-                    <span className="backlog-card__title">{g.name}</span>
-                    <span className="backlog-card__meta">
-                      <PlatformTag platform="steam" /> {Math.round((g.playtime_forever || 0) / 60)}h played
-                    </span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {games.length > 6 && (
-            <>
-              <span className="feed-col__label" style={{ marginTop: "24px", display: "block" }}>Full Library ({games.length})</span>
-              <table className="library-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Game</th>
-                    <th scope="col">Platform</th>
-                    <th scope="col">Playtime</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {games.map((g) => (
-                    <tr key={g.appid}>
-                      <td>
-                        <div className="library-table__game">
-                          {g.img_icon_url && (
-                            <img
-                              src={`https://media.steampowered.com/steamcommunity/public/images/apps/${g.appid}/${g.img_icon_url}.jpg`}
-                              alt=""
-                              className="library-table__icon"
-                              loading="lazy"
-                              decoding="async"
-                            />
-                          )}
-                          {g.name}
-                        </div>
-                      </td>
-                      <td><PlatformTag platform="steam" /></td>
-                      <td>{Math.round((g.playtime_forever || 0) / 60)}h</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </>
-          )}
+          <button type="button" className="quickdash-reset-btn" onClick={onGoToBacklog} style={{ marginTop: "16px" }}>
+            View your Backlog / To Be Played →
+          </button>
         </>
       )}
 
-      {isLoggedIn && libraryItems.length > 0 && (
-        <div className="library-most-played" style={{ marginTop: "24px" }}>
-          <span className="feed-col__label">Xbox &amp; PlayStation Library ({libraryItems.length})</span>
-          <p className="panel__status" style={{ fontSize: "11px", marginBottom: "10px" }}>
-            Your real, full title history — imported from Account Linking's "Import Library to
-            Gaming Collection" buttons, not just what's been observed since linking Discord.
-          </p>
+      {isLoggedIn && linkedSteamId && steamStatus === "loading" && (
+        <p className="panel__status">Loading your Steam library…</p>
+      )}
+      {isLoggedIn && linkedSteamId && steamStatus === "error" && (
+        <p className="panel__status panel__status--error">Couldn't load your Steam library right now.</p>
+      )}
+
+      {isLoggedIn && filteredLibrary.length === 0 && searchTerm.trim() && (
+        <p className="panel__status">No games match &ldquo;{searchTerm.trim()}&rdquo;.</p>
+      )}
+
+      {isLoggedIn && unifiedLibrary.length === 0 && !searchTerm.trim() && steamStatus !== "loading" && (
+        <p className="panel__status">
+          Nothing in your collection yet — use the import buttons above, or{" "}
+          <button type="button" className="steam-sync-link" onClick={onGoToLinking}>link a platform on Account Linking</button>.
+        </p>
+      )}
+
+      {isLoggedIn && filteredLibrary.length > 0 && (
+        <>
+          {!searchTerm.trim() && (
+            <div className="library-most-played">
+              <span className="feed-col__label">Most Played</span>
+              <ul className="backlog-list">
+                {filteredLibrary.slice(0, 6).map((game) => (
+                  <LibraryGameCard
+                    key={game.title}
+                    game={game}
+                    formatPlaytime={formatPlaytime}
+                    steamHeaderArt={steamHeaderArt}
+                  />
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <span className="feed-col__label" style={{ marginTop: "24px", display: "block" }}>
+            {searchTerm.trim() ? `Search results (${filteredLibrary.length})` : `Full Library (${filteredLibrary.length})`}
+          </span>
           <table className="library-table">
             <thead>
               <tr>
                 <th scope="col">Game</th>
-                <th scope="col">Platform</th>
+                <th scope="col">Platforms</th>
+                <th scope="col">Playtime</th>
               </tr>
             </thead>
             <tbody>
-              {libraryItems.map((item) => (
-                <tr key={item.id}>
-                  <td>{item.title}</td>
-                  <td><PlatformTag platform={item.platform} /></td>
-                </tr>
+              {filteredLibrary.map((game) => (
+                <LibraryGameRow key={game.title} game={game} formatPlaytime={formatPlaytime} />
               ))}
             </tbody>
           </table>
-        </div>
-      )}
-
-      {isLoggedIn && libraryItems.length === 0 && (
-        <p className="panel__status" style={{ marginTop: "24px" }}>
-          No Xbox or PlayStation library imported yet —{" "}
-          <button type="button" className="steam-sync-link" onClick={onGoToLinking}>
-            link an account and import your library on Account Linking
-          </button>
-          .
-        </p>
+        </>
       )}
 
       {isLoggedIn && otherPlatformGames.length > 0 && (
         <div className="library-most-played" style={{ marginTop: "24px" }}>
           <span className="feed-col__label">Recently Active (Xbox &amp; PlayStation)</span>
           <p className="panel__status" style={{ fontSize: "11px", marginBottom: "10px" }}>
-            Real playtime observed since you linked Discord — not the full library above, just
-            what's actually been played recently.
+            Real playtime observed since you linked Discord — not your full imported library above, just
+            what&apos;s actually been played recently.
           </p>
           <ul className="backlog-list">
             {otherPlatformGames.map((g) => (
@@ -297,7 +370,7 @@ export default function LibraryPage({
                 <div className="backlog-card__info">
                   <span className="backlog-card__title">{g.game_name}</span>
                   <span className="backlog-card__meta">
-                    <PlatformTag platform={g.platform} /> {Math.round((g.total_minutes || 0) / 60)}h played
+                    <PlatformTag platform={g.platform} /> {formatPlaytime(g.total_minutes)} played
                   </span>
                 </div>
               </li>

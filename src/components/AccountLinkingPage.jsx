@@ -475,11 +475,28 @@ function PsnCard() {
       )}
       {checkStatus === "unlinked" && (
         <>
-          <p className="settings-card__note" style={{ fontSize: "11px" }}>
-            Sony doesn't offer public sign-in for this, so linking uses your own npsso session token instead — the same method every PSN trophy tracker uses. Sign into{" "}
-            <a href="https://ca.account.sony.com/api/v1/ssocookie" target="_blank" rel="noopener noreferrer">this Sony page</a>{" "}
-            in a new tab while logged into PSN, then copy the 64-character value between the quotes and paste it below. Treat it like a password — never share it anywhere else.
-          </p>
+          <div className="linking-instructions">
+            <p className="linking-instructions__lead">
+              Sony doesn&apos;t offer public sign-in, so linking uses a one-time <code>npsso</code> session token.
+            </p>
+            <ol className="linking-instructions__steps">
+              <li>
+                Sign into{" "}
+                <a href="https://www.playstation.com/" target="_blank" rel="noopener noreferrer">PlayStation</a>{" "}
+                in your browser.
+              </li>
+              <li>
+                Open{" "}
+                <a href="https://ca.account.sony.com/api/v1/ssocookie" target="_blank" rel="noopener noreferrer">Sony&apos;s npsso page</a>{" "}
+                in a new tab.
+              </li>
+              <li>Copy the 64-character value between the quotes.</li>
+              <li>Paste it below, then click <strong>Link PlayStation</strong>.</li>
+            </ol>
+            <p className="linking-instructions__warning">
+              Treat your token like a password — never share it anywhere else.
+            </p>
+          </div>
           <form className="price-search" onSubmit={handleLink}>
             <input
               className="price-search__input"
@@ -629,6 +646,7 @@ function CrunchyrollCard() {
 }
 
 export default function AccountLinkingPage({
+  onBack,
   variant = "settings",
   onFinishOnboarding,
   userId,
@@ -726,6 +744,9 @@ export default function AccountLinkingPage({
 
   return (
     <div className={`linking-page${isOnboarding ? " linking-page--onboarding" : ""}`}>
+      {!isOnboarding && onBack && (
+        <button type="button" className="back-link" onClick={onBack}>← Back to Gaming</button>
+      )}
       <div className="linking-page__head">
         <h1 className="linking-page__title">
           {isOnboarding ? "Connect your accounts (optional)" : "Connect your accounts"}

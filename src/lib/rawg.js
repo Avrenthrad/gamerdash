@@ -143,6 +143,87 @@ export async function fetchAdditionsForGame(gameId) {
   return list;
 }
 
+function normalizeRawgPlatforms(game) {
+  return (game?.platforms || []).map((p) => p.platform?.name).filter(Boolean);
+}
+
+function matchesDlcQuery(name, query) {
+  const normalizedName = name.trim().toLowerCase();
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedName || !normalizedQuery) return false;
+  if (normalizedName.includes(normalizedQuery)) return true;
+  return normalizedQuery.split(/\s+/).every((word) => normalizedName.includes(word));
+}
+
+// Backlog search — base games plus DLC/expansions from RAWG's real
+// /additions endpoint. Also checks DLC for titles already in the
+// person's backlog so "Phantom Liberty" can be found even when only
+// Cyberpunk 2077 is tracked.
+export async function searchRawgGamesAndDlc(query, backlogTitles = []) {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+
+  const baseResults = await searchRawgGames(trimmed);
+  if (baseResults === "no_key") return "no_key";
+
+  const seen = new Set();
+  const merged = [];
+
+  function pushResult(result) {
+    if (seen.has(result.id)) return;
+    seen.add(result.id);
+    merged.push(result);
+  }
+
+  for (const result of baseResults) {
+    pushResult({ ...result, isDlc: false, parentTitle: null });
+  }
+
+  async function collectAdditions(parentName, parentPlatforms, parentId) {
+    const additions = await fetchAdditionsForGame(parentId);
+    if (additions === "no_key") return;
+    for (const addition of additions) {
+      if (!matchesDlcQuery(addition.name, trimmed)) continue;
+      pushResult({
+        id: addition.id,
+        name: addition.name,
+        backgroundImage: addition.backgroundImage,
+        metacritic: null,
+        platforms: parentPlatforms,
+        isDlc: true,
+        parentTitle: parentName,
+      });
+    }
+  }
+
+  for (const parent of baseResults.slice(0, 5)) {
+    await collectAdditions(parent.name, parent.platforms, parent.id);
+  }
+
+  const parentTitles = [...new Set(backlogTitles.map((title) => title.trim()).filter(Boolean))].slice(0, 10);
+  for (const title of parentTitles) {
+    const match = await searchRawgGame(title);
+    if (match === "no_key" || !match?.id) continue;
+    await collectAdditions(match.name, normalizeRawgPlatforms(match), match.id);
+  }
+
+  merged.sort((a, b) => {
+    const queryLower = trimmed.toLowerCase();
+    const aName = a.name.toLowerCase();
+    const bName = b.name.toLowerCase();
+    const aExact = aName === queryLower ? 1 : 0;
+    const bExact = bName === queryLower ? 1 : 0;
+    if (aExact !== bExact) return bExact - aExact;
+    const aContains = aName.includes(queryLower) ? 1 : 0;
+    const bContains = bName.includes(queryLower) ? 1 : 0;
+    if (aContains !== bContains) return bContains - aContains;
+    if (a.isDlc !== b.isDlc) return a.isDlc ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return merged.slice(0, 20);
+}
+
 // For logged-in users: cross-references their own games (wishlist +
 // library + backlog titles, already deduplicated by the caller)
 // against RAWG to find upcoming DLC/expansions specifically for

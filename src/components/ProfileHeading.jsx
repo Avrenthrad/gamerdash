@@ -1,12 +1,12 @@
 /**
  * Profile heading — dashboard identity strip.
- * Real Mastery Score when available; platform + stream links and tools on the right.
+ * Username + linked platform handles on the left; Gaming Mastery on the right.
  */
 
 import { useEffect, useState } from "react";
 import { getProfileStreamQuickLinks } from "../lib/streamingProfiles";
 import { QuickLinkRow } from "./CommunityQuickLinks";
-import { MasteryRefreshButton, PlatformQuickLinks } from "./PlatformQuickLinks";
+import { GamingPlatformHandles, MasteryRefreshButton } from "./PlatformQuickLinks";
 
 function DefaultAvatarIcon() {
   return (
@@ -22,9 +22,9 @@ export default function ProfileHeading({
   lastName,
   username,
   avatarUrl,
-  gdScore = 0,
   masteryScore = 0,
   masteryLevel = 0,
+  masteryBreakdown = [],
   isLoggedIn,
   userId,
   linkedSteamId,
@@ -34,8 +34,8 @@ export default function ProfileHeading({
   profileDetails,
 }) {
   const fullName = [firstName, lastName].filter(Boolean).join(" ");
-  const displayName = fullName || username || (isLoggedIn ? "Player" : "Guest");
-  const showHandle = username && username !== displayName;
+  const displayName = username || fullName || (isLoggedIn ? "Player" : "Guest");
+  const showFullName = Boolean(username && fullName && fullName !== username);
 
   const [avatarBroken, setAvatarBroken] = useState(false);
   useEffect(() => {
@@ -59,24 +59,39 @@ export default function ProfileHeading({
 
         <div className="profile-heading__identity">
           <span className="profile-heading__name">{displayName}</span>
-          {showHandle && <span className="profile-heading__handle">@{username}</span>}
+          {showFullName && <span className="profile-heading__handle">{fullName}</span>}
           {!isLoggedIn && (
             <span className="profile-heading__hint">Sign in to sync across devices</span>
+          )}
+          {isLoggedIn && (
+            <GamingPlatformHandles
+              userId={userId}
+              linkedSteamId={linkedSteamId}
+              profileDetails={profileDetails}
+              masteryBreakdown={masteryBreakdown}
+              onGoToLinking={onGoToLinking}
+            />
           )}
         </div>
       </div>
 
       <div className="profile-heading__stats">
-        <div className="profile-heading__stat profile-heading__stat--primary">
-          <span className="profile-heading__stat-value">
-            {Number(gdScore || 0).toLocaleString()}
-          </span>
-          <span className="profile-heading__stat-label">Mastery Score</span>
-        </div>
-        {isLoggedIn && masteryScore > 0 && (
-          <div className="profile-heading__stat" title="Cross-platform Gaming Mastery Score — see Account Linking for the breakdown">
-            <span className="profile-heading__stat-value">{Math.round(masteryScore)}</span>
-            <span className="profile-heading__stat-label">Gaming Mastery · Lvl {masteryLevel}</span>
+        {isLoggedIn ? (
+          <div
+            className="profile-heading__stat profile-heading__stat--primary"
+            title="Cross-platform Gaming Mastery Score — see Account Linking for the breakdown"
+          >
+            <span className="profile-heading__stat-value">
+              {Math.round(masteryScore).toLocaleString()}
+            </span>
+            <span className="profile-heading__stat-label">
+              Gaming Mastery · Lvl {masteryLevel || 0}
+            </span>
+          </div>
+        ) : (
+          <div className="profile-heading__stat profile-heading__stat--primary">
+            <span className="profile-heading__stat-value">—</span>
+            <span className="profile-heading__stat-label">Gaming Mastery</span>
           </div>
         )}
       </div>
@@ -84,12 +99,6 @@ export default function ProfileHeading({
       <div className="profile-heading__tools">
         {isLoggedIn && (
           <>
-            <PlatformQuickLinks
-              userId={userId}
-              linkedSteamId={linkedSteamId}
-              onGoToLinking={onGoToLinking}
-              className="profile-heading__platform-links"
-            />
             {profileStreamLinks.length > 0 && (
               <QuickLinkRow
                 links={profileStreamLinks}

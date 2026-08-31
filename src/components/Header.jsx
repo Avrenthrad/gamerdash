@@ -79,6 +79,14 @@ function CloseIcon() {
   );
 }
 
+function ChevronIcon({ direction = "left" }) {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {direction === "left" ? <path d="M15 6l-6 6 6 6" /> : <path d="M9 6l6 6-6 6" />}
+    </svg>
+  );
+}
+
 function SearchIcon() {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -757,9 +765,29 @@ export default function Header({
           Keeping them as siblings avoids that entirely. */}
       {showBackdrop && <div className="dash-drawer-backdrop" onClick={closeMenu} />}
 
+      {isLoggedIn && openMenu !== "settings" && (
+        <button
+          type="button"
+          className="dash-rail-toggle dash-rail-toggle--right"
+          onClick={() => toggleMenu("settings")}
+          aria-label="Open account menu"
+          title="Account menu"
+        >
+          <ChevronIcon direction="left" />
+        </button>
+      )}
 
       {openMenu === "settings" && (
         <div className="dash-drawer dash-drawer--right">
+          <button
+            type="button"
+            className="dash-drawer__edge-toggle"
+            onClick={closeMenu}
+            aria-label="Hide account menu"
+            title="Hide menu"
+          >
+            <ChevronIcon direction="right" />
+          </button>
           <div className="dash-drawer__head">
             <span className="dash-drawer__title">Account</span>
             <button type="button" className="dash-drawer__close" onClick={closeMenu} aria-label="Close menu">

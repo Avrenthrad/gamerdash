@@ -53,6 +53,7 @@ function ToggleRow({ label, checked, onChange }) {
 }
 
 export default function DashfeedSettingsPage({
+  onBack,
   variant = "settings",
   onFinishOnboarding,
   gameToggles,
@@ -70,6 +71,9 @@ export default function DashfeedSettingsPage({
 
   return (
     <div className="settings-page">
+      {onBack && (
+        <button type="button" className="back-link" onClick={onBack}>← Back to Gaming</button>
+      )}
       <div className="settings-page__head">
         <h1 className="settings-page__title">
           {isOnboarding ? "Set up your Dashfeed" : "Dashfeed Settings"}

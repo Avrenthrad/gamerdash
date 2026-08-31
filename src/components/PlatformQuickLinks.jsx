@@ -1,8 +1,9 @@
 // Shared gaming-platform icon links + mastery refresh — used on the
 // Gaming dashboard profile heading and the Overview stock chart.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { fetchPlayerSummaries } from "../lib/steam";
 import { playstationProfileUrl, steamProfileUrl, xboxProfileUrl } from "../lib/platformAccounts";
 
 function PlatformBrandIcon({ src }) {
@@ -50,7 +51,7 @@ export const GAMING_PLATFORMS = [
   {
     id: "playstation",
     label: "PlayStation",
-    iconSrc: "/icons/platforms/playstation.svg",
+    iconSrc: "/icons/platforms/playstation.png",
     className: "overview-platform-bar__link--playstation",
     // Real PSN trophy sync (psn_tokens) is the primary signal now —
     // same is_psn_linked() RPC reasoning as Xbox above. The old
@@ -64,7 +65,7 @@ export const GAMING_PLATFORMS = [
   },
 ];
 
-export function usePlatformHandles(userId) {
+export function usePlatformHandles(userId, linkedSteamId) {
   const [handles, setHandles] = useState({});
 
   useEffect(() => {
@@ -72,11 +73,14 @@ export function usePlatformHandles(userId) {
       setHandles({});
       return;
     }
+    let cancelled = false;
     Promise.all([
       supabase.from("profiles").select("xbox_gamertag, playstation_online_id").eq("id", userId).single(),
       supabase.rpc("is_xbox_linked"),
       supabase.rpc("is_psn_linked"),
-    ]).then(([profileRes, xboxRes, psnRes]) => {
+      linkedSteamId ? fetchPlayerSummaries([linkedSteamId]).catch(() => []) : Promise.resolve([]),
+    ]).then(([profileRes, xboxRes, psnRes, steamPlayers]) => {
+      if (cancelled) return;
       if (profileRes.error) {
         console.error("Failed to load platform handles:", profileRes.error);
         return;
@@ -86,11 +90,98 @@ export function usePlatformHandles(userId) {
         playstationOnlineId: profileRes.data?.playstation_online_id,
         xboxLinked: Boolean(xboxRes.data),
         psnLinked: Boolean(psnRes.data),
+        steamPersona: steamPlayers[0]?.personaname || null,
       });
     });
-  }, [userId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, linkedSteamId]);
 
   return handles;
+}
+
+function platformHandleLabel(platform, context) {
+  const { linkedSteamId, handles, profileDetails, masteryBreakdown } = context;
+  const platformValues = profileDetails?.platformValues || {};
+  const xboxEntry = masteryBreakdown?.find((e) => e.platform === "xbox");
+
+  if (platform.id === "steam" && platform.isLinked(context)) {
+    return handles.steamPersona || platformValues.steam || `Steam · ${linkedSteamId}`;
+  }
+  if (platform.id === "xbox" && platform.isLinked(context)) {
+    return handles.xboxGamertag || xboxEntry?.gamertag || platformValues.xbox || "Xbox Live";
+  }
+  if (platform.id === "playstation" && platform.isLinked(context)) {
+    return handles.playstationOnlineId || platformValues.playstation || "PlayStation Network";
+  }
+  return null;
+}
+
+export function GamingPlatformHandles({
+  userId,
+  linkedSteamId,
+  profileDetails,
+  masteryBreakdown = [],
+  onGoToLinking,
+  className = "profile-heading__platforms",
+}) {
+  const handles = usePlatformHandles(userId, linkedSteamId);
+  const context = useMemo(
+    () => ({ linkedSteamId, handles, profileDetails, masteryBreakdown }),
+    [linkedSteamId, handles, profileDetails, masteryBreakdown]
+  );
+
+  const linkedPlatforms = GAMING_PLATFORMS
+    .filter((platform) => platform.isLinked(context))
+    .map((platform) => ({
+      platform,
+      label: platformHandleLabel(platform, context),
+      url: platform.profileUrl(context),
+    }));
+
+  if (linkedPlatforms.length === 0) return null;
+
+  return (
+    <div className={className} role="list" aria-label="Linked gaming accounts">
+      {linkedPlatforms.map(({ platform, label, url }) => {
+        const row = (
+          <>
+            <img src={platform.iconSrc} alt="" className="profile-heading__platform-icon" decoding="async" />
+            <span className="profile-heading__platform-handle">{label}</span>
+          </>
+        );
+
+        if (url) {
+          return (
+            <a
+              key={platform.id}
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="profile-heading__platform-row"
+              role="listitem"
+              title={`Open ${platform.label} profile`}
+            >
+              {row}
+            </a>
+          );
+        }
+
+        return (
+          <button
+            key={platform.id}
+            type="button"
+            className="profile-heading__platform-row"
+            role="listitem"
+            onClick={onGoToLinking}
+          >
+            {row}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 export function PlatformQuickLinks({
@@ -100,7 +191,7 @@ export function PlatformQuickLinks({
   className = "overview-platform-bar__links",
   linkClassName = "overview-platform-bar__link",
 }) {
-  const handles = usePlatformHandles(userId);
+  const handles = usePlatformHandles(userId, linkedSteamId);
   const context = { linkedSteamId, handles };
 
   return (

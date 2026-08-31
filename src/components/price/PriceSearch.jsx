@@ -1,16 +1,17 @@
 import { useRef, useState } from "react";
 import { formatPrice } from "../../lib/currency";
-import { searchSteamGames } from "../../lib/steam";
-import { fetchGameDeals } from "../../lib/gameData";
+import { searchRawgGamesAndDlc } from "../../lib/rawg";
+import { fetchGameDeal } from "../../lib/gameData";
 import WishlistToggle from "../WishlistToggle";
 import { StoreChip } from "./StoreChip";
 import { buildStoreRow, getCheapestInfo } from "./priceUtils";
 
 /**
  * Search bar, typeahead suggestions, and search-result cards.
- * Parent owns the heavier enrichment (Xbox/PS/Steam meta) via
- * onResults + enrichSearchResults so the wishlist cards and search
- * cards share the same metaByTitle cache.
+ * Discovery uses RAWG (lib/rawg.js) — same cross-platform + DLC
+ * search as Backlog — since Steam's own search only finds Steam
+ * titles. Parent owns the heavier enrichment (Xbox/PS/Steam meta)
+ * via onEnrich so search cards share the same metaByTitle cache.
  */
 export default function PriceSearch({
   wishlist,
@@ -23,15 +24,17 @@ export default function PriceSearch({
   rates,
   platformOrder,
   metaByTitle,
-  onResults,
   onEnrich,
 }) {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchStatus, setSearchStatus] = useState("idle"); // idle | loading | done | error
-  const [searchResults, setSearchResults] = useState([]);
+  const [rawgResults, setRawgResults] = useState([]);
+  const [dealsByTitle, setDealsByTitle] = useState({});
   const debounceRef = useRef(null);
+
+  const wishlistTitles = wishlist.map((entry) => entry.title);
 
   function handleQueryChange(value) {
     setQuery(value);
@@ -44,8 +47,12 @@ export default function PriceSearch({
     }
 
     debounceRef.current = setTimeout(() => {
-      searchSteamGames(value.trim())
+      searchRawgGamesAndDlc(value.trim(), wishlistTitles)
         .then((matches) => {
+          if (matches === "no_key" || !Array.isArray(matches)) {
+            setSuggestions([]);
+            return;
+          }
           setSuggestions(matches.slice(0, 6));
           setShowSuggestions(true);
         })
@@ -56,13 +63,36 @@ export default function PriceSearch({
   async function runSearch(title) {
     setShowSuggestions(false);
     setSearchStatus("loading");
-    setSearchResults([]);
+    setRawgResults([]);
+    setDealsByTitle({});
+
     try {
-      const deals = await fetchGameDeals(title, 6);
-      setSearchResults(deals);
-      setSearchStatus(deals.length > 0 ? "done" : "error");
-      onResults?.(deals);
-      onEnrich?.(deals);
+      const results = await searchRawgGamesAndDlc(title, wishlistTitles);
+      if (results === "no_key") {
+        setSearchStatus("error");
+        return;
+      }
+      if (results.length === 0) {
+        setSearchStatus("error");
+        return;
+      }
+
+      setRawgResults(results);
+
+      const dealEntries = await Promise.all(
+        results.map(async (result) => {
+          try {
+            const deal = await fetchGameDeal(result.name);
+            return deal ? [result.name, deal] : null;
+          } catch {
+            return null;
+          }
+        })
+      );
+      const deals = Object.fromEntries(dealEntries.filter(Boolean));
+      setDealsByTitle(deals);
+      setSearchStatus("done");
+      onEnrich?.(Object.values(deals));
     } catch (err) {
       console.error("Search failed:", err);
       setSearchStatus("error");
@@ -81,7 +111,8 @@ export default function PriceSearch({
   }
 
   function handleClear() {
-    setSearchResults([]);
+    setRawgResults([]);
+    setDealsByTitle({});
     setSearchStatus("idle");
     setQuery("");
   }
@@ -93,7 +124,7 @@ export default function PriceSearch({
           <input
             className="price-search__input"
             type="text"
-            placeholder="Search for a game or DLC to add…"
+            placeholder="Search a game or DLC to add…"
             value={query}
             onChange={(e) => handleQueryChange(e.target.value)}
             onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
@@ -111,9 +142,9 @@ export default function PriceSearch({
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => handleSuggestionClick(s.name)}
                   >
-                    {s.tiny_image ? (
+                    {s.backgroundImage ? (
                       <img
-                        src={s.tiny_image}
+                        src={s.backgroundImage}
                         alt=""
                         className="search-suggestions__thumb"
                         decoding="async"
@@ -121,7 +152,14 @@ export default function PriceSearch({
                     ) : (
                       <div className="search-suggestions__thumb search-suggestions__thumb--placeholder" />
                     )}
-                    <span className="search-suggestions__title">{s.name}</span>
+                    <span className="search-suggestions__title">
+                      {s.name}
+                      {s.isDlc && s.parentTitle && (
+                        <span className="tag tag--muted backlog-search-results__dlc-tag">
+                          DLC for {s.parentTitle}
+                        </span>
+                      )}
+                    </span>
                   </button>
                 </li>
               ))}
@@ -131,7 +169,7 @@ export default function PriceSearch({
         <button type="submit" className="price-search__button">
           Search
         </button>
-        {searchResults.length > 0 && (
+        {rawgResults.length > 0 && (
           <button type="button" className="price-search__clear" onClick={handleClear}>
             Clear
           </button>
@@ -145,9 +183,15 @@ export default function PriceSearch({
         </p>
       )}
 
-      {searchStatus === "done" && searchResults.length > 0 && (
+      {searchStatus === "done" && rawgResults.length > 0 && (
         <ul className="search-results">
-          {searchResults.map((result) => {
+          {rawgResults.map((rawg) => {
+            const result = dealsByTitle[rawg.name] || {
+              game: rawg.name,
+              thumb: rawg.backgroundImage || null,
+              stores: [],
+              steamAppID: null,
+            };
             const isWishlisted = wishlist.some(
               (e) => e.title.toLowerCase() === result.game.toLowerCase()
             );
@@ -162,7 +206,7 @@ export default function PriceSearch({
                 : { primary: [] };
 
             return (
-              <li key={result.game} className="search-result-card">
+              <li key={rawg.id} className="search-result-card">
                 <div className="search-result-card__row">
                   {result.thumb ? (
                     <img src={result.thumb} alt="" className="search-result-card__thumb" loading="lazy" decoding="async" />
@@ -172,6 +216,16 @@ export default function PriceSearch({
 
                   <div className="search-result-card__info">
                     <span className="wishlist-card__title">{result.game}</span>
+                    {rawg.isDlc && rawg.parentTitle && (
+                      <span className="tag tag--muted backlog-search-results__dlc-tag">
+                        DLC for {rawg.parentTitle}
+                      </span>
+                    )}
+                    {rawg.platforms?.length > 0 && (
+                      <span className="wishlist-card__meta">
+                        {rawg.platforms.slice(0, 3).join(" · ")}
+                      </span>
+                    )}
                   </div>
 
                   {cheapest ? (

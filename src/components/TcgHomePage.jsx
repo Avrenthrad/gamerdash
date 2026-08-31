@@ -27,6 +27,7 @@ import { fetchCollection as fetchYugiohCollection, enrichCollectionEntry as enri
 import { currentYugiohPrice } from "../lib/yugioh";
 import { fetchCollection as fetchOnePieceCollection, enrichCollectionEntry as enrichOnePieceCollectionEntry } from "../lib/onepieceCollection";
 import { currentOnePiecePrice } from "../lib/onepiece";
+import CollegePageTitle from "./CollegePageTitle";
 
 const MTG_FEATURES = [
   { id: "mtg-scan", label: "Scan Cards", icon: "📷", desc: "Free on-device text recognition, matched against real Scryfall data.", emphasized: true },
@@ -65,7 +66,6 @@ const ONEPIECE_FEATURES = [
   { id: "tcg-marketplace", label: "Marketplace", icon: "💰", desc: "Buy and sell real cards with other Lykodex users." },
 ];
 
-
 const RARITY_ORDER = ["mythic", "rare", "uncommon", "common"];
 const RARITY_LABELS = { mythic: "Mythic", rare: "Rare", uncommon: "Uncommon", common: "Common" };
 
@@ -100,9 +100,7 @@ function MtgSummary({ isLoggedIn, userId }) {
   }, 0);
 
   if (!isLoggedIn || status !== "ready") return null;
-  if (entries.length === 0) {
-    return <p className="panel__status">No cards in your collection yet — start with Search or Scan below.</p>;
-  }
+  if (entries.length === 0) return null;
 
   return (
     <div className="backlog-summary">
@@ -375,8 +373,7 @@ export default function TcgHomePage({ onNavigate, isLoggedIn, userId }) {
   return (
     <div className="price-page">
       <div className="price-page__head">
-        <h1 className="price-page__title">TCG</h1>
-        <p className="price-page__subtitle">Magic: The Gathering, Flesh and Blood, Pokémon, Yu-Gi-Oh!, and One Piece.</p>
+        <CollegePageTitle collegeId="tcg" />
       </div>
 
       <div className="backlog-status-tabs">

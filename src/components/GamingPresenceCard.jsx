@@ -95,7 +95,6 @@ export default function GamingPresenceCard({ userId }) {
   return (
     <SlidingBanner
       items={entries}
-      dotsLabel="Xbox/PlayStation status"
       getItemKey={(entry) => entry.id}
       renderItem={(entry) => <PresenceSlide entry={entry} />}
     />

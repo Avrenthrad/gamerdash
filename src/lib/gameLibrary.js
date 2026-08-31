@@ -7,11 +7,6 @@
 // every single imported game to status "backlog" (not yet played) —
 // wrong for games they've already finished. This table has no status
 // at all, just "you own this, on this platform."
-//
-// Steam isn't stored here — LibraryPage.jsx (Gaming Collection) still
-// live-fetches Steam's owned-games list directly from Steam's Web API
-// on every load, same as before this table existed; Steam's data is
-// already real-time and doesn't need a separate persisted copy.
 
 import { supabase } from "./supabaseClient";
 
@@ -25,29 +20,157 @@ export async function fetchGameLibrary(userId) {
   return data || [];
 }
 
-// De-dup on (user_id, platform, title) is enforced by a real unique
-// index at the DB level — ignoreDuplicates makes a repeat import (or
-// a game already added) a silent no-op rather than an error, so
-// callers can just insert whatever a bulk import returns without
-// checking for existing rows first. Chaining .select() is what makes
-// the return value meaningful here: Postgres' ON CONFLICT DO NOTHING
-// (what ignoreDuplicates maps to) returns no row at all for a skipped
-// conflict, so an empty array — not just the absence of an error — is
-// how a caller tells "already had this one" apart from "just added
-// it" (see lib/libraryImport.js's import-progress count).
-export async function addToGameLibrary(userId, title, platform, steamAppid = null) {
+export async function addToGameLibrary(userId, title, platform, steamAppid = null, parentTitle = null) {
   const { data, error } = await supabase
     .from("game_library_items")
     .upsert(
-      { user_id: userId, title, platform, steam_appid: steamAppid ? String(steamAppid) : null },
-      { onConflict: "user_id,platform,title", ignoreDuplicates: true }
+      {
+        user_id: userId,
+        title,
+        platform,
+        steam_appid: steamAppid ? String(steamAppid) : null,
+        parent_title: parentTitle || null,
+      },
+      { onConflict: "user_id,platform,title" }
     )
     .select();
   if (error) throw error;
-  return (data || []).length > 0; // true only if this was a genuinely new row
+  return (data || []).length > 0;
 }
 
 export async function removeFromGameLibrary(itemId) {
   const { error } = await supabase.from("game_library_items").delete().eq("id", itemId);
   if (error) throw error;
+}
+
+function normalizeTitleKey(title) {
+  return title.trim().toLowerCase();
+}
+
+// Best-effort parent match for Xbox/PSN titles like "Destiny 2: Shadowkeep".
+export function inferParentTitleFromName(title, baseTitleKeys) {
+  const colonIdx = title.indexOf(":");
+  if (colonIdx > 0) {
+    const base = title.slice(0, colonIdx).trim();
+    if (baseTitleKeys.has(normalizeTitleKey(base))) return base;
+  }
+
+  const dashMatch = title.match(/^(.+?)\s+-\s+/);
+  if (dashMatch) {
+    const base = dashMatch[1].trim();
+    if (baseTitleKeys.has(normalizeTitleKey(base))) return base;
+  }
+
+  return null;
+}
+
+// One card per base game title — multiple platforms on the same row, with
+// purchased DLC nested under the parent instead of as separate cards.
+export function mergeLibraryByTitle({ steamGames = [], libraryItems = [], platformPlaytime = [] }) {
+  const rawEntries = [];
+
+  for (const game of steamGames) {
+    rawEntries.push({
+      title: game.name,
+      platform: "steam",
+      steamAppid: game.appid ? String(game.appid) : null,
+      playtimeMinutes: game.playtime_forever || 0,
+      imgIconUrl: game.img_icon_url || null,
+      parentTitle: null,
+    });
+  }
+
+  for (const item of libraryItems) {
+    rawEntries.push({
+      title: item.title,
+      platform: item.platform,
+      steamAppid: item.steam_appid ? String(item.steam_appid) : null,
+      playtimeMinutes: 0,
+      imgIconUrl: null,
+      parentTitle: item.parent_title || null,
+    });
+  }
+
+  const baseTitleKeys = new Set(
+    rawEntries
+      .filter((entry) => !entry.parentTitle)
+      .map((entry) => normalizeTitleKey(entry.title))
+  );
+
+  for (const entry of rawEntries) {
+    if (!entry.parentTitle) {
+      entry.parentTitle = inferParentTitleFromName(entry.title, baseTitleKeys);
+    }
+  }
+
+  const map = new Map();
+  const dlcByParent = new Map();
+
+  function ensureParent(title) {
+    const key = normalizeTitleKey(title);
+    if (!map.has(key)) {
+      map.set(key, {
+        title: title.trim(),
+        platforms: new Set(),
+        playtimeMinutes: {},
+        steamAppid: null,
+        imgIconUrl: null,
+        dlc: [],
+      });
+    }
+    return map.get(key);
+  }
+
+  for (const entry of rawEntries) {
+    if (entry.parentTitle) {
+      const parentKey = normalizeTitleKey(entry.parentTitle);
+      if (!dlcByParent.has(parentKey)) dlcByParent.set(parentKey, []);
+      dlcByParent.get(parentKey).push({
+        title: entry.title,
+        platform: entry.platform,
+      });
+      continue;
+    }
+
+    const parent = ensureParent(entry.title);
+    parent.platforms.add(entry.platform);
+    if (entry.steamAppid) parent.steamAppid = entry.steamAppid;
+    if (entry.imgIconUrl) parent.imgIconUrl = entry.imgIconUrl;
+    if (entry.playtimeMinutes != null) {
+      parent.playtimeMinutes[entry.platform] = Math.max(
+        parent.playtimeMinutes[entry.platform] || 0,
+        entry.playtimeMinutes
+      );
+    }
+  }
+
+  for (const row of platformPlaytime) {
+    if (row.platform !== "xbox" && row.platform !== "playstation") continue;
+    const parent = map.get(normalizeTitleKey(row.game_name));
+    if (!parent) continue;
+    parent.platforms.add(row.platform);
+    parent.playtimeMinutes[row.platform] = Math.max(
+      parent.playtimeMinutes[row.platform] || 0,
+      row.total_minutes || 0
+    );
+  }
+
+  for (const [parentKey, dlcList] of dlcByParent) {
+    const parent = map.get(parentKey);
+    if (!parent) continue;
+    const seen = new Set(parent.dlc.map((item) => `${item.platform}:${item.title}`));
+    for (const item of dlcList) {
+      const key = `${item.platform}:${item.title}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      parent.dlc.push(item);
+    }
+    parent.dlc.sort((a, b) => a.title.localeCompare(b.title));
+  }
+
+  return [...map.values()].map((entry) => ({
+    ...entry,
+    platforms: [...entry.platforms].sort(),
+    totalPlaytimeMinutes: Object.values(entry.playtimeMinutes).reduce((sum, mins) => sum + mins, 0),
+  }));
 }

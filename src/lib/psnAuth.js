@@ -53,3 +53,9 @@ export async function fetchLivePsnPresence() {
 export async function fetchPsnLibrary() {
   return callPsnService("library");
 }
+
+// Real PS Store wishlist — undocumented GraphQL query, same mechanism
+// trophy trackers use (see api/pricing.js's psnFetchWishlist).
+export async function fetchPsnWishlist() {
+  return callPsnService("wishlist");
+}

@@ -164,3 +164,9 @@ export async function fetchLiveXboxPresence() {
 export async function fetchXboxLibrary() {
   return callXboxService("library");
 }
+
+// Real store wishlist — see api/pricing.js's xboxFetchWishlist. May
+// fail with 501 until Microsoft exposes a stable list endpoint.
+export async function fetchXboxWishlist() {
+  return callXboxService("wishlist");
+}

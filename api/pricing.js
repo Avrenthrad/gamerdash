@@ -31,10 +31,12 @@
 //   POST /api/pricing?service=xbox&mode=gamerscore, Authorization: Bearer <token>
 //   POST /api/pricing?service=xbox&mode=presence, Authorization: Bearer <token>
 //   POST /api/pricing?service=xbox&mode=library, Authorization: Bearer <token>
+//   POST /api/pricing?service=xbox&mode=wishlist, Authorization: Bearer <token>
 //   POST /api/pricing?service=psn&mode=link, Authorization: Bearer <token>, body {npsso}
 //   POST /api/pricing?service=psn&mode=trophies, Authorization: Bearer <token>
 //   POST /api/pricing?service=psn&mode=presence, Authorization: Bearer <token>
 //   POST /api/pricing?service=psn&mode=library, Authorization: Bearer <token>
+//   POST /api/pricing?service=psn&mode=wishlist, Authorization: Bearer <token>
 //   POST /api/pricing?service=lykodex-session, Authorization: Bearer <caller's access token>
 //   GET  /api/pricing?service=mastery-cron, Authorization: Bearer <CRON_SECRET> (Vercel Cron only, see vercel.json)
 
@@ -689,6 +691,84 @@ async function getLiveXboxLibrary(adminClient, userId) {
   return { games };
 }
 
+// Microsoft doesn't document a public wishlist list API for third-party
+// apps — xbox.com loads it through internal emerald routes that need
+// extra S2S headers we can't obtain from a normal OAuth link. This
+// probes the most likely emerald path; if it 404s, the Prices page
+// shows an honest "not available yet" message instead of faking data.
+async function xboxFetchWishlist(userhash, xstsToken) {
+  const url = "https://emerald.xboxservices.com/xboxcomfd/wishlist?locale=en-US";
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `XBL3.0 x=${userhash};${xstsToken}`,
+      "x-ms-api-version": "1.0",
+      Referer: "https://www.xbox.com/",
+      Origin: "https://www.xbox.com",
+    },
+  });
+  if (!res.ok) {
+    throw Object.assign(
+      new Error("Xbox wishlist sync isn't available yet — Microsoft doesn't expose wishlist data through the linked-account API."),
+      { status: 501 }
+    );
+  }
+  const data = await res.json();
+  const products = data?.products || data?.items || data?.wishlistItems || [];
+  if (!Array.isArray(products) || products.length === 0) {
+    throw Object.assign(
+      new Error("Xbox wishlist sync isn't available yet — Microsoft doesn't expose wishlist data through the linked-account API."),
+      { status: 501 }
+    );
+  }
+  return products
+    .map((item) => ({
+      name: item.title || item.name || item.productTitle || null,
+      productId: item.productId || item.id || null,
+    }))
+    .filter((item) => item.name);
+}
+
+async function getLiveXboxWishlist(adminClient, userId) {
+  const { data: stored, error: fetchError } = await adminClient.from("xbox_tokens").select("*").eq("user_id", userId).maybeSingle();
+  if (fetchError) throw fetchError;
+  if (!stored) return "not_linked";
+
+  let { userhash, xsts_token: xstsToken } = stored;
+  const xstsExpired = new Date(stored.xsts_expires_at).getTime() < Date.now();
+  const msExpired = new Date(stored.ms_expires_at).getTime() < Date.now();
+
+  if (xstsExpired) {
+    let msAccessToken = stored.ms_access_token;
+    let newMsFields = null;
+    if (msExpired) {
+      if (!stored.ms_refresh_token) return "expired";
+      const refreshed = await xboxOAuthTokenRequest({ grant_type: "refresh_token", refresh_token: stored.ms_refresh_token, scope: "Xboxlive.signin Xboxlive.offline_access" }, { usePublicClient: stored.is_public_client });
+      msAccessToken = refreshed.access_token;
+      newMsFields = {
+        ms_access_token: refreshed.access_token,
+        ms_refresh_token: refreshed.refresh_token || stored.ms_refresh_token,
+        ms_expires_at: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
+      };
+    }
+    const userTokenResp = await xboxRequestUserToken(msAccessToken);
+    const xsts = await xboxRequestXstsToken(userTokenResp.Token);
+    const claims = xsts.DisplayClaims.xui[0];
+    userhash = claims.uhs;
+    xstsToken = xsts.Token;
+    await adminClient.from("xbox_tokens").update({
+      ...(newMsFields || {}),
+      xsts_token: xsts.Token,
+      xsts_expires_at: xsts.NotAfter,
+      userhash: claims.uhs,
+      xuid: claims.xid,
+      updated_at: new Date().toISOString(),
+    }).eq("user_id", userId);
+  }
+
+  const items = await xboxFetchWishlist(userhash, xstsToken);
+  return { items };
+}
+
 // Verifies the caller against their own Supabase session (same pattern
 // as handleLykodexSession above) and returns a service_role admin
 // client for reading/writing this user's stored tokens.
@@ -780,6 +860,15 @@ async function handleXbox(req, searchParams, res) {
       if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
       const { userId, adminClient } = await verifyCallerAndGetAdminClient(req);
       const result = await getLiveXboxLibrary(adminClient, userId);
+      if (result === "not_linked") return res.status(404).json({ error: "Xbox not linked" });
+      if (result === "expired") return res.status(401).json({ error: "Xbox link expired — please re-link" });
+      return res.status(200).json(result);
+    }
+
+    if (mode === "wishlist") {
+      if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+      const { userId, adminClient } = await verifyCallerAndGetAdminClient(req);
+      const result = await getLiveXboxWishlist(adminClient, userId);
       if (result === "not_linked") return res.status(404).json({ error: "Xbox not linked" });
       if (result === "expired") return res.status(401).json({ error: "Xbox link expired — please re-link" });
       return res.status(200).json(result);
@@ -929,6 +1018,65 @@ async function psnFetchLibrary(accessToken, accountId) {
   }));
 }
 
+// Undocumented persisted GraphQL query the PS App uses — confirmed
+// against andshrew/PlayStation-Trophies docs (not guessed). Sony can
+// rotate the hash without notice; if they do, this fails with a clear
+// error rather than returning stale/wrong data.
+const PSN_WISHLIST_QUERY_HASH = "571149e8aa4d76af7dd33b92e1d6f8f828ebc5fa8f0f6bf51a8324a0e6d71324";
+
+async function psnFetchWishlist(accessToken) {
+  const params = new URLSearchParams({
+    operationName: "metGetStoreWishlist",
+    variables: "{}",
+    extensions: JSON.stringify({
+      persistedQuery: { version: 1, sha256Hash: PSN_WISHLIST_QUERY_HASH },
+    }),
+  });
+  const url = `https://m.np.playstation.com/api/graphql/v1/op?${params}`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "apollographql-client-name": "PlayStationApp-Android",
+      "content-type": "application/json",
+    },
+  });
+  if (!res.ok) throw new Error(`PSN wishlist request failed (${res.status})`);
+  const data = await res.json();
+  const entries = data?.data?.storeWishlist;
+  if (!Array.isArray(entries)) {
+    const detail = data?.errors?.[0]?.message || "unexpected response";
+    throw new Error(`PSN wishlist unavailable — Sony may have rotated the query: ${detail}`);
+  }
+  return entries.map((entry) => ({
+    name: entry.name,
+    productId: entry.id || null,
+  })).filter((entry) => entry.name);
+}
+
+async function getLivePsnWishlist(adminClient, userId) {
+  const { data: stored, error: fetchError } = await adminClient.from("psn_tokens").select("*").eq("user_id", userId).maybeSingle();
+  if (fetchError) throw fetchError;
+  if (!stored) return "not_linked";
+
+  let accessToken = stored.access_token;
+  if (new Date(stored.access_expires_at).getTime() < Date.now()) {
+    if (new Date(stored.refresh_expires_at).getTime() < Date.now()) return "expired";
+    const refreshed = await psnRefreshTokens(stored.refresh_token);
+    accessToken = refreshed.access_token;
+    const now = Date.now();
+    await adminClient.from("psn_tokens").update({
+      access_token: refreshed.access_token,
+      refresh_token: refreshed.refresh_token || stored.refresh_token,
+      access_expires_at: new Date(now + refreshed.expires_in * 1000).toISOString(),
+      refresh_expires_at: new Date(now + refreshed.refresh_token_expires_in * 1000).toISOString(),
+      updated_at: new Date().toISOString(),
+    }).eq("user_id", userId);
+  }
+
+  const items = await psnFetchWishlist(accessToken);
+  return { items };
+}
+
 async function getLivePsnLibrary(adminClient, userId) {
   const { data: stored, error: fetchError } = await adminClient.from("psn_tokens").select("*").eq("user_id", userId).maybeSingle();
   if (fetchError) throw fetchError;
@@ -1032,6 +1180,15 @@ async function handlePsn(req, searchParams, res) {
       if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
       const { userId, adminClient } = await verifyCallerAndGetAdminClient(req);
       const result = await getLivePsnLibrary(adminClient, userId);
+      if (result === "not_linked") return res.status(404).json({ error: "PlayStation not linked" });
+      if (result === "expired") return res.status(401).json({ error: "PlayStation link expired — please re-link with a fresh npsso" });
+      return res.status(200).json(result);
+    }
+
+    if (mode === "wishlist") {
+      if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+      const { userId, adminClient } = await verifyCallerAndGetAdminClient(req);
+      const result = await getLivePsnWishlist(adminClient, userId);
       if (result === "not_linked") return res.status(404).json({ error: "PlayStation not linked" });
       if (result === "expired") return res.status(401).json({ error: "PlayStation link expired — please re-link with a fresh npsso" });
       return res.status(200).json(result);

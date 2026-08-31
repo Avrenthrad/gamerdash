@@ -1,41 +1,75 @@
-// Xbox/PSN library import — adds real owned/played games to Gaming
-// Collection's real game_library_items table (see lib/gameLibrary.js
-// for why that's a separate table from Backlog, not the same one this
-// used to write to: bulk-importing someone's full Xbox/PSN library
-// into Backlog's 4-state model silently defaulted every imported game
-// to status "backlog" (not yet played), which is wrong for games
-// they've already finished). Not the Wishlist either — these are
-// things a person already owns, not things they want. Mirrors
-// lib/wishlistImport.js's batch-with-progress shape.
-//
-// De-duplication is enforced at the DB level now (game_library_items
-// has a real unique(user_id, platform, title) index) — addToGameLibrary
-// silently no-ops a repeat, so this file doesn't need to check for
-// existing rows itself the way the old Backlog-targeting version did.
+// Xbox/PSN/Steam library import — adds real owned/played games to Gaming
+// Collection's real game_library_items table (see lib/gameLibrary.js).
+// DLC rows are stored with parent_title so the collection UI can show
+// purchased add-ons under the base game card.
 
-import { addToGameLibrary } from "./gameLibrary";
+import { addToGameLibrary, inferParentTitleFromName } from "./gameLibrary";
+import { fetchOwnedGames, resolveGameName } from "./steam";
 import { fetchXboxLibrary } from "./xboxOAuth";
 import { fetchPsnLibrary } from "./psnAuth";
 
-async function importGames(userId, games, platform, onProgress) {
+const STEAM_INFO_BATCH = 8;
+
+async function importGames(userId, games, platform, onProgress, parentByTitle = null) {
   let added = 0;
   for (let i = 0; i < games.length; i++) {
     onProgress?.(i + 1, games.length);
-    const name = games[i].name;
+    const game = games[i];
+    const name = game.name;
     if (!name) continue;
-    if (await addToGameLibrary(userId, name, platform)) added += 1;
+    const parentTitle = parentByTitle?.get(name) || null;
+    if (await addToGameLibrary(userId, name, platform, game.appid || null, parentTitle)) added += 1;
   }
   return { total: games.length, added };
+}
+
+function buildParentMap(games) {
+  const baseTitleKeys = new Set(games.map((game) => game.name.trim().toLowerCase()));
+  const parentByTitle = new Map();
+  for (const game of games) {
+    const parentTitle = inferParentTitleFromName(game.name, baseTitleKeys);
+    if (parentTitle) parentByTitle.set(game.name, parentTitle);
+  }
+  return parentByTitle;
 }
 
 export async function importXboxLibrary(userId, onProgress) {
   const { games } = await fetchXboxLibrary();
   if (!games || games.length === 0) throw new Error("No Xbox title history found.");
-  return importGames(userId, games, "xbox", onProgress);
+  return importGames(userId, games, "xbox", onProgress, buildParentMap(games));
 }
 
 export async function importPsnLibrary(userId, onProgress) {
   const { games } = await fetchPsnLibrary();
   if (!games || games.length === 0) throw new Error("No PlayStation played games found.");
-  return importGames(userId, games, "playstation", onProgress);
+  return importGames(userId, games, "playstation", onProgress, buildParentMap(games));
+}
+
+export async function importSteamLibrary(userId, linkedSteamId, onProgress) {
+  const games = await fetchOwnedGames(linkedSteamId);
+  if (!games || games.length === 0) throw new Error("No Steam games found.");
+
+  const parentByTitle = new Map();
+  for (let i = 0; i < games.length; i += STEAM_INFO_BATCH) {
+    const batch = games.slice(i, i + STEAM_INFO_BATCH);
+    await Promise.all(batch.map(async (game) => {
+      if (!game.name) return;
+      try {
+        const info = await resolveGameName(game.appid);
+        if (info?.appType === "dlc" && info.parentTitle) {
+          parentByTitle.set(game.name, info.parentTitle);
+        }
+      } catch {
+        // Fall back to title heuristics during merge if appdetails fails.
+      }
+    }));
+    onProgress?.(Math.min(i + batch.length, games.length), games.length);
+  }
+
+  const heuristicParents = buildParentMap(games);
+  for (const [title, parentTitle] of heuristicParents) {
+    if (!parentByTitle.has(title)) parentByTitle.set(title, parentTitle);
+  }
+
+  return importGames(userId, games, "steam", onProgress, parentByTitle);
 }

@@ -140,6 +140,8 @@ export default async function handler(req, res) {
         // etc. Used to honestly split DLC out from base games rather
         // than guessing from the title.
         appType: entry.data.type || null,
+        parentTitle: entry.data.fullgame?.name || null,
+        parentAppid: entry.data.fullgame?.appid ? String(entry.data.fullgame.appid) : null,
         metacriticScore: entry.data.metacritic?.score ?? null,
         metacriticUrl: entry.data.metacritic?.url ?? null,
         // Real genre tags Steam assigns per game — used for the Hype

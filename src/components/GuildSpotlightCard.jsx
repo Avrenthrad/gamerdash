@@ -19,7 +19,7 @@ import MiniAvatar from "./MiniAvatar";
 
 const MEMBER_AVATAR_CAP = 4;
 
-export default function GuildSpotlightCard({ userId, onOpenGuilds }) {
+export default function GuildSpotlightCard({ userId, onOpenGuilds, embedded = false }) {
   const [guild, setGuild] = useState(null);
   const [members, setMembers] = useState([]);
   const [recentActivity, setRecentActivity] = useState(null);
@@ -61,8 +61,12 @@ export default function GuildSpotlightCard({ userId, onOpenGuilds }) {
   const previewMembers = members.slice(0, MEMBER_AVATAR_CAP);
   const overflowCount = Math.max(0, memberCount - MEMBER_AVATAR_CAP);
 
+  const rootClass = embedded
+    ? "guild-social-card__section guild-spotlight-card"
+    : "panel hero-card guild-spotlight-card";
+
   return (
-    <div className="panel hero-card guild-spotlight-card">
+    <div className={rootClass}>
       <div className="panel__head">
         <span className="panel__eyebrow">Guild Spotlight</span>
       </div>

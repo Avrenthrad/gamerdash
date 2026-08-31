@@ -20,18 +20,35 @@ import {
   resolveGameName,
   fetchReviewSummary,
 } from "../lib/steam";
-import { importSteamWishlist } from "../lib/wishlistImport";
+import { importSteamWishlist, importXboxWishlist, importPsnWishlist } from "../lib/wishlistImport";
+import { fetchLiveGamerscore } from "../lib/xboxOAuth";
+import { fetchLiveTrophies } from "../lib/psnAuth";
 import { getExchangeRates, SUPPORTED_CURRENCIES, formatPrice } from "../lib/currency";
 import { getCheapestInfo, categorizeWishlistEntry } from "./price/priceUtils";
 import WishlistCard from "./price/WishlistCard";
 import PriceSearch from "./price/PriceSearch";
+import ReleaseCalendarCard from "./ReleaseCalendarCard";
 
 const WISHLIST_COLUMNS = [
-  { id: "onSale", label: "On Sale" },
-  { id: "preorder", label: "Preorders" },
-  { id: "games", label: "Games" },
-  { id: "dlc", label: "DLC" },
+  { id: "onSale", label: "On sale", blurb: "Dropping now", accent: "teal" },
+  { id: "preorder", label: "Preorders", blurb: "Coming soon", accent: "amber" },
+  { id: "games", label: "Games", blurb: "Full titles", accent: "sky" },
+  { id: "dlc", label: "DLC", blurb: "Add-ons & expansions", accent: "rose" },
 ];
+
+const WISHLIST_SYNC_PLATFORMS = [
+  { id: "steam", label: "Steam", resyncLabel: "Resync Steam wishlist", title: "Resync your Steam wishlist" },
+  { id: "xbox", label: "Xbox", resyncLabel: "Resync Xbox wishlist", title: "Resync your Xbox wishlist" },
+  { id: "playstation", label: "PlayStation", resyncLabel: "Resync PSN wishlist", title: "Resync your PlayStation wishlist" },
+];
+
+function SyncIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+      <path d="M12 2a10 10 0 1 0 10 10h-2a8 8 0 1 1-2.34-5.66L15 9V3H9l2.3 2.3A9.96 9.96 0 0 0 12 2z" />
+    </svg>
+  );
+}
 
 export default function PriceComparisonPage({
   wishlist,
@@ -40,7 +57,7 @@ export default function PriceComparisonPage({
   onOpenHypeCharts,
   onOpenMarket,
   onOpenSales,
-  onOpenUpcomingReleases,
+  onOpenCalendar,
   isLoggedIn,
   onSignIn,
   onCreateAccount,
@@ -55,13 +72,39 @@ export default function PriceComparisonPage({
   const [rates, setRates] = useState(null);
   const [errorByTitle, setErrorByTitle] = useState({});
   const [sortBy, setSortBy] = useState("newest");
-  const [resyncStatus, setResyncStatus] = useState("idle");
-  const [resyncMessage, setResyncMessage] = useState("");
+  const [platformLinked, setPlatformLinked] = useState({
+    steam: false,
+    xbox: false,
+    playstation: false,
+  });
+  const [syncState, setSyncState] = useState({
+    steam: { status: "idle", message: "" },
+    xbox: { status: "idle", message: "" },
+    playstation: { status: "idle", message: "" },
+  });
 
   // ---------- exchange rates (once) ----------
   useEffect(() => {
     getExchangeRates().then(setRates);
   }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setPlatformLinked({ steam: false, xbox: false, playstation: false });
+      return;
+    }
+
+    setPlatformLinked((prev) => ({ ...prev, steam: Boolean(linkedSteamId) }));
+
+    Promise.allSettled([fetchLiveGamerscore(), fetchLiveTrophies()])
+      .then(([xboxResult, psnResult]) => {
+        setPlatformLinked({
+          steam: Boolean(linkedSteamId),
+          xbox: xboxResult.status === "fulfilled",
+          playstation: psnResult.status === "fulfilled",
+        });
+      });
+  }, [isLoggedIn, linkedSteamId]);
 
   // ---------- load deals for wishlist entries ----------
   function loadDealForTitle(title) {
@@ -216,27 +259,61 @@ export default function PriceComparisonPage({
     });
   }
 
-  // ---------- Steam wishlist resync ----------
-  async function handleResync() {
-    if (!linkedSteamId) return;
-    setResyncStatus("loading");
-    setResyncMessage("");
+  // ---------- platform wishlist resync ----------
+  const anySyncLoading = WISHLIST_SYNC_PLATFORMS.some(
+    (platform) => syncState[platform.id]?.status === "loading"
+  );
+  const activeSyncMessage = WISHLIST_SYNC_PLATFORMS.map((platform) => syncState[platform.id])
+    .find((state) => state?.message)?.message || "";
+  const activeSyncError = WISHLIST_SYNC_PLATFORMS.some(
+    (platform) => syncState[platform.id]?.status === "error"
+  );
+
+  async function handleResync(platformId) {
+    if (!platformLinked[platformId]) return;
+
+    setSyncState((prev) => ({
+      ...prev,
+      [platformId]: { status: "loading", message: "" },
+    }));
+
+    const onProgress = (current, totalCount) => {
+      setSyncState((prev) => ({
+        ...prev,
+        [platformId]: { ...prev[platformId], message: `Syncing… ${current} of ${totalCount}` },
+      }));
+    };
 
     try {
-      const { total, added } = await importSteamWishlist(
-        linkedSteamId,
-        onAddToWishlist,
-        (current, totalCount) =>
-          setResyncMessage(`Syncing… ${current} of ${totalCount}`)
-      );
-      setResyncStatus("done");
-      setResyncMessage(`Synced — ${added} of ${total} games up to date.`);
+      let total;
+      let added;
+
+      if (platformId === "steam") {
+        ({ total, added } = await importSteamWishlist(linkedSteamId, onAddToWishlist, onProgress));
+      } else if (platformId === "xbox") {
+        ({ total, added } = await importXboxWishlist(onAddToWishlist, onProgress));
+      } else {
+        ({ total, added } = await importPsnWishlist(onAddToWishlist, onProgress));
+      }
+
+      setSyncState((prev) => ({
+        ...prev,
+        [platformId]: {
+          status: "done",
+          message: `Synced — ${added} of ${total} games up to date.`,
+        },
+      }));
     } catch (err) {
-      console.error("Steam resync failed:", err);
-      setResyncStatus("error");
-      setResyncMessage(
-        "Couldn't resync right now — make sure your wishlist is still set to public on Steam."
-      );
+      console.error(`${platformId} wishlist resync failed:`, err);
+      const fallback = platformId === "steam"
+        ? "Couldn't resync right now — make sure your wishlist is still set to public on Steam."
+        : platformId === "xbox"
+          ? "Xbox wishlist sync isn't available yet — Microsoft doesn't expose wishlist data through the linked-account API."
+          : "Couldn't resync your PlayStation wishlist right now — try re-linking on Account Linking.";
+      setSyncState((prev) => ({
+        ...prev,
+        [platformId]: { status: "error", message: err.message || fallback },
+      }));
     }
   }
 
@@ -440,41 +517,40 @@ export default function PriceComparisonPage({
             </span>
           </button>
         )}
-        {onOpenUpcomingReleases && (
-          <button
-            type="button"
-            className="price-nav-card"
-            onClick={onOpenUpcomingReleases}
-          >
-            <span className="price-nav-card__title">Upcoming Releases</span>
-            <span className="price-nav-card__subtitle">
-              Real release-date calendar for what's coming
-            </span>
-          </button>
-        )}
       </div>
 
-      {linkedSteamId && (
+      <ReleaseCalendarCard
+        wishlist={wishlist}
+        linkedSteamId={linkedSteamId}
+        onOpenCalendar={onOpenCalendar}
+      />
+
+      {isLoggedIn && (
         <div className="steam-sync-row">
-          <button
-            type="button"
-            className="steam-sync-btn"
-            onClick={handleResync}
-            disabled={resyncStatus === "loading"}
-            title="Resync your Steam wishlist"
-          >
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-              <path d="M12 2a10 10 0 1 0 10 10h-2a8 8 0 1 1-2.34-5.66L15 9V3H9l2.3 2.3A9.96 9.96 0 0 0 12 2z" />
-            </svg>
-            {resyncStatus === "loading" ? "Syncing…" : "Resync Steam wishlist"}
-          </button>
-          {resyncMessage && (
+          {WISHLIST_SYNC_PLATFORMS.map((platform) => {
+            const state = syncState[platform.id];
+            const linked = platformLinked[platform.id];
+            return (
+              <button
+                key={platform.id}
+                type="button"
+                className="steam-sync-btn"
+                onClick={() => handleResync(platform.id)}
+                disabled={!linked || anySyncLoading}
+                title={linked ? platform.title : `Link ${platform.label} on Account Linking first`}
+              >
+                <SyncIcon />
+                {state?.status === "loading" ? "Syncing…" : platform.resyncLabel}
+              </button>
+            );
+          })}
+          {activeSyncMessage && (
             <span
               className={`panel__status ${
-                resyncStatus === "error" ? "panel__status--error" : ""
+                activeSyncError ? "panel__status--error" : ""
               }`}
             >
-              {resyncMessage}
+              {activeSyncMessage}
             </span>
           )}
         </div>
@@ -494,13 +570,17 @@ export default function PriceComparisonPage({
         onEnrich={enrichSearchResults}
       />
 
-      <div className="wishlist-sort-row">
-        <span className="feed-col__label">
-          Your wishlist
-          <span className="feed-col__count">{wishlist.length}</span>
-        </span>
-        <div className="wishlist-sort-row__controls">
-          <label className="wishlist-sort-row__control">
+      <section className="market-wishlist" aria-labelledby="market-wishlist-heading">
+        <header className="market-wishlist__header">
+          <div className="market-wishlist__intro">
+            <h2 id="market-wishlist-heading" className="market-wishlist__title">Your wishlist</h2>
+            <p className="market-wishlist__subtitle">
+              {wishlist.length === 0
+                ? "Search above to start tracking prices."
+                : `${wishlist.length} title${wishlist.length === 1 ? "" : "s"} · ${onSaleCount} on sale right now`}
+            </p>
+          </div>
+          <label className="market-wishlist__sort wishlist-sort-row__control">
             <span>Sort by</span>
             <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
               <option value="newest">Recently added</option>
@@ -511,82 +591,99 @@ export default function PriceComparisonPage({
               <option value="discount">Discount %</option>
             </select>
           </label>
-        </div>
-      </div>
+        </header>
 
-      {wishlist.length === 0 ? (
-        <div className="empty-state">
-          <p className="empty-state__title">Your wishlist is a void.</p>
-          <p className="empty-state__body">
-            Search above and start tracking prices. Future-you will thank present-you
-            when something finally drops.
-          </p>
-        </div>
-      ) : (
-        <>
-          {pendingEntries.length > 0 && (
-            <ul className="wishlist-list" style={{ marginBottom: "20px" }}>
-              {pendingEntries.map((entry) => (
-                <WishlistCard
-                  key={entry.id}
-                  entry={entry}
-                  deal={dealsByTitle[entry.title]}
-                  players={playersByTitle[entry.title]}
-                  meta={metaByTitle[entry.title]}
-                  rates={rates}
-                  currency={currency}
-                  onRemove={onRemoveFromWishlist}
-                  error={errorByTitle[entry.title]}
-                  onRetry={loadDealForTitle}
-                  isLoggedIn={isLoggedIn}
-                  onSignIn={onSignIn}
-                  onCreateAccount={onCreateAccount}
-                  platformOrder={platformOrder}
-                />
-              ))}
-            </ul>
-          )}
-
-          <div className="wishlist-columns">
-            {columns.map((col) => (
-              <div key={col.id}>
-                <div className="wishlist-column__head">
-                  <span className="wishlist-column__label">{col.label} ({col.items.length})</span>
-                  {rates && col.items.length > 0 && (
-                    <span className="wishlist-column__value">
-                      {formatPrice(col.valueAud, "AUD", rates, currency)}
-                    </span>
-                  )}
-                </div>
-                {col.items.length === 0 ? (
-                  <p className="panel__status">Nothing here yet.</p>
-                ) : (
-                  <ul className="wishlist-list">
-                    {col.items.map((entry) => (
-                      <WishlistCard
-                        key={entry.id}
-                        entry={entry}
-                        deal={dealsByTitle[entry.title]}
-                        players={playersByTitle[entry.title]}
-                        meta={metaByTitle[entry.title]}
-                        rates={rates}
-                        currency={currency}
-                        onRemove={onRemoveFromWishlist}
-                        error={errorByTitle[entry.title]}
-                        onRetry={loadDealForTitle}
-                        isLoggedIn={isLoggedIn}
-                        onSignIn={onSignIn}
-                        onCreateAccount={onCreateAccount}
-                        platformOrder={platformOrder}
-                      />
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
+        {wishlist.length === 0 ? (
+          <div className="market-wishlist__empty empty-state">
+            <p className="empty-state__title">Your wishlist is a void.</p>
+            <p className="empty-state__body">
+              Search above and start tracking prices. Future-you will thank present-you
+              when something finally drops.
+            </p>
           </div>
-        </>
-      )}
+        ) : (
+          <>
+            {pendingEntries.length > 0 && (
+              <div className="market-wishlist__pending">
+                <span className="market-wishlist__pending-label">Still loading prices</span>
+                <ul className="wishlist-list wishlist-list--pending">
+                  {pendingEntries.map((entry) => (
+                    <WishlistCard
+                      key={entry.id}
+                      entry={entry}
+                      deal={dealsByTitle[entry.title]}
+                      players={playersByTitle[entry.title]}
+                      meta={metaByTitle[entry.title]}
+                      rates={rates}
+                      currency={currency}
+                      onRemove={onRemoveFromWishlist}
+                      error={errorByTitle[entry.title]}
+                      onRetry={loadDealForTitle}
+                      isLoggedIn={isLoggedIn}
+                      onSignIn={onSignIn}
+                      onCreateAccount={onCreateAccount}
+                      platformOrder={platformOrder}
+                    />
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="wishlist-columns">
+              {columns.map((col) => {
+                const columnDef = WISHLIST_COLUMNS.find((c) => c.id === col.id);
+                return (
+                  <section
+                    key={col.id}
+                    className={`wishlist-column wishlist-column--${col.id}`}
+                    data-accent={columnDef?.accent}
+                  >
+                    <header className="wishlist-column__head">
+                      <div className="wishlist-column__head-top">
+                        <span className="wishlist-column__eyebrow">{columnDef?.blurb}</span>
+                        <span className="wishlist-column__count">{col.items.length}</span>
+                      </div>
+                      <div className="wishlist-column__head-bottom">
+                        <span className="wishlist-column__label">{columnDef?.label || col.label}</span>
+                        {rates && col.items.length > 0 && (
+                          <span className="wishlist-column__value">
+                            {formatPrice(col.valueAud, "AUD", rates, currency)}
+                          </span>
+                        )}
+                      </div>
+                    </header>
+
+                    {col.items.length === 0 ? (
+                      <p className="wishlist-column__empty">Nothing here yet.</p>
+                    ) : (
+                      <ul className="wishlist-list">
+                        {col.items.map((entry) => (
+                          <WishlistCard
+                            key={entry.id}
+                            entry={entry}
+                            deal={dealsByTitle[entry.title]}
+                            players={playersByTitle[entry.title]}
+                            meta={metaByTitle[entry.title]}
+                            rates={rates}
+                            currency={currency}
+                            onRemove={onRemoveFromWishlist}
+                            error={errorByTitle[entry.title]}
+                            onRetry={loadDealForTitle}
+                            isLoggedIn={isLoggedIn}
+                            onSignIn={onSignIn}
+                            onCreateAccount={onCreateAccount}
+                            platformOrder={platformOrder}
+                          />
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </section>
     </div>
   );
 }

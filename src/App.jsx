@@ -13,8 +13,9 @@ import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
 import Header from "./components/Header";
-import { GAMING_VIEWS } from "./lib/navSections";
-import GamingSidebar from "./components/GamingSidebar";
+import { getCollegeSidebarForView } from "./lib/navSections";
+import CollegeSidebar from "./components/CollegeSidebar";
+import { useCollegeSidebarState } from "./hooks/useCollegeSidebarState";
 import OnboardingCollegePicker from "./components/OnboardingCollegePicker";
 import LoginPage from "./components/LoginPage";
 import { AccountGatePage } from "./components/AccountGate";
@@ -37,6 +38,7 @@ const MarketPage = lazy(() => import("./components/MarketPage"));
 const BacklogPage = lazy(() => import("./components/BacklogPage"));
 const AchievementsPage = lazy(() => import("./components/AchievementsPage"));
 const UpcomingReleasesPage = lazy(() => import("./components/UpcomingReleasesPage"));
+const ReleaseCalendarPage = lazy(() => import("./components/ReleaseCalendarPage"));
 const MtgSearchPage = lazy(() => import("./components/MtgSearchPage"));
 const MtgCollectionPage = lazy(() => import("./components/MtgCollectionPage"));
 const MtgDeckBuilderPage = lazy(() => import("./components/MtgDeckBuilderPage"));
@@ -177,6 +179,9 @@ export default function App() {
   const gridContainerRef = useRef(null);
   const [gridWidth, setGridWidth] = useState(0);
 
+  const sidebarConfig = getCollegeSidebarForView(view);
+  const [collegeSidebarOpen, setCollegeSidebarOpen] = useCollegeSidebarState(sidebarConfig?.collegeId ?? null);
+
   // Universal command palette — Ctrl/Cmd+K from anywhere, or the
   // header search icon (see CommandPalette.jsx). Lives at this level
   // (not per-page) since it's a global overlay, not a route.
@@ -299,13 +304,22 @@ export default function App() {
         />
 
         <div className="dash-layout">
-          {GAMING_VIEWS.includes(view) && (
-            <GamingSidebar currentView={view} onNavigate={(id) => goTo(id)} />
+          {sidebarConfig && (
+            <CollegeSidebar
+              collegeId={sidebarConfig.collegeId}
+              label={sidebarConfig.label}
+              items={sidebarConfig.items}
+              currentView={view}
+              onNavigate={(id) => goTo(id)}
+              collapsed={!collegeSidebarOpen}
+              onToggleCollapsed={() => setCollegeSidebarOpen((open) => !open)}
+            />
           )}
           <div className={`dash ${view === "prices" ? "dash--wide" : ""}`}>
           {view === "linking" &&
             (isLoggedIn ? (
               <AccountLinkingPage
+                onBack={() => goTo("dashboard")}
                 userId={userId}
                 linkedSteamId={linkedSteamId}
                 onUnlinkSteam={() => {
@@ -331,6 +345,7 @@ export default function App() {
           {view === "settings" &&
             (isLoggedIn ? (
               <AccountSettingsPage
+                onBack={() => goTo("dashboard")}
                 avatarUrl={avatarUrl}
                 onAvatarChange={setAvatarUrl}
                 firstName={firstName}
@@ -375,6 +390,7 @@ export default function App() {
           {view === "dashfeed" &&
             (isLoggedIn ? (
               <DashfeedSettingsPage
+                onBack={() => goTo("dashboard")}
                 gameToggles={gameToggles}
                 onGameTogglesChange={setGameToggles}
                 storeToggles={storeToggles}
@@ -395,10 +411,9 @@ export default function App() {
               wishlist={wishlist}
               onAddToWishlist={addToWishlist}
               onRemoveFromWishlist={removeFromWishlist}
-              onOpenHypeCharts={() => goTo("hype-charts")}
               onOpenMarket={() => goTo("market")}
               onOpenSales={() => goTo("sales")}
-              onOpenUpcomingReleases={() => goTo("upcoming-releases")}
+              onOpenCalendar={() => goTo("release-calendar")}
               linkedSteamId={linkedSteamId}
               currency={currency}
               onCurrencyChange={setCurrency}
@@ -449,9 +464,18 @@ export default function App() {
               />
             ))}
 
+          {view === "release-calendar" && (
+            <ReleaseCalendarPage
+              onBack={() => goTo("dashboard")}
+              wishlist={wishlist}
+              linkedSteamId={linkedSteamId}
+              onOpenBrowse={() => goTo("upcoming-releases")}
+            />
+          )}
+
           {view === "upcoming-releases" && (
             <UpcomingReleasesPage
-              onBack={() => goTo("prices")}
+              onBack={() => goTo("release-calendar")}
               isLoggedIn={isLoggedIn}
               userId={userId}
               wishlist={wishlist}
@@ -893,11 +917,9 @@ export default function App() {
               firstName={firstName}
               lastName={lastName}
               username={username}
-              gdScore={gdScore}
               masteryScore={masteryScore}
               masteryLevel={masteryLevel}
               masteryBreakdown={masteryBreakdown}
-              masteryXp={masteryXp}
               wishlist={wishlist}
               linkedSteamId={linkedSteamId}
               userId={userId}

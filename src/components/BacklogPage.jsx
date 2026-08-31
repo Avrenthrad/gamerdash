@@ -16,8 +16,8 @@
 // against backlog tracking that feels like pressure instead of fun.
 
 import { useEffect, useState } from "react";
-import { fetchOwnedGames, searchSteamGames } from "../lib/steam";
-import { searchRawgGames } from "../lib/rawg";
+import { searchSteamGames } from "../lib/steam";
+import { searchRawgGamesAndDlc } from "../lib/rawg";
 import { logActivityForUser } from "../lib/guilds";
 import {
   fetchBacklog,
@@ -40,12 +40,6 @@ const SORT_OPTIONS = [
 
 const FILTER_OPTIONS = ["all", ...STATUSES];
 
-// Owned games under 2 hours playtime are reasonable "haven't really
-// started this" candidates to suggest for import — not a claim about
-// what the person has or hasn't actually experienced, just a filter
-// to keep the import list from being their entire library.
-const LOW_PLAYTIME_THRESHOLD_MINUTES = 120;
-
 export default function BacklogPage({ onBack, userId, linkedSteamId }) {
   const [items, setItems] = useState([]);
   const [status, setStatus] = useState("loading"); // page load state: loading | ready | error
@@ -58,10 +52,6 @@ export default function BacklogPage({ onBack, userId, linkedSteamId }) {
   const [searchError, setSearchError] = useState(null);
   const [platformByResult, setPlatformByResult] = useState({}); // rawgId -> chosen platform
   const [addingId, setAddingId] = useState(null);
-
-  const [importCandidates, setImportCandidates] = useState([]);
-  const [importLoaded, setImportLoaded] = useState(false);
-  const [showImport, setShowImport] = useState(false);
 
   const [surpriseItem, setSurpriseItem] = useState(null);
 
@@ -92,7 +82,10 @@ export default function BacklogPage({ onBack, userId, linkedSteamId }) {
     setSearching(true);
     setSearchError(null);
     try {
-      const results = await searchRawgGames(searchTerm.trim());
+      const results = await searchRawgGamesAndDlc(
+        searchTerm.trim(),
+        items.map((item) => item.title)
+      );
       if (results === "no_key") {
         setSearchError("Platform search isn't configured yet.");
         setSearchResults([]);
@@ -128,40 +121,13 @@ export default function BacklogPage({ onBack, userId, linkedSteamId }) {
           // No Steam match found — still add with the real platform, just no enrichment.
         }
       }
-      await addToBacklog(userId, result.name, steamAppid, platform);
+      await addToBacklog(userId, result.name, steamAppid, platform, result.parentTitle || null);
       setSearchResults((prev) => prev.filter((r) => r.id !== result.id));
       loadBacklog();
     } catch (err) {
       console.error("Failed to add to backlog:", err);
     } finally {
       setAddingId(null);
-    }
-  }
-
-  async function loadImportCandidates() {
-    setShowImport(true);
-    if (importLoaded || !linkedSteamId) return;
-    try {
-      const games = await fetchOwnedGames(linkedSteamId);
-      const alreadyAdded = new Set(items.map((i) => i.steam_appid));
-      const candidates = games
-        .filter((g) => (g.playtime_forever || 0) <= LOW_PLAYTIME_THRESHOLD_MINUTES)
-        .filter((g) => !alreadyAdded.has(String(g.appid)))
-        .sort((a, b) => a.name.localeCompare(b.name));
-      setImportCandidates(candidates);
-      setImportLoaded(true);
-    } catch (err) {
-      console.error("Failed to load Steam library for import:", err);
-    }
-  }
-
-  async function handleImport(game) {
-    try {
-      await addToBacklog(userId, game.name, game.appid, "PC");
-      setImportCandidates((prev) => prev.filter((g) => g.appid !== game.appid));
-      loadBacklog();
-    } catch (err) {
-      console.error("Failed to import game:", err);
     }
   }
 
@@ -290,7 +256,7 @@ export default function BacklogPage({ onBack, userId, linkedSteamId }) {
           <input
             className="price-search__input"
             type="text"
-            placeholder="Search a game to add…"
+            placeholder="Search a game or DLC to add…"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -306,7 +272,12 @@ export default function BacklogPage({ onBack, userId, linkedSteamId }) {
             {searchResults.map((r) => (
               <li key={r.id} className="backlog-search-results__row">
                 {r.backgroundImage && <img src={r.backgroundImage} alt="" loading="lazy" decoding="async" />}
-                <span>{r.name}</span>
+                <span className="backlog-search-results__name">
+                  {r.name}
+                  {r.isDlc && r.parentTitle && (
+                    <span className="tag tag--muted backlog-search-results__dlc-tag">DLC for {r.parentTitle}</span>
+                  )}
+                </span>
                 {r.platforms.length > 0 ? (
                   <label className="currency-picker" style={{ flexShrink: 0 }}>
                     <span>Platform</span>
@@ -335,32 +306,6 @@ export default function BacklogPage({ onBack, userId, linkedSteamId }) {
           </ul>
         )}
 
-        {linkedSteamId && (
-          <button type="button" className="quickdash-reset-btn" onClick={loadImportCandidates}>
-            {showImport ? "Import from Steam library" : "Import from Steam library ▾"}
-          </button>
-        )}
-
-        {showImport && (
-          <div className="backlog-import">
-            {!importLoaded && <p className="panel__status">Loading your library…</p>}
-            {importLoaded && importCandidates.length === 0 && (
-              <p className="panel__status">No low-playtime games found to suggest — your backlog's already caught up, or everything's added.</p>
-            )}
-            {importLoaded && importCandidates.length > 0 && (
-              <ul className="backlog-search-results">
-                {importCandidates.slice(0, 20).map((g) => (
-                  <li key={g.appid} className="backlog-search-results__row">
-                    <span>{g.name}</span>
-                    <button type="button" className="linking-row__connect" onClick={() => handleImport(g)}>
-                      Add
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
       </div>
 
       {status === "ready" && items.length > 0 && (
@@ -409,6 +354,9 @@ export default function BacklogPage({ onBack, userId, linkedSteamId }) {
               <div className="backlog-card__info">
                 <span className="backlog-card__title">{item.title}</span>
                 <div className="backlog-card__meta">
+                  {item.parent_title && (
+                    <span className="tag tag--muted">DLC for {item.parent_title}</span>
+                  )}
                   {item.platform && <span className="tag tag--muted">{item.platform}</span>}
                   {item.metacriticScore != null && <span className="score-badge">Metacritic {item.metacriticScore}</span>}
                   {item.releaseDate && <span>{item.releaseDate}</span>}

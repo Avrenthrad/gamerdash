@@ -8,7 +8,7 @@ import { fetchRecentActivityForUser, describeActivity, displayName } from "../li
 import { relativeTime } from "./price/priceUtils";
 import MiniAvatar from "./MiniAvatar";
 
-export default function RecentActivityCard({ userId, onOpenGuilds }) {
+export default function RecentActivityCard({ userId, onOpenGuilds, embedded = false }) {
   const [activity, setActivity] = useState([]);
   const [status, setStatus] = useState("loading"); // loading | ready | error
 
@@ -29,8 +29,10 @@ export default function RecentActivityCard({ userId, onOpenGuilds }) {
     return () => { cancelled = true; };
   }, [userId]);
 
+  const rootClass = embedded ? "guild-social-card__section" : "panel hero-card";
+
   return (
-    <div className="panel hero-card">
+    <div className={rootClass}>
       <div className="panel__head">
         <span className="panel__eyebrow">Recent Activity</span>
         <button type="button" className="linkish" onClick={onOpenGuilds}>View all →</button>

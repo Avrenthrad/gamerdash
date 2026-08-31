@@ -66,6 +66,7 @@ function initialVisibility(fields) {
 }
 
 export default function AccountSettingsPage({
+  onBack,
   avatarUrl,
   onAvatarChange,
   firstName,
@@ -222,6 +223,9 @@ export default function AccountSettingsPage({
 
   return (
     <div className="settings-page">
+      {onBack && (
+        <button type="button" className="back-link" onClick={onBack}>← Back to Gaming</button>
+      )}
       <div className="settings-page__head">
         <h1 className="settings-page__title">Account settings</h1>
         <p className="settings-page__subtitle">Manage your profile, linked platform names, and privacy.</p>

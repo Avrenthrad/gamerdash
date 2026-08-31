@@ -162,7 +162,6 @@ export default function SteamPresenceCard({ userId, linkedSteamId }) {
   return (
     <SlidingBanner
       items={entries}
-      dotsLabel="Steam status"
       getItemKey={(entry) => entry.id}
       emptyState={
         <div className="presence-card presence-card--empty">

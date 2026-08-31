@@ -80,7 +80,6 @@ export default function GuildPulseCard({ userId, onGoToGuilds }) {
   return (
     <SlidingBanner
       items={events}
-      dotsLabel="Guild activity"
       getItemKey={(entry) => entry.id}
       emptyState={
         <div className="presence-card presence-card--empty guild-pulse-slide">

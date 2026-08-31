@@ -16,7 +16,6 @@ export default function SlidingBanner({
   getItemKey,
   emptyState = null,
   className = "",
-  dotsLabel = "Items",
 }) {
   const [index, setIndex] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -80,21 +79,6 @@ export default function SlidingBanner({
           ))}
         </div>
       </div>
-
-      {items.length > 1 && items.length <= 8 && (
-        <div className="sliding-banner__dots" role="tablist" aria-label={dotsLabel}>
-          {items.map((item, i) => (
-            <button
-              key={getItemKey ? getItemKey(item, i) : i}
-              type="button"
-              role="tab"
-              aria-selected={i === index}
-              className={`sliding-banner__dot ${i === index ? "sliding-banner__dot--active" : ""}`}
-              onClick={() => setIndex(i)}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }

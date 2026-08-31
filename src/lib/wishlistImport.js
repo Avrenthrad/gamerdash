@@ -1,11 +1,12 @@
-// Shared Steam-wishlist-import logic — used both by Account Linking
-// (the first-time link + import) and the Prices page's resync button
-// (re-running the same import against an already-linked Steam ID).
+// Shared platform wishlist-import logic — used by Account Linking
+// (first-time import) and the Prices page resync buttons.
 //
-// Processed in batches rather than one giant Promise.all — friendlier
-// to Steam's API for people with large wishlists.
+// Steam resolves appids to names in batches; Xbox/PSN return titles
+// directly from the linked-account APIs (see api/pricing.js).
 
 import { resolveSteamIdInput, fetchWishlist, resolveGameName } from "./steam";
+import { fetchXboxWishlist } from "./xboxOAuth";
+import { fetchPsnWishlist } from "./psnAuth";
 
 const BATCH_SIZE = 10;
 
@@ -39,4 +40,31 @@ export async function importSteamWishlist(steamIdOrProfileInput, onAddToWishlist
   }
 
   return { steamId, total: items.length, added };
+}
+
+async function importNamedWishlistItems(items, onAddToWishlist, onProgress) {
+  if (!items || items.length === 0) {
+    throw new Error("That wishlist is empty.");
+  }
+
+  let added = 0;
+  for (let i = 0; i < items.length; i++) {
+    onProgress?.(i + 1, items.length);
+    const name = items[i].name;
+    if (!name) continue;
+    onAddToWishlist(name);
+    added += 1;
+  }
+
+  return { total: items.length, added };
+}
+
+export async function importXboxWishlist(onAddToWishlist, onProgress) {
+  const { items } = await fetchXboxWishlist();
+  return importNamedWishlistItems(items, onAddToWishlist, onProgress);
+}
+
+export async function importPsnWishlist(onAddToWishlist, onProgress) {
+  const { items } = await fetchPsnWishlist();
+  return importNamedWishlistItems(items, onAddToWishlist, onProgress);
 }
