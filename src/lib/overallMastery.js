@@ -17,7 +17,7 @@
 // fixed constants handed down from anywhere real — they're isolated
 // here specifically so they're easy to retune later.
 
-import { normalize, accountXpFromMastery, levelFromXp } from "./gameMastery";
+import { normalize, accountXpFromMastery, levelFromXp } from "./gameMastery.js";
 
 export { accountXpFromMastery, levelFromXp };
 
