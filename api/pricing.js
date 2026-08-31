@@ -40,7 +40,7 @@
 
 import { allowCors } from "./_cors.js";
 import { createClient } from "@supabase/supabase-js";
-import { randomUUID } from "crypto";
+import { randomUUID } from "node:crypto";
 import { computeXboxScore, computePsScore, computeSteamScore, computeMasteryScore, accountXpFromMastery, levelFromXp } from "../src/lib/gameMastery.js";
 import { computeOverallScore } from "../src/lib/overallMastery.js";
 
