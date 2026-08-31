@@ -42,25 +42,18 @@ import { importXboxLibrary, importPsnLibrary } from "../lib/libraryImport";
 import { useApp } from "../hooks/useApp";
 import GameMasterySection from "./GameMasterySection";
 
-// accountUrl, where present, is a real, verified destination for
-// finding the actual Gamerscore/trophy numbers typed into
-// GameMasterySection below — confirmed live, not guessed:
-//   - Xbox: account.xbox.com/en-us/profile is Microsoft's own
-//     sign-in-gated "your profile" page; passing the saved Gamertag
-//     takes it straight there instead of a bare landing page.
-//   - PlayStation: my.playstation.com's old direct profile/trophy URLs
-//     are dead (redirect straight to the PlayStation homepage now,
-//     confirmed live) — library.playstation.com is Sony's real current
-//     sign-in-gated web app and the honest destination; no trophies
-//     sub-path could be verified working, so this links to the library
-//     root rather than guess one.
-//   - Nintendo has no equivalent self-service stats page at all, so no
-//     accountUrl here.
-//
 // fields is a list (not a single value) because Nintendo needs two —
-// Friend Code AND Username — while Xbox/PlayStation only need one;
-// PlatformHandleCard below renders one input per field but saves/
-// clears them together as a single "platform" unit.
+// Friend Code AND Username — while other self-reported platforms
+// might only need one; PlatformHandleCard below renders one input per
+// field but saves/clears them together as a single "platform" unit.
+//
+// PlayStation's own self-reported "Online ID" entry used to live here
+// too, but it was a confusing duplicate once real PSN linking (see
+// PsnCard below) existed — a second "PlayStation" card on the same
+// page, showing a self-reported handle with no relation to the real
+// npsso-verified trophy link. Removed entirely; Nintendo is the only
+// self-reported platform left since it still has no public API for a
+// person's own library at all.
 //
 // hideRefresh: Nintendo has no Gaming Mastery contribution at all (see
 // lib/gameMastery.js — only xbox/playstation/steam feed that score),
@@ -68,13 +61,6 @@ import GameMasterySection from "./GameMasterySection";
 // Steam data while implying it does something with the Nintendo
 // fields, which it never did — misleading, so it's just not offered.
 const HANDLE_PLATFORMS = [
-  {
-    id: "playstation",
-    label: "PlayStation",
-    fields: [{ id: "playstation_online_id", fieldLabel: "Online ID", placeholder: "Your PSN Online ID" }],
-    accountUrl: () => "https://library.playstation.com",
-    accountLinkLabel: "Open your PlayStation Library →",
-  },
   {
     id: "nintendo",
     label: "Nintendo",
@@ -529,16 +515,15 @@ export default function AccountLinkingPage({
   const [status, setStatus] = useState("idle"); // idle | loading | done | error
   const [message, setMessage] = useState("");
 
-  // Self-reported Xbox/PlayStation/Nintendo handles — real reference
-  // info the person saves themselves, no API to sync from for any of
-  // the three. See PlatformHandleCard above and platform_handles in
-  // schema.sql.
+  // Self-reported Nintendo handle — real reference info the person
+  // saves themselves, no public API to sync from (see
+  // PlatformHandleCard above and platform_handles in schema.sql).
   const [handles, setHandles] = useState({});
   useEffect(() => {
     if (!userId) return;
     supabase
       .from("profiles")
-      .select("playstation_online_id, nintendo_friend_code, nintendo_username")
+      .select("nintendo_friend_code, nintendo_username")
       .eq("id", userId)
       .single()
       .then(({ data, error }) => {
@@ -673,6 +658,13 @@ export default function AccountLinkingPage({
         />
       )}
 
+      {!isOnboarding && (
+        <>
+          <PsnCard />
+          <XboxLiveCard />
+        </>
+      )}
+
       {providersLoaded && (
         <>
           <OAuthProviderCard
@@ -690,13 +682,6 @@ export default function AccountLinkingPage({
           {/* Google/Apple cards hidden for now — same deferred
               external-setup reason as LoginPage.jsx's oauthProviders
               list. Re-add here once that infrastructure is done. */}
-        </>
-      )}
-
-      {!isOnboarding && (
-        <>
-          <XboxLiveCard />
-          <PsnCard />
         </>
       )}
 

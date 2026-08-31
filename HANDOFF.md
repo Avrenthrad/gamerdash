@@ -134,6 +134,24 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-30 — **Account Linking: reordered cards, removed a leftover
+  duplicate PlayStation card.** Order is now Steam → PSN → Xbox →
+  Discord → Twitch (per request). Also found and removed a real bug
+  while doing this: `HANDLE_PLATFORMS` in `AccountLinkingPage.jsx`
+  still had a self-reported "PlayStation" entry (an "Online ID" field
+  + "Open your PlayStation Library" link) that was never cleaned up
+  when real PSN linking (`PsnCard`, npsso-based) replaced manual
+  entry earlier this session — two separate "PlayStation" cards were
+  rendering on the same page, one real and verified, one a stale
+  self-reported duplicate. Confirmed live via a user screenshot
+  showing the duplicate's "Online ID: Avrenthrad" / Refresh / library
+  link, none of which exist in the real `PsnCard`. Nintendo is now the
+  only entry left in `HANDLE_PLATFORMS` (still no public API for a
+  person's own library at all). Dropped `playstation_online_id` from
+  this file's profile fetch too — `PlatformQuickLinks.jsx` still
+  references that column separately (as a documented, low-priority
+  fallback for a profile-link destination) and wasn't touched here.
+
 - 2026-08-30 — **Real "Sign in through Steam" replaces the old
   "paste your SteamID64 and we trust it" flow.** Steam's OpenID 2.0
   provider (`steamcommunity.com/openid/login`) is the only account-
