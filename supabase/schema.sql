@@ -2515,6 +2515,17 @@ create table if not exists public.xbox_tokens (
   userhash text not null,
   xuid text not null,
   gamertag text,
+  -- Set at link time (see api/pricing.js's handleXbox "link" mode):
+  -- true when this account was linked via the packaged-app flow
+  -- (redirect_uri = lykodex://xbox-callback, a public client in
+  -- Azure), false for the web flow (a confidential client). A later
+  -- refresh_token request has no redirect_uri of its own to infer
+  -- this from, but must still send/omit client_secret the same way
+  -- the original link did — Microsoft rejects a public-client
+  -- request outright if a secret is present at all ("Public clients
+  -- can't send a client secret", confirmed live testing desktop
+  -- Xbox sign-in).
+  is_public_client boolean not null default false,
   updated_at timestamptz default now()
 );
 

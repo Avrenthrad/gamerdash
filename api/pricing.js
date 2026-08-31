@@ -414,7 +414,20 @@ async function handleRiftbound(searchParams, res) {
 // Tokens are stored server-side only (xbox_tokens table, no RLS
 // policies granted — service_role only, same posture as the
 // lykodex-session endpoint above) and never sent to the client.
-async function xboxOAuthTokenRequest(params) {
+//
+// usePublicClient: true for the packaged-app flow (redirect_uri is
+// the lykodex://xbox-callback scheme, registered in Azure under
+// "Mobile and desktop applications" with "Allow public client flows"
+// on — see xboxOAuth.js) — Microsoft rejects that flow outright if a
+// client_secret is present at all ("Public clients can't send a
+// client secret", confirmed live testing desktop sign-in), since a
+// packaged app can't actually keep one confidential. The web flow
+// (redirect_uri under the "Web" platform) is a confidential client
+// and still requires it. Which one applies has to be remembered per
+// stored token (xbox_tokens.is_public_client, set at link time) since
+// a later refresh_token request carries no redirect_uri of its own to
+// infer this from.
+async function xboxOAuthTokenRequest(params, { usePublicClient = false } = {}) {
   // Deliberately the SAME env var lib/xboxOAuth.js reads client-side
   // (VITE_MICROSOFT_CLIENT_ID), not a separate server-only name — the
   // client ID isn't a secret, and Vercel's serverless runtime still
@@ -428,7 +441,7 @@ async function xboxOAuthTokenRequest(params) {
   const clientId = process.env.VITE_MICROSOFT_CLIENT_ID;
   const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
   const body = new URLSearchParams({ ...params, client_id: clientId });
-  if (clientSecret) body.set("client_secret", clientSecret);
+  if (clientSecret && !usePublicClient) body.set("client_secret", clientSecret);
   const res = await fetch("https://login.live.com/oauth20_token.srf", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -502,7 +515,7 @@ async function getLiveXboxGamerscore(adminClient, userId) {
     let newMsFields = null;
     if (msExpired) {
       if (!stored.ms_refresh_token) return "expired";
-      const refreshed = await xboxOAuthTokenRequest({ grant_type: "refresh_token", refresh_token: stored.ms_refresh_token, scope: "Xboxlive.signin Xboxlive.offline_access" });
+      const refreshed = await xboxOAuthTokenRequest({ grant_type: "refresh_token", refresh_token: stored.ms_refresh_token, scope: "Xboxlive.signin Xboxlive.offline_access" }, { usePublicClient: stored.is_public_client });
       msAccessToken = refreshed.access_token;
       newMsFields = {
         ms_access_token: refreshed.access_token,
@@ -568,7 +581,7 @@ async function getLiveXboxPresence(adminClient, userId) {
     let newMsFields = null;
     if (msExpired) {
       if (!stored.ms_refresh_token) return "expired";
-      const refreshed = await xboxOAuthTokenRequest({ grant_type: "refresh_token", refresh_token: stored.ms_refresh_token, scope: "Xboxlive.signin Xboxlive.offline_access" });
+      const refreshed = await xboxOAuthTokenRequest({ grant_type: "refresh_token", refresh_token: stored.ms_refresh_token, scope: "Xboxlive.signin Xboxlive.offline_access" }, { usePublicClient: stored.is_public_client });
       msAccessToken = refreshed.access_token;
       newMsFields = {
         ms_access_token: refreshed.access_token,
@@ -646,7 +659,7 @@ async function getLiveXboxLibrary(adminClient, userId) {
     let newMsFields = null;
     if (msExpired) {
       if (!stored.ms_refresh_token) return "expired";
-      const refreshed = await xboxOAuthTokenRequest({ grant_type: "refresh_token", refresh_token: stored.ms_refresh_token, scope: "Xboxlive.signin Xboxlive.offline_access" });
+      const refreshed = await xboxOAuthTokenRequest({ grant_type: "refresh_token", refresh_token: stored.ms_refresh_token, scope: "Xboxlive.signin Xboxlive.offline_access" }, { usePublicClient: stored.is_public_client });
       msAccessToken = refreshed.access_token;
       newMsFields = {
         ms_access_token: refreshed.access_token,
@@ -707,7 +720,18 @@ async function handleXbox(req, searchParams, res) {
       const { code, redirectUri } = req.body || {};
       if (!code || !redirectUri) return res.status(400).json({ error: "Missing code or redirectUri" });
 
-      const oauth = await xboxOAuthTokenRequest({ grant_type: "authorization_code", code, redirect_uri: redirectUri, scope: "Xboxlive.signin Xboxlive.offline_access" });
+      // The packaged-app flow's redirect_uri is the lykodex://
+      // scheme (see xboxOAuth.js's xboxRedirectUri) — anything else
+      // is the web flow's real https:// deployed URL. Whichever this
+      // link used has to be remembered (is_public_client below) so a
+      // later refresh_token request sends/omits client_secret the
+      // same way this initial exchange did (see xboxOAuthTokenRequest
+      // above for why mixing them fails).
+      const isPublicClient = redirectUri.startsWith("lykodex://");
+      const oauth = await xboxOAuthTokenRequest(
+        { grant_type: "authorization_code", code, redirect_uri: redirectUri, scope: "Xboxlive.signin Xboxlive.offline_access" },
+        { usePublicClient: isPublicClient }
+      );
       const userTokenResp = await xboxRequestUserToken(oauth.access_token);
       const xsts = await xboxRequestXstsToken(userTokenResp.Token);
       const claims = xsts.DisplayClaims.xui[0];
@@ -724,6 +748,7 @@ async function handleXbox(req, searchParams, res) {
         userhash: claims.uhs,
         xuid: claims.xid,
         gamertag: gamertag || claims.gtg || null,
+        is_public_client: isPublicClient,
         updated_at: new Date().toISOString(),
       });
       if (upsertError) throw upsertError;

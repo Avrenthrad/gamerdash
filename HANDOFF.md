@@ -134,6 +134,28 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-30 — **Fixed "Public clients can't send a client secret" on
+  desktop Xbox sign-in.** Confirmed live: after the deep-link fix
+  below, sign-in reached the real token exchange but Microsoft
+  rejected it outright — registering `lykodex://xbox-callback` under
+  Azure's "Mobile and desktop applications" platform with "Allow
+  public client flows" on (both needed to get past the earlier
+  confirm-loop) makes Microsoft treat that specific redirect_uri as a
+  **public client**, which must never send `client_secret` at all; the
+  web flow's redirect_uri is still a confidential client and still
+  requires it. `xboxOAuthTokenRequest()` always included the secret
+  whenever the env var was set, regardless of which flow was in play.
+
+  Fixed by threading a `usePublicClient` flag through: computed once
+  at link time from whether `redirectUri` is the `lykodex://` scheme,
+  persisted on a new `xbox_tokens.is_public_client` column (applied
+  live via `apply_migration` and mirrored in `schema.sql`, since a
+  later `refresh_token` request has no redirect_uri of its own to
+  infer this from), and read back by all three refresh call sites
+  (`getLiveXboxGamerscore`/`getLiveXboxPresence`/`getLiveXboxLibrary`)
+  so a refresh sends/omits the secret the same way the original link
+  did.
+
 - 2026-08-30 — **Fixed deep-link callbacks never reaching the frontend
   on Windows desktop (`src-tauri/src/lib.rs`).** Confirmed live: Xbox
   sign-in on desktop got past Azure's consent screen fine (after the
