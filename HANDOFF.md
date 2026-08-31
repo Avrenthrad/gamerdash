@@ -149,61 +149,55 @@ purely so that setup is fully recoverable if/when mobile work resumes.
   download URL both just work, no token needed — verified against the
   real endpoint (currently resolves to `desktop-v0.1.77`).
 
-- 2026-08-30 — **Mastery recompute at each person's own local
-  midnight, across all 5 Colleges, not just once daily UTC for
-  Xbox/PSN.** Three parts:
+- 2026-08-30 — **Mastery recompute across all 5 Colleges (not just
+  Xbox/PSN) — daily, not per-timezone-midnight as first attempted.**
+  This was originally built to run hourly and only act at each
+  person's own local midnight (`profiles.timezone`) — that schedule
+  **broke every single deployment** from the moment it shipped,
+  including totally unrelated commits pushed afterward (confirmed via
+  GitHub's commit-status API: Vercel's own failure link redirected
+  straight to its [Cron Jobs usage & pricing
+  docs](https://vercel.com/docs/cron-jobs/usage-and-pricing) —
+  **Hobby-plan accounts hard-reject any cron expression that would run
+  more than once a day**, failing the deployment outright, not just
+  silently coalescing it). Reverted `vercel.json` back to
+  `"0 4 * * *"` and dropped the per-timezone gating entirely to
+  unblock deploys immediately.
 
-  1. **`profiles.timezone`** (new column, applied live + mirrored in
-     `schema.sql`) — a real IANA name (e.g. "Australia/Sydney"), not a
-     raw UTC offset, so it survives daylight saving changes without
-     drifting. Captured client-side in `AppContext.jsx` from the
-     browser's own `Intl.DateTimeFormat().resolvedOptions().timeZone`
-     on every real login (plain update, self-healing if a person's
-     system timezone changes — no "only if different" check needed,
-     it's cheap enough to just always keep current).
+  What actually shipped, once-daily for everyone (same fixed UTC time
+  as the original Xbox/PSN-only cron, now a real superset):
+  - **Steam genuinely refreshes too now**, not just Xbox/PSN — new
+    `getLiveSteamMasteryRaw()`/`steamFetch*` helpers in
+    `api/pricing.js` replicate the same 3 Steam Web API endpoints
+    `lib/gameMasteryData.js`'s (browser-only, not importable server-
+    side) `gatherSteamAchievements` uses. Falls back to the last-
+    computed value only if the live fetch fails, same "never silently
+    drop a contribution" rule Xbox/PSN's fallback already used.
+  - **Overall Mastery (all 5 Colleges) recombines too** — new
+    `recomputeOverallMasteryServerSide()`. Deliberately does NOT
+    re-gather TCG/Library/Loot/Wartable's own raw data server-side
+    (would mean duplicating `mtg.js`/`entertainment.js`/
+    `collectibles.js`/`tabletop.js`, all browser-only): those 4 only
+    change when a person edits them directly in-app, which already
+    triggers a fresh combine right then — no external drift to catch
+    overnight the way Gaming's real third-party platforms have.
+    Reuses each College's already-cached `raw` value from
+    `overall_mastery_breakdown` (see `overallMastery.js`'s
+    `computeOverallScore`, which already stores raw alongside
+    normalized) and only replaces Gaming's with the fresh one.
 
-  2. **The cron is now hourly** (`vercel.json`, `"0 * * * *"`, was
-     `"0 4 * * *"`), and `isLocalMidnightHour()` in `api/pricing.js`
-     is what actually gates real work to once per person per day — it
-     checks each profile's stored timezone against the current hour
-     and only proceeds for whoever's local hour is genuinely 0.
-     **⚠️ Open question, not yet confirmed:** Vercel's Hobby plan has
-     historically limited Cron Jobs to once a day — if this project is
-     still on Hobby, an hourly schedule may get silently coalesced/
-     rejected by Vercel rather than actually firing every hour. Check
-     the Cron Jobs tab in the Vercel dashboard after this deploys to
-     confirm it's actually running hourly; if it isn't, either upgrade
-     the plan or fall back to a single fixed-UTC-time cron (losing the
-     per-timezone accuracy) — no code change needed for that fallback,
-     just the `vercel.json` schedule.
+  `profiles.timezone` (real IANA name, e.g. "Australia/Sydney",
+  captured client-side in `AppContext.jsx` from the browser's own
+  `Intl.DateTimeFormat().resolvedOptions().timeZone` on every login)
+  is still captured and kept current — genuinely per-user-midnight
+  precision needs a **Vercel Pro upgrade** (Pro allows per-minute
+  cron schedules; Hobby is capped at once/day) to actually build,
+  and the timezone data will already be there ready to use whenever
+  that happens. Pick this up by re-adding an hourly cron +
+  `isLocalMidnightHour()`-style gating (removed from `api/pricing.js`
+  when this was reverted) only after confirming the plan is Pro.
 
-  3. **Steam now genuinely refreshes too**, not just Xbox/PSN — new
-     `getLiveSteamMasteryRaw()`/`steamFetch*` helpers in
-     `api/pricing.js` replicate the same 3 Steam Web API endpoints
-     `lib/gameMasteryData.js`'s (browser-only, not importable server-
-     side) `gatherSteamAchievements` uses, since this now runs at each
-     person's actual local midnight rather than one shared time where
-     re-scanning everyone's Steam library felt heavier to justify.
-     Falls back to the last-computed value only if the live fetch
-     fails, same "never silently drop a contribution" rule as Xbox/
-     PSN's existing fallback.
-
-  4. **Overall Mastery (all 5 Colleges) recombines too** — new
-     `recomputeOverallMasteryServerSide()`. Deliberately does NOT
-     re-gather TCG/Library/Loot/Wartable's own raw data server-side
-     (would mean duplicating `mtg.js`/`entertainment.js`/
-     `collectibles.js`/`tabletop.js`, all browser-only): those 4 only
-     change when a person edits their own collection/backlog/campaigns
-     directly in the app, which already triggers a fresh combine right
-     then — no external drift to catch overnight the way Gaming's real
-     third-party platforms have. Reuses each College's already-cached
-     `raw` value from `overall_mastery_breakdown` (see
-     `overallMastery.js`'s `computeOverallScore`, which already stores
-     raw alongside normalized) and only replaces Gaming's with the
-     freshly-recomputed one.
-
-  **Not yet tested live** — same caveat as everything else in this
-  area until an actual midnight passes for a real timezone.
+  **Not yet tested live** in its shipped (once-daily) form.
 
 - 2026-08-30 — **Account Linking: reordered cards, removed a leftover
   duplicate PlayStation card.** Order is now Steam → PSN → Xbox →

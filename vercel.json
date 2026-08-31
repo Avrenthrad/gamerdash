@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/pricing?service=mastery-cron",
-      "schedule": "0 * * * *"
+      "schedule": "0 4 * * *"
     }
   ]
 }

@@ -1051,29 +1051,24 @@ async function handlePsn(req, searchParams, res) {
   }
 }
 
-// ---------- Midnight-local-time Mastery recompute (all 5 Colleges) ----------
-// Vercel Cron (see vercel.json, "0 * * * *" — hourly) hits this every
-// hour; isLocalMidnightHour below is what actually gates real work to
-// once per person per day, at THEIR local midnight rather than one
-// fixed UTC time for everyone — profiles.timezone is a real IANA name
-// (e.g. "Australia/Sydney"), captured client-side from the browser's
-// own Intl.DateTimeFormat().resolvedOptions().timeZone (see
-// AppContext.jsx), so this stays correct across daylight saving
-// without needing a raw UTC-offset column that would silently drift.
+// ---------- Daily Mastery recompute (all 5 Colleges, all linked platforms) ----------
+// Vercel Cron (see vercel.json, "0 4 * * *") hits this once a day for
+// every user with Xbox, PSN, or Steam linked, refreshing all three
+// live and recombining Overall Mastery (all 5 Colleges) from the
+// result.
 //
-// hourCycle: "h23" rather than the less strictly specified
-// hour12: false — confirmed live (Node): both return "00" for
-// midnight today, but h23 is the one actually guaranteed by ECMA-402
-// to never fall back to "24".
-function isLocalMidnightHour(timezone) {
-  try {
-    const hour = new Intl.DateTimeFormat("en-US", { timeZone: timezone, hourCycle: "h23", hour: "numeric" }).format(new Date());
-    return hour === "0" || hour === "00";
-  } catch {
-    return false; // invalid/unrecognized timezone string — skip this user rather than crash the whole run
-  }
-}
-
+// This was originally built to fire hourly and only act at each
+// person's own local midnight (profiles.timezone, captured client-
+// side in AppContext.jsx, is still there and still gets kept current
+// for exactly this reason) — but Vercel's Hobby plan hard-rejects any
+// cron expression that would run more than once a day ("This cron
+// expression would run more than once per day", confirmed via Vercel's
+// own usage-and-pricing docs after an hourly schedule here silently
+// failed EVERY deployment, including unrelated ones, until this was
+// reverted). Genuine per-timezone-midnight precision needs a Pro-plan
+// upgrade (per-minute schedules) to actually implement — until/unless
+// that happens, this runs once for everyone at the one fixed UTC time
+// Hobby allows, same as the original version of this cron did.
 const GAMES_TO_SCAN = 15; // same bound as gameMasteryData.js's client-side gatherSteamAchievements
 
 async function steamFetchOwnedGames(steamId) {
@@ -1274,26 +1269,32 @@ async function handleMasteryCron(req, res) {
   }
   const adminClient = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
 
-  // Every profile with a real timezone on file — not just Xbox/PSN-
-  // linked ones, since Overall Mastery recombination is worth doing
-  // for anyone with real data in any College, and isLocalMidnightHour
-  // below already makes this a cheap no-op for everyone else this run.
-  const { data: profiles, error: profilesError } = await adminClient.from("profiles").select("id, timezone, linked_steam_id").not("timezone", "is", null);
-  if (profilesError) return res.status(500).json({ error: profilesError.message });
+  // Everyone with Xbox, PSN, or Steam linked — a real superset of the
+  // original Xbox/PSN-only query, now that Steam genuinely refreshes
+  // here too (see getLiveSteamMasteryRaw above).
+  const [{ data: xboxRows }, { data: psnRows }, { data: steamRows }] = await Promise.all([
+    adminClient.from("xbox_tokens").select("user_id"),
+    adminClient.from("psn_tokens").select("user_id"),
+    adminClient.from("profiles").select("id, linked_steam_id").not("linked_steam_id", "is", null),
+  ]);
+  const steamByUserId = new Map((steamRows || []).map((r) => [r.id, r.linked_steam_id]));
+  const userIds = [...new Set([
+    ...(xboxRows || []).map((r) => r.user_id),
+    ...(psnRows || []).map((r) => r.user_id),
+    ...steamByUserId.keys(),
+  ])];
 
-  const dueNow = (profiles || []).filter((p) => isLocalMidnightHour(p.timezone));
-
-  const results = { total: (profiles || []).length, dueThisHour: dueNow.length, gamingUpdated: 0, overallUpdated: 0, noData: 0, failed: 0 };
-  for (const profile of dueNow) {
+  const results = { total: userIds.length, gamingUpdated: 0, overallUpdated: 0, noData: 0, failed: 0 };
+  for (const userId of userIds) {
     try {
-      const freshGamingScore = await recomputeMasteryForUserServerSide(adminClient, profile.id, profile.linked_steam_id);
+      const freshGamingScore = await recomputeMasteryForUserServerSide(adminClient, userId, steamByUserId.get(userId));
       if (freshGamingScore != null) results.gamingUpdated += 1;
       else results.noData += 1;
 
-      const overallUpdated = await recomputeOverallMasteryServerSide(adminClient, profile.id, freshGamingScore);
+      const overallUpdated = await recomputeOverallMasteryServerSide(adminClient, userId, freshGamingScore);
       if (overallUpdated) results.overallUpdated += 1;
     } catch (err) {
-      console.error(`pricing (mastery-cron): failed for user ${profile.id}`, err);
+      console.error(`pricing (mastery-cron): failed for user ${userId}`, err);
       results.failed += 1;
     }
   }
