@@ -38,7 +38,9 @@ import { supabase } from "../lib/supabaseClient";
 import { getXboxSignInUrl, startXboxSignIn, fetchLiveGamerscore, unlinkXbox } from "../lib/xboxOAuth";
 import { linkPsnAccount, fetchLiveTrophies, unlinkPsn } from "../lib/psnAuth";
 import { startSteamSignIn } from "../lib/steamAuth";
+import { linkCrunchyrollAccount, fetchCrunchyrollLibrary, unlinkCrunchyroll } from "../lib/crunchyrollAuth";
 import { importXboxLibrary, importPsnLibrary } from "../lib/libraryImport";
+import { importCrunchyrollLibrary } from "../lib/mediaLibraryImport";
 import { useApp } from "../hooks/useApp";
 import GameMasterySection from "./GameMasterySection";
 
@@ -497,6 +499,135 @@ function PsnCard() {
   );
 }
 
+// Real Crunchyroll linking — Crunchyroll has no public API or OAuth
+// sign-in at all, so this uses the person's own etp_rt session cookie
+// (see lib/crunchyrollAuth.js) the same way PSN linking uses an
+// npsso token — unofficial but real, confirmed against
+// HarshitKumar9030/crunchyroll-api's actual working implementation.
+function CrunchyrollCard() {
+  const { userId } = useApp();
+  const [checkStatus, setCheckStatus] = useState("checking"); // checking | linked | unlinked
+  const [titleCount, setTitleCount] = useState(null);
+  const [cookieInput, setCookieInput] = useState("");
+  const [linkStatus, setLinkStatus] = useState("idle"); // idle | linking | error
+  const [linkError, setLinkError] = useState("");
+  const [unlinking, setUnlinking] = useState(false);
+  const [importStatus, setImportStatus] = useState("idle"); // idle | importing | done | error
+  const [importMessage, setImportMessage] = useState("");
+
+  async function handleImportLibrary() {
+    setImportStatus("importing");
+    setImportMessage("");
+    try {
+      const { total, added } = await importCrunchyrollLibrary(userId, (current, totalCount) =>
+        setImportMessage(`Importing… ${current} of ${totalCount}`)
+      );
+      setImportStatus("done");
+      setImportMessage(`Added ${added} of ${total} titles to your Library Collection.`);
+    } catch (err) {
+      console.error("Crunchyroll library import failed:", err);
+      setImportStatus("error");
+      setImportMessage(err.message || "Couldn't import your watch history right now.");
+    }
+  }
+
+  async function checkLinked() {
+    setCheckStatus("checking");
+    try {
+      const { titles } = await fetchCrunchyrollLibrary();
+      setTitleCount(titles.length);
+      setCheckStatus("linked");
+    } catch {
+      setCheckStatus("unlinked");
+    }
+  }
+
+  useEffect(() => {
+    checkLinked();
+  }, []);
+
+  async function handleLink(e) {
+    e.preventDefault();
+    if (!cookieInput.trim()) return;
+    setLinkStatus("linking");
+    setLinkError("");
+    try {
+      await linkCrunchyrollAccount(cookieInput.trim());
+      setCookieInput("");
+      setLinkStatus("idle");
+      await checkLinked();
+    } catch (err) {
+      console.error("Failed to link Crunchyroll:", err);
+      setLinkStatus("error");
+      setLinkError(err.message || "Couldn't link — check your cookie is fresh and try again.");
+    }
+  }
+
+  async function handleUnlink() {
+    setUnlinking(true);
+    try {
+      await unlinkCrunchyroll();
+      setCheckStatus("unlinked");
+      setTitleCount(null);
+    } catch (err) {
+      console.error("Failed to unlink Crunchyroll:", err);
+    } finally {
+      setUnlinking(false);
+    }
+  }
+
+  return (
+    <div className="steam-link-card">
+      <h2 className="settings-card__title">Crunchyroll</h2>
+      {checkStatus === "checking" && <p className="panel__status">Checking…</p>}
+      {checkStatus === "linked" && (
+        <>
+          <p className="settings-card__note">
+            Linked — <strong>{titleCount}</strong> titles in your real watch history.
+          </p>
+          <div className="backlog-card__actions">
+            <button type="button" className="linking-row__connect" onClick={handleImportLibrary} disabled={importStatus === "importing"}>
+              {importStatus === "importing" ? "Importing…" : "Import Library to Library Collection"}
+            </button>
+            <button type="button" className="linking-row__connect" onClick={handleUnlink} disabled={unlinking}>
+              {unlinking ? "Disconnecting…" : "Disconnect Crunchyroll"}
+            </button>
+          </div>
+          {importMessage && (
+            <p className={`panel__status ${importStatus === "error" ? "panel__status--error" : ""}`}>{importMessage}</p>
+          )}
+        </>
+      )}
+      {checkStatus === "unlinked" && (
+        <>
+          <p className="settings-card__note" style={{ fontSize: "11px" }}>
+            Crunchyroll doesn't offer public sign-in for this, so linking uses your own session
+            cookie instead. Sign into{" "}
+            <a href="https://www.crunchyroll.com" target="_blank" rel="noopener noreferrer">crunchyroll.com</a>{" "}
+            in a new tab, open your browser's DevTools → Application/Storage → Cookies →
+            crunchyroll.com, find the <code>etp_rt</code> cookie, and paste{" "}
+            <code>etp_rt=&lt;its value&gt;</code> below. Treat it like a password — never share it
+            anywhere else.
+          </p>
+          <form className="price-search" onSubmit={handleLink}>
+            <input
+              className="price-search__input"
+              type="text"
+              placeholder="etp_rt=..."
+              value={cookieInput}
+              onChange={(e) => setCookieInput(e.target.value)}
+            />
+            <button type="submit" className="price-search__button" disabled={linkStatus === "linking"}>
+              {linkStatus === "linking" ? "Linking…" : "Link Crunchyroll"}
+            </button>
+          </form>
+          {linkStatus === "error" && <p className="panel__status panel__status--error">{linkError}</p>}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function AccountLinkingPage({
   variant = "settings",
   onFinishOnboarding,
@@ -662,6 +793,7 @@ export default function AccountLinkingPage({
         <>
           <PsnCard />
           <XboxLiveCard />
+          <CrunchyrollCard />
         </>
       )}
 

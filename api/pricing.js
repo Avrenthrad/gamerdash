@@ -40,6 +40,7 @@
 
 import { allowCors } from "./_cors.js";
 import { createClient } from "@supabase/supabase-js";
+import { randomUUID } from "crypto";
 import { computeXboxScore, computePsScore, computeSteamScore, computeMasteryScore, accountXpFromMastery, levelFromXp } from "../src/lib/gameMastery.js";
 import { computeOverallScore } from "../src/lib/overallMastery.js";
 
@@ -1051,6 +1052,144 @@ async function handlePsn(req, searchParams, res) {
   }
 }
 
+// ---------- Crunchyroll (unofficial, cookie-based) ----------
+// Crunchyroll has no public developer API at all — this talks to the
+// same internal beta-api.crunchyroll.com endpoints crunchyroll.com's
+// own website calls, confirmed against HarshitKumar9030/crunchyroll-
+// api's actual working source (not guessed). The person signs into
+// Crunchyroll normally in their own browser and pastes their own
+// etp_rt session cookie value here — same "paste a token you grab
+// from your own session" shape as PSN's npsso, not a real OAuth
+// redirect (Crunchyroll doesn't offer one).
+const CRUNCHYROLL_BASE = "https://beta-api.crunchyroll.com";
+// Crunchyroll's own client_id:client_secret for this specific grant
+// type, base64-encoded — this is the exact value the real
+// crunchyroll.com website itself sends for an etp_rt cookie exchange,
+// not a Lykodex-issued credential.
+const CRUNCHYROLL_ETP_RT_AUTH_HEADER = "Basic bm9haWhkZXZtXzZpeWcwYThsMHE6";
+
+async function crunchyrollExchangeCookieForTokens(cookie, deviceId) {
+  const res = await fetch(`${CRUNCHYROLL_BASE}/auth/v1/token`, {
+    method: "POST",
+    headers: {
+      Authorization: CRUNCHYROLL_ETP_RT_AUTH_HEADER,
+      "Content-Type": "application/x-www-form-urlencoded",
+      Cookie: cookie,
+    },
+    body: new URLSearchParams({ device_type: "Chrome on Android", device_id: deviceId, grant_type: "etp_rt_cookie" }).toString(),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(`Crunchyroll sign-in failed: ${data.error_description || data.error || res.status} — check the etp_rt cookie is fresh.`);
+  return data; // { access_token, refresh_token, expires_in, profile_id, account_id, ... }
+}
+
+async function crunchyrollRefreshTokens(refreshToken, deviceId) {
+  const res = await fetch(`${CRUNCHYROLL_BASE}/auth/v1/token`, {
+    method: "POST",
+    headers: {
+      Authorization: CRUNCHYROLL_ETP_RT_AUTH_HEADER,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({ refresh_token: refreshToken, device_id: deviceId, grant_type: "refresh_token" }).toString(),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(`Crunchyroll token refresh failed: ${data.error_description || data.error || res.status}`);
+  return data;
+}
+
+// Real watch history — each entry's real show/movie title lives at
+// entry.panel.title (confirmed against the real WatchHistoryEntry/
+// CrunchyItem shape, not guessed).
+async function crunchyrollFetchWatchHistory(accessToken, accountId) {
+  const res = await fetch(`${CRUNCHYROLL_BASE}/content/v2/${encodeURIComponent(accountId)}/watch-history?locale=en-US`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error(`Crunchyroll watch history request failed (${res.status})`);
+  const data = await res.json();
+  return (data.data || [])
+    .map((entry) => entry.panel?.title)
+    .filter(Boolean);
+}
+
+// Same refresh-if-needed pattern as getLiveXboxGamerscore/getLiveTrophies
+// above — "not_linked"/"expired" sentinel strings rather than throwing.
+async function getLiveCrunchyrollLibrary(adminClient, userId) {
+  const { data: stored, error: fetchError } = await adminClient.from("crunchyroll_tokens").select("*").eq("user_id", userId).maybeSingle();
+  if (fetchError) throw fetchError;
+  if (!stored) return "not_linked";
+
+  let accessToken = stored.access_token;
+  if (new Date(stored.expires_at).getTime() < Date.now()) {
+    if (!stored.refresh_token) return "expired";
+    const refreshed = await crunchyrollRefreshTokens(stored.refresh_token, stored.device_id);
+    accessToken = refreshed.access_token;
+    await adminClient.from("crunchyroll_tokens").update({
+      access_token: refreshed.access_token,
+      refresh_token: refreshed.refresh_token || stored.refresh_token,
+      expires_at: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
+      updated_at: new Date().toISOString(),
+    }).eq("user_id", userId);
+  }
+
+  const titles = await crunchyrollFetchWatchHistory(accessToken, stored.account_id);
+  return { titles };
+}
+
+async function handleCrunchyroll(req, searchParams, res) {
+  const mode = searchParams.get("mode");
+
+  try {
+    if (mode === "link") {
+      if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+      const { userId, adminClient } = await verifyCallerAndGetAdminClient(req);
+      const { cookie } = req.body || {};
+      if (!cookie || !cookie.includes("etp_rt=")) {
+        return res.status(400).json({ error: "Missing or invalid cookie — it must include etp_rt=" });
+      }
+
+      const deviceId = randomUUID();
+      const tokens = await crunchyrollExchangeCookieForTokens(cookie, deviceId);
+
+      const { error: upsertError } = await adminClient.from("crunchyroll_tokens").upsert({
+        user_id: userId,
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token || null,
+        account_id: tokens.account_id || null,
+        profile_id: tokens.profile_id || null,
+        device_id: deviceId,
+        expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+      if (upsertError) throw upsertError;
+
+      const result = await getLiveCrunchyrollLibrary(adminClient, userId);
+      return res.status(200).json({ titleCount: result === "not_linked" || result === "expired" ? 0 : result.titles.length });
+    }
+
+    if (mode === "library") {
+      if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+      const { userId, adminClient } = await verifyCallerAndGetAdminClient(req);
+      const result = await getLiveCrunchyrollLibrary(adminClient, userId);
+      if (result === "not_linked") return res.status(404).json({ error: "Crunchyroll not linked" });
+      if (result === "expired") return res.status(401).json({ error: "Crunchyroll link expired — please re-link with a fresh cookie" });
+      return res.status(200).json(result);
+    }
+
+    if (mode === "unlink") {
+      if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+      const { userId, adminClient } = await verifyCallerAndGetAdminClient(req);
+      const { error: deleteError } = await adminClient.from("crunchyroll_tokens").delete().eq("user_id", userId);
+      if (deleteError) throw deleteError;
+      return res.status(200).json({ ok: true });
+    }
+
+    return res.status(400).json({ error: "Missing or invalid mode parameter" });
+  } catch (err) {
+    console.error("pricing (crunchyroll):", err);
+    return res.status(err.status || 500).json({ error: err.message });
+  }
+}
+
 // ---------- Daily Mastery recompute (all 5 Colleges, all linked platforms) ----------
 // Vercel Cron (see vercel.json, "0 4 * * *") hits this once a day for
 // every user with Xbox, PSN, or Steam linked, refreshing all three
@@ -1416,6 +1555,7 @@ export default async function handler(req, res) {
   if (service === "riftbound") return handleRiftbound(searchParams, res);
   if (service === "xbox") return handleXbox(req, searchParams, res);
   if (service === "psn") return handlePsn(req, searchParams, res);
+  if (service === "crunchyroll") return handleCrunchyroll(req, searchParams, res);
   if (service === "mastery-cron") return handleMasteryCron(req, res);
   if (service === "lykodex-session") return handleLykodexSession(req, res);
 

@@ -186,6 +186,7 @@ create table public.backlog_items (
   steam_appid text,
   hours_estimate numeric,
   status text default 'backlog' check (status in ('backlog', 'playing', 'completed', 'dropped')),
+  parent_title text,
   added_at timestamptz default now()
 );
 
@@ -2618,6 +2619,7 @@ create table public.game_library_items (
   title text not null,
   platform text not null,
   steam_appid text,
+  parent_title text,
   added_at timestamptz default now()
 );
 
@@ -2697,3 +2699,73 @@ as $$
 $$;
 revoke execute on function public.get_guild_mastery_average(uuid) from public, anon;
 grant execute on function public.get_guild_mastery_average(uuid) to authenticated;
+
+-- ---------- Crunchyroll linking (unofficial, cookie-based) ----------
+-- Applied in production via add_crunchyroll_tokens migration.
+-- Crunchyroll has no public developer API at all — this uses the same
+-- internal beta-api.crunchyroll.com endpoints crunchyroll.com's own
+-- website calls (confirmed against HarshitKumar9030/crunchyroll-api's
+-- actual working source, not guessed): POST /auth/v1/token with
+-- grant_type=etp_rt_cookie and the person's own etp_rt session cookie
+-- (extracted from their own logged-in browser, same "paste a token
+-- from your own session" shape as PSN's npsso) -> {access_token,
+-- refresh_token, expires_in, profile_id, account_id}. Watch history
+-- lives at GET /content/v2/{accountId}/watch-history, each entry's
+-- real title at entry.panel.title. Same posture as xbox_tokens/
+-- psn_tokens: RLS enabled, zero client policies — service_role only.
+create table public.crunchyroll_tokens (
+  user_id uuid primary key references auth.users on delete cascade,
+  access_token text not null,
+  refresh_token text,
+  account_id text,
+  profile_id text,
+  device_id text not null,
+  expires_at timestamptz not null,
+  updated_at timestamptz default now()
+);
+
+alter table public.crunchyroll_tokens enable row level security;
+
+create or replace function public.is_crunchyroll_linked()
+returns boolean language sql security definer set search_path = public stable as $$
+  select exists (select 1 from public.crunchyroll_tokens where user_id = auth.uid());
+$$;
+revoke execute on function public.is_crunchyroll_linked() from public, anon;
+grant execute on function public.is_crunchyroll_linked() to authenticated;
+
+-- ---------- Library College's real imported-media library ----------
+-- Applied in production via add_media_library_items migration. Same
+-- shape/reason as game_library_items (Gaming): a flat "you have this,
+-- from this source" list with no status/completion tracking forced
+-- onto it — entertainment_entries already has a status field
+-- (completed/watching/want_to_watch) for what a person manually
+-- tracks; bulk-importing a full Crunchyroll/Kindle/Audible history
+-- into that table would silently default every imported title to one
+-- status, wrong for a mix of finished/in-progress/never-started real
+-- history.
+create table public.media_library_items (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  title text not null,
+  source text not null, -- 'crunchyroll' | 'kindle' | 'audible'
+  added_at timestamptz default now()
+);
+
+alter table public.media_library_items enable row level security;
+
+create policy "Users can view their own media library"
+  on public.media_library_items for select
+  using (auth.uid() = user_id);
+
+create policy "Users can add to their own media library"
+  on public.media_library_items for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can remove their own media library items"
+  on public.media_library_items for delete
+  using (auth.uid() = user_id);
+
+create index media_library_items_user_id_idx on public.media_library_items (user_id);
+-- Exact-case match, same reasoning as game_library_items: titles come
+-- consistently from each import source's own casing.
+create unique index media_library_items_user_source_title_idx on public.media_library_items (user_id, source, title);
