@@ -2471,7 +2471,17 @@ as $$
 $$;
 
 -- Guildmate-scoped history — same trust model, shared-guild check.
-create or replace function public.get_guildmates_mastery_history(p_ids uuid[], p_since timestamptz)
+-- This function was documented here for a long time without ever
+-- actually being applied to the live database (confirmed live: a
+-- pg_proc lookup came back empty) — every call from
+-- fetchGuildmatesMasteryHistory (lib/guilds.js, used by the Overview
+-- chart's guild/red peer lines) was silently failing this whole time,
+-- caught and logged as a warning, rendering as "no guild data" rather
+-- than a visible error. Actually applied now, with the same live
+-- "now" row unioned in as get_friends_mastery_history above, for the
+-- same reason (a same-day recompute otherwise waits for the next
+-- daily snapshot to show up at all).
+create or replace function public.get_guildmates_mastery_history(p_ids uuid[], p_since timestamptz default (now() - '90 days'::interval))
 returns table (user_id uuid, overall_mastery_score numeric, recorded_at timestamptz)
 language sql
 security definer
@@ -2490,7 +2500,20 @@ as $$
         and theirs.user_id = h.user_id
         and theirs.user_id = any(p_ids)
     )
-  order by h.recorded_at asc;
+  union all
+  select p.id, p.overall_mastery_score, now()
+  from public.profiles p
+  where p.id = any(p_ids)
+    and p.overall_mastery_score > 0
+    and exists (
+      select 1
+      from public.guild_members mine
+      join public.guild_members theirs on mine.guild_id = theirs.guild_id
+      where mine.user_id = auth.uid()
+        and theirs.user_id = p.id
+        and theirs.user_id = any(p_ids)
+    )
+  order by recorded_at asc;
 $$;
 
 -- ---------- Xbox Live / PSN OAuth tokens (real Gamerscore/trophy sync) ----------
@@ -2619,3 +2642,58 @@ create index game_library_items_user_id_idx on public.game_library_items (user_i
 -- Steam) is two real, distinct rows, not a duplicate to collapse.
 create unique index game_library_items_user_platform_title_idx on public.game_library_items (user_id, platform, title);
 alter table public.profiles add column if not exists timezone text;
+
+-- ---------- Primary guild + Guild Mastery Score average ----------
+-- Applied in production via add_guild_primary_and_mastery_average
+-- migration. At most one primary guild per user (a partial unique
+-- index on user_id where is_primary is true), not one per guild - a
+-- personal choice among a user's own guild memberships, set via
+-- set_primary_guild() from the Guilds screen (see lib/guilds.js's
+-- setPrimaryGuild).
+alter table public.guild_members add column if not exists is_primary boolean not null default false;
+create unique index if not exists guild_members_one_primary_per_user_idx
+  on public.guild_members (user_id) where (is_primary);
+
+create or replace function public.set_primary_guild(p_guild_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (
+    select 1 from public.guild_members
+    where guild_id = p_guild_id and user_id = auth.uid()
+  ) then
+    raise exception 'Not a member of this guild';
+  end if;
+
+  update public.guild_members set is_primary = false where user_id = auth.uid() and is_primary = true;
+  update public.guild_members set is_primary = true where guild_id = p_guild_id and user_id = auth.uid();
+end;
+$$;
+revoke execute on function public.set_primary_guild(uuid) from public, anon;
+grant execute on function public.set_primary_guild(uuid) to authenticated;
+
+-- Guild Mastery Score: the real average of every member's own Overall
+-- Mastery Score - always computed live (no cache/recompute trigger
+-- needed, guild rosters are small), and public to any signed-in user
+-- (matches "Any signed-in user can browse guilds") since an aggregate
+-- average doesn't reveal any one member's individual score. See
+-- lib/masteryTiers.js for the tier bands this feeds into.
+create or replace function public.get_guild_mastery_average(p_guild_id uuid)
+returns table (avg_score numeric, member_count integer)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select
+    coalesce(avg(p.overall_mastery_score), 0) as avg_score,
+    count(*)::integer as member_count
+  from public.guild_members gm
+  join public.profiles p on p.id = gm.user_id
+  where gm.guild_id = p_guild_id;
+$$;
+revoke execute on function public.get_guild_mastery_average(uuid) from public, anon;
+grant execute on function public.get_guild_mastery_average(uuid) to authenticated;

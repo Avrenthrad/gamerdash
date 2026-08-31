@@ -23,6 +23,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createChart, AreaSeries } from "lightweight-charts";
 import { fetchFriends, fetchFriendsMasteryHistory } from "../lib/friends";
+import { tierFromScore } from "../lib/masteryTiers";
 import MiniAvatar from "./MiniAvatar";
 
 const UP_COLOR = "#22c55e";
@@ -185,7 +186,15 @@ export default function FriendMasteryChart({ userId }) {
           <div className="friend-mastery-chart__head">
             <MiniAvatar profile={current.profile} />
             <div className="friend-mastery-chart__info">
-              <span className="friend-mastery-chart__name">{name}</span>
+              <span className="friend-mastery-chart__name">
+                {name}
+                <span
+                  className="tag tag--platform"
+                  style={{ marginLeft: "8px", color: tierFromScore(last).color, borderColor: tierFromScore(last).color }}
+                >
+                  {tierFromScore(last).label}
+                </span>
+              </span>
               <span className={`friend-mastery-chart__delta ${up ? "friend-mastery-chart__delta--up" : "friend-mastery-chart__delta--down"}`}>
                 {Math.round(last).toLocaleString()}
                 <span aria-hidden="true">{up ? " ▲ " : " ▼ "}</span>

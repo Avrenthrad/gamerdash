@@ -134,6 +134,69 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-08-31 — **Mastery tier system (Bronze/Silver/Gold/Platinum/
+  Diamond) + Guild Mastery Score (average of all members) + primary
+  guild assignment.** Three real pieces:
+
+  1. **`lib/masteryTiers.js`** (new, pure): `tierFromScore(score)` —
+     round-number bands (0/1,000/2,500/5,000/10,000), not percentile
+     math — confirmed live there are only 2 real active users right
+     now (~312 and ~5,060), nowhere near enough for percentiles to
+     mean anything. Diamond (10,000+) is deliberately aspirational,
+     nobody's there yet. Shared by both individual Overall Mastery
+     Score and Guild Mastery Score below — same bands for both, since
+     a guild's score is just an average on the identical scale.
+
+  2. **Guild Mastery Score** — `get_guild_mastery_average(p_guild_id)`
+     RPC (public to any signed-in user, matches "Any signed-in user
+     can browse guilds" — an aggregate average reveals no individual
+     member's own score, which stays strictly self-only) averages
+     every member's real `profiles.overall_mastery_score` live, no
+     caching/recompute trigger needed (guild rosters are small).
+     `lib/guilds.js`'s `fetchGuildMasteryAverage`. Shown on
+     `GuildDetail` (GuildsPage.jsx) with its tier badge and progress
+     to the next tier. Verified live: a real 2-member guild (5,060 +
+     311.9) correctly averaged to 2,686 → Gold, 2,314 to Platinum.
+
+  3. **Primary guild** — `guild_members.is_primary` (new column) with
+     a partial unique index on `user_id where is_primary` — at most
+     one per USER across all their guilds (not one per guild), set
+     atomically via `set_primary_guild(p_guild_id)` RPC (unsets any
+     existing primary + sets the new one in one call, no window where
+     two could briefly both be true). `lib/guilds.js`'s
+     `setPrimaryGuild`; `fetchMyGuilds` now carries `is_primary` on
+     each returned guild. "Set as Primary Guild" button added to
+     `GuildDetail`, gated on membership. Verified live end-to-end,
+     including confirming via direct SQL that exactly one row has
+     `is_primary = true` after clicking it.
+
+  Individual tier badges shown in `FriendMasteryChart.jsx` (next to
+  each friend's name — verified live: SpinelDos's real 312 correctly
+  shows "Bronze") and in `Header.jsx`'s Mastery Score popover (next
+  to your own score) — **the Header.jsx change is only applied
+  locally, not committed**, same entanglement-with-Cursor's-concurrent-
+  work reason as the two other pending Header.jsx changes below.
+
+  **Found and fixed in passing**: `get_guildmates_mastery_history`
+  (called live from `lib/guilds.js`'s `fetchGuildmatesMasteryHistory`,
+  used by the Overview chart's guild/red peer lines) was documented in
+  `schema.sql` for a long time but **never actually applied to the
+  database** — confirmed via a direct `pg_proc` lookup coming back
+  empty. Every call was silently failing this whole time, caught and
+  logged as a warning, rendering as "no guild data" rather than a
+  visible error. Applied now, with the same live "now" row unioned in
+  as `get_friends_mastery_history` already had.
+
+  **Header.jsx now has a second pending local-only fix**, on top of
+  the `GAMING_VIEWS` one from before: Cursor's same edit also dropped
+  the `TCG_VIEWS` import (`ReferenceError: TCG_VIEWS is not defined`,
+  crashing the whole app again exactly the same way) — restored
+  locally alongside the `GAMING_VIEWS` one. Whoever commits
+  `Header.jsx` next needs BOTH:
+  `import { GAMING_VIEWS, TCG_VIEWS } from "../lib/navSections";`
+  — plus the "Recompute" → "Refresh" label and the mastery tier badge
+  from this entry, all still sitting uncommitted in the same file.
+
 - 2026-08-31 — **College "collection" pages renamed (user-visible text
   only, per request) + Xbox/PSN library import now targets a real
   Gaming Collection, not Backlog.**

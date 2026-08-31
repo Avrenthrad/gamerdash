@@ -258,13 +258,37 @@ export async function revokeGuildInvite(inviteId) {
   if (error) throw error;
 }
 
+// is_primary rides along on each returned guild object so callers
+// (GuildsPage.jsx's "Set as Primary" control) don't need a second
+// query to know which one's already set.
 export async function fetchMyGuilds(userId) {
   const { data, error } = await supabase
     .from("guild_members")
-    .select("guild_id, guilds(*)")
+    .select("guild_id, is_primary, guilds(*)")
     .eq("user_id", userId);
   if (error) throw error;
-  return (data || []).map((row) => row.guilds).filter(Boolean);
+  return (data || [])
+    .filter((row) => row.guilds)
+    .map((row) => ({ ...row.guilds, is_primary: row.is_primary }));
+}
+
+// Atomic: unsets any existing primary for the caller and sets this
+// one, in a single server-side call (see set_primary_guild in
+// schema.sql) - never a moment where two rows are both primary.
+export async function setPrimaryGuild(guildId) {
+  const { error } = await supabase.rpc("set_primary_guild", { p_guild_id: guildId });
+  if (error) throw error;
+}
+
+// Guild Mastery Score - the real average of every member's own
+// Overall Mastery Score, always computed live (see
+// get_guild_mastery_average in schema.sql, no caching/staleness to
+// worry about). Returns { avgScore, memberCount }.
+export async function fetchGuildMasteryAverage(guildId) {
+  const { data, error } = await supabase.rpc("get_guild_mastery_average", { p_guild_id: guildId });
+  if (error) throw error;
+  const row = data?.[0];
+  return { avgScore: Number(row?.avg_score) || 0, memberCount: row?.member_count || 0 };
 }
 
 // Guildmates who share a guild with the viewer but are not already

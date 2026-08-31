@@ -18,7 +18,9 @@ import {
   fetchGuildPosts, createGuildPost, deleteGuildPost, voteOnPost,
   fetchPostComments, addPostComment, deletePostComment, uploadPostImage,
   updateGuildMemberRole, kickGuildMember,
+  setPrimaryGuild, fetchGuildMasteryAverage,
 } from "../lib/guilds";
+import { tierFromScore } from "../lib/masteryTiers";
 import { findUserByFriendCode } from "../lib/friends";
 import { supabase } from "../lib/supabaseClient";
 import { sortOnlineFirst } from "../lib/presence";
@@ -126,6 +128,15 @@ export default function GuildsPage({ onBack, userId, isLoggedIn, onSignIn, onCre
     }
   }
 
+  async function handleSetPrimary(guildId) {
+    try {
+      await setPrimaryGuild(guildId);
+      loadGuilds();
+    } catch (err) {
+      console.error("Failed to set primary guild:", err);
+    }
+  }
+
   async function handleAcceptInvite(invite) {
     try {
       await acceptGuildInvite(invite);
@@ -169,6 +180,8 @@ export default function GuildsPage({ onBack, userId, isLoggedIn, onSignIn, onCre
         userId={userId}
         isMember={myGuildIds.has(activeGuild.id)}
         isOwner={activeGuild.created_by === userId}
+        isPrimary={myGuilds.find((g) => g.id === activeGuild.id)?.is_primary || false}
+        onSetPrimary={() => handleSetPrimary(activeGuild.id)}
         onBack={() => setActiveGuild(null)}
         onLeave={() => handleLeave(activeGuild.id)}
         onPrivacyChanged={(isPrivate) => {
@@ -309,7 +322,7 @@ function GuildRow({ guild, userId, isMember, onView, onRequestJoin }) {
   );
 }
 
-function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, onLeave, onPrivacyChanged }) {
+function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, isPrimary, onSetPrimary, onBack, onLeave, onPrivacyChanged }) {
   // Deliberate exception to this page's usual "everything via props"
   // convention — see AccountSettingsPage.jsx for the same pattern.
   // onlineUserIds only lives in AppContext; not worth threading
@@ -321,6 +334,8 @@ function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, o
   const [activity, setActivity] = useState([]);
   const [joinRequests, setJoinRequests] = useState([]);
   const [status, setStatus] = useState("loading");
+  const [guildMastery, setGuildMastery] = useState(null); // { avgScore, memberCount }
+  const [settingPrimary, setSettingPrimary] = useState(false);
   const [inviteCode, setInviteCode] = useState("");
   const [inviteStatus, setInviteStatus] = useState("idle");
   const [inviteMessage, setInviteMessage] = useState("");
@@ -394,6 +409,24 @@ function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, o
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guild.id]);
+
+  // Its own effect (not folded into load() above) so a failure here
+  // never blocks the rest of the guild page from rendering — Guild
+  // Mastery Score is a nice-to-have summary stat, not core guild data.
+  useEffect(() => {
+    fetchGuildMasteryAverage(guild.id)
+      .then(setGuildMastery)
+      .catch((err) => console.error("Guild Mastery Score fetch failed:", err));
+  }, [guild.id]);
+
+  async function handleSetPrimaryClick() {
+    setSettingPrimary(true);
+    try {
+      await onSetPrimary();
+    } finally {
+      setSettingPrimary(false);
+    }
+  }
 
   async function load() {
     setStatus("loading");
@@ -513,6 +546,38 @@ function GuildDetail({ guild: initialGuild, userId, isMember, isOwner, onBack, o
         </div>
         {guild.description && <p className="settings-card__note">{guild.description}</p>}
       </div>
+
+      {guildMastery && guildMastery.memberCount > 0 && (() => {
+        const tier = tierFromScore(guildMastery.avgScore);
+        return (
+          <div className="backlog-summary">
+            <div className="panel__stat">
+              <span className="panel__stat-value">{Math.round(guildMastery.avgScore).toLocaleString()}</span>
+              <span className="panel__stat-label">Guild Mastery Score</span>
+            </div>
+            <div className="panel__stat">
+              <span className="panel__stat-value" style={{ color: tier.color }}>{tier.label}</span>
+              <span className="panel__stat-label">
+                {tier.nextTier
+                  ? `${Math.round((tier.nextTier.minScore - guildMastery.avgScore)).toLocaleString()} to ${tier.nextTier.label}`
+                  : "Top tier"}
+              </span>
+            </div>
+          </div>
+        );
+      })()}
+
+      {isMember && (
+        <button
+          type="button"
+          className="quickdash-reset-btn"
+          onClick={handleSetPrimaryClick}
+          disabled={isPrimary || settingPrimary}
+          title={isPrimary ? "This is your primary guild" : "Set as your primary guild"}
+        >
+          {isPrimary ? "★ Primary Guild" : settingPrimary ? "Setting…" : "Set as Primary Guild"}
+        </button>
+      )}
 
       {isMember && (
         <div className="friend-code-row">
