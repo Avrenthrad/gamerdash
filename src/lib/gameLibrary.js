@@ -98,17 +98,18 @@ export function mergeLibraryByTitle({ steamGames = [], libraryItems = [], platfo
     });
   }
 
-  const baseTitleKeys = new Set(
-    rawEntries
-      .filter((entry) => !entry.parentTitle)
-      .map((entry) => normalizeTitleKey(entry.title))
-  );
-
-  for (const entry of rawEntries) {
-    if (!entry.parentTitle) {
-      entry.parentTitle = inferParentTitleFromName(entry.title, baseTitleKeys);
-    }
-  }
+  // DLC nesting relies ONLY on an explicit, already-verified
+  // item.parent_title (Steam-imported rows get this from Steam's own
+  // real appdetails type/fullgame fields — see libraryImport.js's
+  // importSteamLibrary). This used to also re-run the
+  // inferParentTitleFromName string heuristic here for every entry
+  // lacking one — confirmed live to wrongly nest entire separate games
+  // (Final Fantasy IV: The After Years, Call of Duty: Black Ops, and
+  // others) under a same-prefix title purely because colon-subtitled
+  // sequels read identically to real DLC names to a string match. That
+  // pass has been removed entirely: an entry with no verified
+  // parent_title now always renders as its own standalone game rather
+  // than being guessed into someone else's DLC list.
 
   const map = new Map();
   const dlcByParent = new Map();

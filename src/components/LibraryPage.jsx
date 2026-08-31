@@ -46,6 +46,10 @@ const IMPORT_PLATFORMS = [
   { id: "xbox", label: "Xbox", icon: "/icons/platforms/xbox.svg" },
   { id: "playstation", label: "PlayStation", icon: "/icons/platforms/playstation.png" },
 ];
+// Nintendo isn't listed here — there's no real library-import source
+// for it yet (see AccountLinkingPage.jsx), so a filter option for it
+// would only ever show zero games right now.
+const FILTER_PLATFORMS = ["steam", "xbox", "playstation"];
 
 function formatPlaytime(minutes) {
   if (!minutes) return null;
@@ -63,6 +67,7 @@ export default function LibraryPage({
   const [otherPlatformGames, setOtherPlatformGames] = useState([]);
   const [libraryItems, setLibraryItems] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [platformFilter, setPlatformFilter] = useState(() => new Set(FILTER_PLATFORMS));
   const [platformLinked, setPlatformLinked] = useState({
     steam: false,
     xbox: false,
@@ -149,9 +154,21 @@ export default function LibraryPage({
 
   const filteredLibrary = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
-    if (!query) return unifiedLibrary;
-    return unifiedLibrary.filter((game) => game.title.toLowerCase().includes(query));
-  }, [searchTerm, unifiedLibrary]);
+    return unifiedLibrary.filter((game) => {
+      if (query && !game.title.toLowerCase().includes(query)) return false;
+      if (!game.platforms.some((p) => platformFilter.has(p))) return false;
+      return true;
+    });
+  }, [searchTerm, unifiedLibrary, platformFilter]);
+
+  function togglePlatformFilter(platform) {
+    setPlatformFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(platform)) next.delete(platform);
+      else next.add(platform);
+      return next;
+    });
+  }
 
   const totalGames = unifiedLibrary.length;
   const steamPlaytimeHours = Math.round(
@@ -308,8 +325,12 @@ export default function LibraryPage({
         <p className="panel__status panel__status--error">Couldn't load your Steam library right now.</p>
       )}
 
-      {isLoggedIn && filteredLibrary.length === 0 && searchTerm.trim() && (
-        <p className="panel__status">No games match &ldquo;{searchTerm.trim()}&rdquo;.</p>
+      {isLoggedIn && filteredLibrary.length === 0 && unifiedLibrary.length > 0 && (
+        <p className="panel__status">
+          {searchTerm.trim()
+            ? `No games match “${searchTerm.trim()}”.`
+            : "No games match the selected platform filter."}
+        </p>
       )}
 
       {isLoggedIn && unifiedLibrary.length === 0 && !searchTerm.trim() && steamStatus !== "loading" && (
@@ -337,9 +358,30 @@ export default function LibraryPage({
             </div>
           )}
 
-          <span className="feed-col__label" style={{ marginTop: "24px", display: "block" }}>
-            {searchTerm.trim() ? `Search results (${filteredLibrary.length})` : `Full Library (${filteredLibrary.length})`}
-          </span>
+          <div className="library-full-header">
+            <span className="feed-col__label">
+              {searchTerm.trim() ? `Search results (${filteredLibrary.length})` : `Full Library (${filteredLibrary.length})`}
+            </span>
+            <details className="library-platform-filter">
+              <summary className="library-platform-filter__summary">
+                Platforms{platformFilter.size < FILTER_PLATFORMS.length ? ` (${platformFilter.size})` : ""}
+              </summary>
+              <ul className="library-platform-filter__list">
+                {FILTER_PLATFORMS.map((platform) => (
+                  <li key={platform} className="library-platform-filter__option">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={platformFilter.has(platform)}
+                        onChange={() => togglePlatformFilter(platform)}
+                      />
+                      {PLATFORM_LABELS[platform]}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          </div>
           <table className="library-table">
             <thead>
               <tr>
