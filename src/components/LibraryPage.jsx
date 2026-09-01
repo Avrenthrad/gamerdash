@@ -30,8 +30,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchOwnedGames, steamHeaderArt } from "../lib/steam";
-import { fetchBacklog } from "../lib/backlog";
+import { fetchBacklog, addToBacklog } from "../lib/backlog";
 import { fetchGameLibrary, mergeLibraryByTitle } from "../lib/gameLibrary";
+import { fetchGameLibraryTags, toggleGameLibraryTag } from "../lib/gameLibraryTags";
+import { fetchMyRatings, submitRating, fetchAverageRatings } from "../lib/gameRatings";
 import { fetchPlatformPlaytime } from "../lib/crossPlatformActivity";
 import { importSteamLibrary, importXboxLibrary, importPsnLibrary } from "../lib/libraryImport";
 import { fetchLiveGamerscore } from "../lib/xboxOAuth";
@@ -50,6 +52,7 @@ const IMPORT_PLATFORMS = [
 // for it yet (see AccountLinkingPage.jsx), so a filter option for it
 // would only ever show zero games right now.
 const FILTER_PLATFORMS = ["steam", "xbox", "playstation"];
+const EMPTY_TAG_SET = new Set();
 
 function formatPlaytime(minutes) {
   if (!minutes) return null;
@@ -63,12 +66,16 @@ export default function LibraryPage({
 }) {
   const [steamGames, setSteamGames] = useState([]);
   const [backlogCount, setBacklogCount] = useState(null);
+  const [backlogTitles, setBacklogTitles] = useState(() => new Set());
   const [steamStatus, setSteamStatus] = useState("idle");
   const [otherPlatformGames, setOtherPlatformGames] = useState([]);
   const [libraryItems, setLibraryItems] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [platformFilter, setPlatformFilter] = useState(() => new Set(FILTER_PLATFORMS));
   const [sortMode, setSortMode] = useState("playtime"); // "playtime" | "recent"
+  const [libraryTags, setLibraryTags] = useState(() => new Map());
+  const [myRatings, setMyRatings] = useState(() => new Map());
+  const [avgRatings, setAvgRatings] = useState(() => new Map());
   const [platformLinked, setPlatformLinked] = useState({
     steam: false,
     xbox: false,
@@ -82,6 +89,33 @@ export default function LibraryPage({
     return fetchGameLibrary(userId)
       .then(setLibraryItems)
       .catch((err) => console.error("Game library fetch failed:", err));
+  }, [userId]);
+
+  const reloadBacklog = useCallback(() => {
+    if (!userId) return Promise.resolve();
+    return fetchBacklog(userId)
+      .then((rows) => {
+        setBacklogCount(rows.length);
+        setBacklogTitles(new Set(rows.map((r) => r.title)));
+      })
+      .catch((err) => {
+        console.error("Backlog fetch failed:", err);
+        setBacklogCount(null);
+      });
+  }, [userId]);
+
+  const reloadLibraryTags = useCallback(() => {
+    if (!userId) return Promise.resolve();
+    return fetchGameLibraryTags(userId)
+      .then(setLibraryTags)
+      .catch((err) => console.error("Game library tags fetch failed:", err));
+  }, [userId]);
+
+  const reloadMyRatings = useCallback(() => {
+    if (!userId) return Promise.resolve();
+    return fetchMyRatings(userId)
+      .then(setMyRatings)
+      .catch((err) => console.error("Game ratings fetch failed:", err));
   }, [userId]);
 
   useEffect(() => {
@@ -105,14 +139,16 @@ export default function LibraryPage({
   }, [linkedSteamId]);
 
   useEffect(() => {
-    if (!userId) return;
-    fetchBacklog(userId)
-      .then((rows) => setBacklogCount(rows.length))
-      .catch((err) => {
-        console.error("Backlog count fetch failed:", err);
-        setBacklogCount(null);
-      });
-  }, [userId]);
+    reloadBacklog();
+  }, [reloadBacklog]);
+
+  useEffect(() => {
+    reloadLibraryTags();
+  }, [reloadLibraryTags]);
+
+  useEffect(() => {
+    reloadMyRatings();
+  }, [reloadMyRatings]);
 
   useEffect(() => {
     if (!userId) return;
@@ -152,6 +188,15 @@ export default function LibraryPage({
     }),
     [steamGames, libraryItems, otherPlatformGames]
   );
+
+  // One batched call for every title currently in the collection,
+  // rather than one round-trip per row (see lib/gameRatings.js).
+  useEffect(() => {
+    if (!unifiedLibrary.length) return;
+    fetchAverageRatings(unifiedLibrary.map((g) => g.title))
+      .then(setAvgRatings)
+      .catch((err) => console.error("Average ratings fetch failed:", err));
+  }, [unifiedLibrary]);
 
   const filteredLibrary = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -233,6 +278,53 @@ export default function LibraryPage({
       console.error(`${platformId} library import failed:`, err);
       setImportState((prev) => ({ ...prev, [platformId]: "error" }));
       setImportMessage(err.message || "Couldn't import your library right now.");
+    }
+  }
+
+  async function handleToggleTag(title, tag) {
+    if (!userId) return;
+    const currentlySet = libraryTags.get(title)?.has(tag) || false;
+    // Optimistic — the row toggles immediately rather than waiting on
+    // a round-trip, then reconciles with reloadLibraryTags either way.
+    setLibraryTags((prev) => {
+      const next = new Map(prev);
+      const set = new Set(next.get(title) || []);
+      if (currentlySet) set.delete(tag); else set.add(tag);
+      next.set(title, set);
+      return next;
+    });
+    try {
+      await toggleGameLibraryTag(userId, title, tag, currentlySet);
+    } catch (err) {
+      console.error("Failed to toggle game library tag:", err);
+      reloadLibraryTags();
+    }
+  }
+
+  async function handleAddToBacklog(game) {
+    if (!userId || backlogTitles.has(game.title)) return;
+    try {
+      await addToBacklog(userId, game.title, game.steamAppid, game.platforms[0] || null);
+      await reloadBacklog();
+    } catch (err) {
+      console.error("Failed to add to Backlog:", err);
+    }
+  }
+
+  async function handleSubmitRating(title, value) {
+    if (!userId) return;
+    setMyRatings((prev) => new Map(prev).set(title, value));
+    try {
+      await submitRating(userId, title, value);
+      const updated = await fetchAverageRatings([title]);
+      setAvgRatings((prev) => {
+        const next = new Map(prev);
+        if (updated.has(title)) next.set(title, updated.get(title));
+        return next;
+      });
+    } catch (err) {
+      console.error("Failed to submit rating:", err);
+      reloadMyRatings();
     }
   }
 
@@ -425,11 +517,24 @@ export default function LibraryPage({
                 <th scope="col">Game</th>
                 <th scope="col">Platforms</th>
                 <th scope="col">Playtime</th>
+                <th scope="col">Status</th>
+                <th scope="col">Rating</th>
               </tr>
             </thead>
             <tbody>
               {filteredLibrary.map((game) => (
-                <LibraryGameRow key={game.title} game={game} formatPlaytime={formatPlaytime} />
+                <LibraryGameRow
+                  key={game.title}
+                  game={game}
+                  formatPlaytime={formatPlaytime}
+                  tags={libraryTags.get(game.title) || EMPTY_TAG_SET}
+                  onToggleTag={(tag) => handleToggleTag(game.title, tag)}
+                  inBacklog={backlogTitles.has(game.title)}
+                  onAddToBacklog={() => handleAddToBacklog(game)}
+                  rating={myRatings.get(game.title) || null}
+                  avgRating={avgRatings.get(game.title) || null}
+                  onSubmitRating={(value) => handleSubmitRating(game.title, value)}
+                />
               ))}
             </tbody>
           </table>
