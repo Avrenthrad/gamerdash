@@ -134,6 +134,108 @@ purely so that setup is fully recoverable if/when mobile work resumes.
 
 ## In progress / recently touched (most recent first)
 
+- 2026-09-01 — **Note for Cursor: college overview banners — hero
+  animation requested.** User wants each College's overview banner
+  (currently a static header image per College, e.g. the Gaming
+  banner) turned into a hero animation that extends the full width of
+  the page, themed to that specific College (Gaming/TCG/Library/Loot/
+  Wartable each get their own look, not one shared treatment). Not
+  scoped or started — just capturing the request here since it's
+  V0/UI-generation + wiring territory, not something Claude Code
+  picked up this session.
+
+- 2026-09-01 — **Emergency production outage in `api/pricing.js`,
+  found and fixed — root cause was NOT what it first looked like.**
+  After the Crunchyroll commit deployed, every single service in
+  `api/pricing.js` started returning `FUNCTION_INVOCATION_FAILED` (not
+  just the new one) — confirmed via direct `curl` against multiple
+  unrelated modes, including `service=currency` which touches none of
+  the new code. First fix attempt (a bare `"crypto"` import →
+  `"node:crypto"`) shipped clean but did NOT resolve it — the actual
+  cause was `src/lib/overallMastery.js` importing `./gameMastery` with
+  no `.js` extension: fine under Vite/webpack, but this project has
+  `"type": "module"` in `package.json`, so Node's native ESM loader
+  (which Vercel's Node runtime uses) rejects an extensionless relative
+  import outright with `ERR_MODULE_NOT_FOUND` — and since
+  `api/pricing.js` imports from that file, the whole module failed to
+  load for every request. **Lesson worth keeping in mind for both of
+  us:** `node --check` only validates syntax, it does NOT catch this —
+  the only way to actually catch an import-resolution bug like this
+  before shipping is `node -e "import('./api/file.js')"` (or an
+  equivalent real module load), which is what actually caught it here
+  after the first fix's blind spot. Fixed, verified locally via a real
+  module load before pushing, confirmed live afterward.
+
+- 2026-09-01 — **Gaming Collection: Full Library got real status
+  toggles, a rating system, sort/filter, and a fixed DLC-nesting bug
+  (confirmed live to be genuinely broken, not a one-off).** All in
+  `LibraryPage.jsx`/`LibraryGameCard.jsx`/`gameLibrary.js` unless noted:
+  - **DLC-nesting bug, two separate causes, both fixed:** entire
+    separate games (Call of Duty: Black Ops, Modern Warfare, Vanguard,
+    WWII; Final Fantasy IV: The After Years; Halo: Reach; Assassin's
+    Creed: Brotherhood; and more) were being shown nested as "N DLC
+    owned" under a bare franchise/base title, confirmed live via two
+    real user screenshots. (1) Xbox/PSN had ZERO real DLC/parent-game
+    data available at all (neither platform exposes any), so the old
+    `inferParentTitleFromName` title-string heuristic was pure
+    guessing — removed entirely for both, titles now import
+    standalone. (2) Steam DOES have a real signal (`resolveGameName` →
+    `api/steam.js`'s `appinfo` mode → Steam's own appdetails
+    type/fullgame fields), and it correctly said "this is a real game,
+    not DLC" — but the heuristic fallback in `importSteamLibrary`
+    didn't distinguish "the real check failed to run" from "the real
+    check ran and said no," so it silently overrode confirmed real
+    games anyway. Also removed the SAME heuristic from
+    `mergeLibraryByTitle`'s live client-side grouping (a second,
+    independent re-nesting pass on every render that the import-time
+    fix alone didn't touch — confirmed live that Final Fantasy IV: The
+    After Years was STILL nested even after the import-time fix
+    shipped, until this was also removed). DLC nesting now relies
+    solely on an explicit, already-Steam-verified `parent_title`.
+    Cleared the 33 already-wrong rows directly in production via SQL
+    (23 Xbox, 10 PlayStation) since `ignoreDuplicates` on the upsert
+    means a re-import can no longer self-correct existing rows.
+  - **Platform filter**: checkbox dropdown (Steam/Xbox/PlayStation —
+    Nintendo omitted, no real library-import source for it exists yet)
+    above the Full Library table.
+  - **Sort**: toggle between Most Played (existing default) and
+    Recently Added, using `game_library_items.added_at` — real for
+    Xbox/PSN (when actually imported), but Steam has no purchase-date
+    field available at all via `GetOwnedGames` (confirmed — only
+    `rtime_last_played` exists and needs the account owner's own
+    personal API key, not this project's shared server key), so
+    undated Steam-only entries sort last rather than getting a
+    fabricated date.
+  - **Row status toggles**: Completed / Run It Back / 100% / Backlog+ /
+    Dropped. First four are independent, non-exclusive flags in a new
+    `game_library_tags` table (deliberately separate from
+    `backlog_items`' 4-state status column — these can all be true at
+    once for one game). Backlog+ isn't a tag, it's a real
+    `addToBacklog` call, disabled once already there.
+  - **Rating system**: 1-10 scale, real and persisted (not a mockup —
+    user explicitly wants richer fields added later, but the core
+    submit/display loop to work now). New `game_ratings` table, RLS
+    strictly self-only on raw rows; `get_game_average_ratings` RPC
+    (security definer, batched per page load) is the only way a
+    cross-user average is ever exposed — never who rated what.
+  - **Known gap**: could not do a live click-through of the row
+    toggles/rating popover specifically — the local dev session was
+    lost when the preview server got restarted mid-session, and
+    re-authenticating needs credentials Claude Code doesn't have.
+    Verified instead that the whole app bundle loads with zero
+    console/transform errors before and after, which would have caught
+    a JSX break in these files (they're statically imported, not
+    lazy-loaded). Worth an actual click-through by whoever picks this
+    up next if anything looks off.
+  - **Xbox/PSN playtime import — investigated, not yet built.** PSN's
+    real gamelist response includes a genuine `playDuration` field
+    (ISO 8601 duration, e.g. `"PT228H56M33S"`) we're not capturing yet
+    — real and addable. Xbox's titlehub response has no equivalent
+    universal field (confirmed against the real
+    OpenXbox/xbox-webapi-python `Title` model — `stats` is per-title
+    and inconsistent, not a clean minutes-played value), so Xbox
+    playtime alongside Steam isn't reliably buildable the same way.
+
 - 2026-09-01 — **Real Crunchyroll account linking (unofficial, cookie-
   based) — first of a planned batch (Crunchyroll done, Kindle and
   Audible next).** Researched which streaming/media services actually
