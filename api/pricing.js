@@ -1623,19 +1623,33 @@ async function handleMasteryCron(req, res) {
     ...steamByUserId.keys(),
   ])];
 
+  // Concurrent, not sequential — confirmed live as the real cause of a
+  // silent per-user failure: with users processed one at a time (each
+  // needing several sequential external API round-trips — Steam, then
+  // Xbox, then PSN), a second user pushed the function past Vercel's
+  // default duration limit (no maxDuration was set at all before this
+  // fix). A timeout just kills the function outright — no exception,
+  // no entry in `failed`, the DB write for that user simply never
+  // happens — which is exactly what was found: a friend's Xbox/PSN
+  // tokens hadn't refreshed in 4 days even though the tokens
+  // themselves were still completely valid when tested directly.
   const results = { total: userIds.length, gamingUpdated: 0, overallUpdated: 0, noData: 0, failed: 0 };
-  for (const userId of userIds) {
-    try {
-      const freshGamingScore = await recomputeMasteryForUserServerSide(adminClient, userId, steamByUserId.get(userId));
-      if (freshGamingScore != null) results.gamingUpdated += 1;
-      else results.noData += 1;
+  const outcomes = await Promise.allSettled(userIds.map(async (userId) => {
+    const freshGamingScore = await recomputeMasteryForUserServerSide(adminClient, userId, steamByUserId.get(userId));
+    const overallUpdated = await recomputeOverallMasteryServerSide(adminClient, userId, freshGamingScore);
+    return { freshGamingScore, overallUpdated };
+  }));
 
-      const overallUpdated = await recomputeOverallMasteryServerSide(adminClient, userId, freshGamingScore);
-      if (overallUpdated) results.overallUpdated += 1;
-    } catch (err) {
-      console.error(`pricing (mastery-cron): failed for user ${userId}`, err);
+  for (let i = 0; i < outcomes.length; i++) {
+    const outcome = outcomes[i];
+    if (outcome.status === "rejected") {
+      console.error(`pricing (mastery-cron): failed for user ${userIds[i]}`, outcome.reason);
       results.failed += 1;
+      continue;
     }
+    if (outcome.value.freshGamingScore != null) results.gamingUpdated += 1;
+    else results.noData += 1;
+    if (outcome.value.overallUpdated) results.overallUpdated += 1;
   }
 
   return res.status(200).json(results);

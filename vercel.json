@@ -4,5 +4,10 @@
       "path": "/api/pricing?service=mastery-cron",
       "schedule": "0 4 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "api/pricing.js": {
+      "maxDuration": 60
+    }
+  }
 }
